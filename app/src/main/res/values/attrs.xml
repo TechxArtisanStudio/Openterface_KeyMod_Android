@@ -1,0 +1,6 @@
+<!-- res/values/attrs.xml -->
+<resources>
+    <declare-styleable name="Keyboard">
+        <attr name="keySymbolLabel" format="string" />
+    </declare-styleable>
+</resources>

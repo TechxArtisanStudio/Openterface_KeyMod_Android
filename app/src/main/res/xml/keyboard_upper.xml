@@ -32,7 +32,7 @@
         <Key android:codes="-5" android:keyLabel="Del" android:keyWidth="15%p" />
     </Row>
     <Row>
-        <Key android:codes="1000" android:keyLabel="Caps" android:keyWidth="15%p" />
+        <Key android:codes="20" android:keyLabel="Caps" android:keyWidth="15%p" />
         <Key android:codes="65" android:keyLabel="A" />
         <Key android:codes="83" android:keyLabel="S" />
         <Key android:codes="68" android:keyLabel="D" />

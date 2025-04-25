@@ -3,6 +3,10 @@ package com.example.dual_modekeyboard;
 import android.content.Context;
 import android.graphics.Color;
 import android.text.Editable;
+import android.text.Spannable;
+import android.text.SpannableString;
+import android.text.style.AbsoluteSizeSpan;
+import android.text.style.ForegroundColorSpan;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.View;
@@ -22,6 +26,10 @@ public class CustomKeyboardView extends LinearLayout {
     private EditText editText;
     private boolean isCaps = false;
     private boolean isCapsLocked = false;
+    private boolean isShiftLeftLocked = false;
+    private boolean isCtrlLeftLocked = false;
+    private boolean isAltLeftLocked = false;
+    private boolean isWinLeftLocked = false;
     private boolean isSymbolMode = false;
     private List<List<Key>> lowerKeys;
     private List<List<Key>> upperKeys;
@@ -29,12 +37,14 @@ public class CustomKeyboardView extends LinearLayout {
 
     private static class Key {
         String label;
+        String symbolLabel; // New field for secondary label
         int code;
         float widthPercent;
         int iconResId;
 
-        Key(String label, int code, float widthPercent, int iconResId) {
+        Key(String label, String symbolLabel, int code, float widthPercent, int iconResId) {
             this.label = label;
+            this.symbolLabel = symbolLabel;
             this.code = code;
             this.widthPercent = widthPercent;
             this.iconResId = iconResId;
@@ -62,6 +72,7 @@ public class CustomKeyboardView extends LinearLayout {
         List<List<Key>> rows = new ArrayList<>();
         List<Key> currentRow = null;
         final String ANDROID_NS = "http://schemas.android.com/apk/res/android";
+        final String CUSTOM_NS = "http://schemas.android.com/apk/res-auto";
 
         try {
             XmlPullParser parser = context.getResources().getXml(resourceId);
@@ -78,6 +89,13 @@ public class CustomKeyboardView extends LinearLayout {
                         if (label == null) {
                             label = "";
                             System.out.println("Warning: android:keyLabel is missing");
+                        }
+
+                        // get custom:keySymbolLabel
+                        String symbolLabel = parser.getAttributeValue(CUSTOM_NS, "keySymbolLabel");
+                        if (symbolLabel == null) {
+                            symbolLabel = "";
+                            System.out.println("Warning: custom:keySymbolLabel is missing");
                         }
 
                         // get android:codes
@@ -108,13 +126,13 @@ public class CustomKeyboardView extends LinearLayout {
                         if (label.equals("Win")) {
                             iconResId = R.drawable.windows; // direct use R.drawable.windows
                             System.out.println("Hardcoded icon for Win: " + iconResId);
-                        } else if (label.equals("Del")) {
+                        } else if (label.equals("BackSpace")) {
                             iconResId = R.drawable.backspace; // direct use R.drawable.backspace
-                            System.out.println("Hardcoded icon for Del: " + iconResId);
+                            System.out.println("Hardcoded icon for BackSpace: " + iconResId);
                         }
 
-                        System.out.println("Parsed Key: label=" + label + ", code=" + code + ", width=" + widthPercent + ", icon=" + iconResId);
-                        currentRow.add(new Key(label, code, widthPercent, iconResId));
+                        System.out.println("Parsed Key: label=" + label + ", symbolLabel=" + symbolLabel + ", code=" + code + ", width=" + widthPercent + ", icon=" + iconResId);
+                        currentRow.add(new Key(label, symbolLabel, code, widthPercent, iconResId));
                     }
                 } else if (eventType == XmlPullParser.END_TAG) {
                     if ("Row".equals(parser.getName()) && currentRow != null) {
@@ -158,18 +176,7 @@ public class CustomKeyboardView extends LinearLayout {
                 LayoutParams params = new LayoutParams(0, dpToPx(60), weight);
                 params.setMargins(2, 2, 2, 2);
 
-                if (key.label.equals("Win")) {
-                    // use ImageButton display the centered icon
-                    ImageButton imageButton = new ImageButton(getContext());
-                    imageButton.setLayoutParams(params);
-                    imageButton.setBackgroundResource(R.drawable.key_background);
-                    if (key.iconResId != 0) {
-                        imageButton.setImageResource(key.iconResId);
-                        imageButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
-                    }
-                    imageButton.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
-                    button = imageButton;
-                }else if (key.label.equals("Del")) {
+                if (key.label.equals("Win") || key.label.equals("BackSpace")) {
                     // use ImageButton display the centered icon
                     ImageButton imageButton = new ImageButton(getContext());
                     imageButton.setLayoutParams(params);
@@ -181,16 +188,31 @@ public class CustomKeyboardView extends LinearLayout {
                     imageButton.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
                     button = imageButton;
                 } else {
-                    // Use of other keys Button
+                    // Use Button for other keys
                     Button textButton = new Button(getContext());
                     textButton.setLayoutParams(params);
-                    if (key.iconResId == 0 || !key.label.isEmpty()) {
-                        textButton.setText(key.label);
-                        textButton.setTextSize(18);
-                    }
-                    textButton.setTextColor(Color.BLACK);
                     textButton.setBackgroundResource(R.drawable.key_background);
                     textButton.setGravity(Gravity.CENTER);
+
+                    if (key.iconResId == 0 && !key.label.isEmpty()) {
+                        if (!key.symbolLabel.isEmpty() && !isSymbolMode) {
+                            // Combine primary and secondary labels
+                            String combinedText = key.symbolLabel + "\n" + key.label;
+                            SpannableString spannable = new SpannableString(combinedText);
+                            // Style secondary label (gray, top)
+                            spannable.setSpan(new ForegroundColorSpan(Color.BLACK), 0, key.symbolLabel.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                            // Style primary label (black, below)
+                            spannable.setSpan(new ForegroundColorSpan(Color.BLACK), key.symbolLabel.length() + 1, combinedText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                            textButton.setText(spannable);
+//                            textButton.setTextSize(18); // Keep default size for both labels
+                        } else {
+                            // Show only primary label or symbol label in symbol mode
+                            textButton.setText(isSymbolMode && !key.symbolLabel.isEmpty() ? key.symbolLabel : key.label);
+//                            textButton.setTextSize(18);
+                            textButton.setTextColor(Color.BLACK);
+                        }
+                    }
+
                     if (key.iconResId != 0) {
                         textButton.setCompoundDrawablesWithIntrinsicBounds(0, key.iconResId, 0, 0);
                         textButton.setCompoundDrawablePadding(dpToPx(4));
@@ -211,41 +233,46 @@ public class CustomKeyboardView extends LinearLayout {
         int start = editText.getSelectionStart();
         int end = editText.getSelectionEnd();
 
-        switch (key.code) {
-            case -5: // Delete
-                if (start > 0 && start == end) {
-                    editable.delete(start - 1, start);
-                } else if (start != end) {
-                    editable.delete(start, end);
-                }
-                break;
-            case -1: // Shift
-                if (!isCapsLocked) {
-                    isCaps = !isCaps;
+        if (isSymbolMode && !key.symbolLabel.isEmpty()) {
+            // In symbol mode, insert the symbolLabel
+            editable.insert(start, key.symbolLabel);
+        } else {
+            switch (key.code) {
+                case 8: // BackSpace
+                    if (start > 0 && start == end) {
+                        editable.delete(start - 1, start);
+                    } else if (start != end) {
+                        editable.delete(start, end);
+                    }
+                    break;
+                case 20: // Caps Lock
+                    isCapsLocked = !isCapsLocked;
+                    isCaps = isCapsLocked;
                     updateKeyboard();
-                }
-                break;
-            case 1000: // Caps Lock
-                isCapsLocked = !isCapsLocked;
-                isCaps = isCapsLocked;
-                updateKeyboard();
-                break;
-            case 1001: // Symbol/Numeric toggle
-                isSymbolMode = !isSymbolMode;
-                updateKeyboard();
-                break;
-            case -4: // Enter
-                editable.insert(start, "\n");
-                break;
-            case 32: // Space
-                editable.insert(start, " ");
-                break;
-            case 9: // Tab
-                editable.insert(start, "\t");
-                break;
-            default:
-                editable.insert(start, String.valueOf((char) key.code));
-                break;
+                    break;
+                case -1: // Shift
+                    if (!isCapsLocked) {
+                        isCaps = !isCaps;
+                        updateKeyboard();
+                    }
+                    break;
+                case 1001: // Symbol/Numeric toggle
+                    isSymbolMode = !isSymbolMode;
+                    updateKeyboard();
+                    break;
+                case -4: // Enter
+                    editable.insert(start, "\n");
+                    break;
+                case 32: // Space
+                    editable.insert(start, " ");
+                    break;
+                case 9: // Tab
+                    editable.insert(start, "\t");
+                    break;
+                default:
+                    editable.insert(start, String.valueOf((char) key.code));
+                    break;
+            }
         }
     }
 
