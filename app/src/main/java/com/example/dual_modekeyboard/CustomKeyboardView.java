@@ -1,146 +1,15 @@
-//package com.example.dual_modekeyboard;
-//
-//import android.content.Context;
-//import android.inputmethodservice.Keyboard;
-//import android.inputmethodservice.KeyboardView;
-//import android.text.Editable;
-//import android.util.AttributeSet;
-//import android.widget.EditText;
-//
-//import java.util.List;
-//
-//public class CustomKeyboardView extends KeyboardView {
-//    private EditText editText;
-//    private Keyboard keyboardLower;
-//    private Keyboard keyboardUpper;
-//    private Keyboard keyboardSymbol;
-//    private boolean isCaps = false;
-//    private boolean isCapsLocked = false;
-//    private boolean isSymbolMode = false;
-//
-//    public CustomKeyboardView(Context context, AttributeSet attrs) {
-//        super(context, attrs);
-//        init(context);
-//    }
-//
-//    private void init(Context context) {
-//        setOnKeyboardActionListener(new KeyboardActionListener());
-//        keyboardLower = new Keyboard(context, R.xml.keyboard_lower);
-//        keyboardUpper = new Keyboard(context, R.xml.keyboard_upper);
-//        keyboardSymbol = new Keyboard(context, R.xml.keyboard_symbol);
-//        setKeyboard(keyboardLower);
-////        setPreviewEnabled(false); // Disable key preview
-//    }
-//
-//    public void setEditText(EditText editText) {
-//        this.editText = editText;
-//    }
-//
-//    private class KeyboardActionListener implements OnKeyboardActionListener {
-//        @Override
-//        public void onKey(int primaryCode, int[] keyCodes) {
-//            if (editText == null) return;
-//            Editable editable = editText.getText();
-//            int start = editText.getSelectionStart();
-//            int end = editText.getSelectionEnd();
-//
-//            switch (primaryCode) {
-//                case Keyboard.KEYCODE_DELETE:
-//                    if (start > 0 && start == end) {
-//                        editable.delete(start - 1, start);
-//                    } else if (start != end) {
-//                        editable.delete(start, end);
-//                    }
-//                    break;
-//                case Keyboard.KEYCODE_SHIFT:
-//                    if (!isCapsLocked) {
-//                        isCaps = !isCaps;
-//                        setKeyboard(isSymbolMode ? keyboardSymbol : (isCaps ? keyboardUpper : keyboardLower));
-//                    }
-//                    break;
-//                case 1000: // Caps Lock
-//                    System.out.println("Caps lock pressed");
-//                    isCapsLocked = !isCapsLocked;
-//                    isCaps = isCapsLocked;
-//                    changeCapital(isCaps);
-//                    setKeyboard(keyboardLower);
-////                    setKeyboard(isSymbolMode ? keyboardSymbol : (isCaps ? keyboardUpper : keyboardLower));
-//                    break;
-//                case 1001: // Symbol/Numeric toggle
-//                    isSymbolMode = !isSymbolMode;
-//                    setKeyboard(isSymbolMode ? keyboardSymbol : (isCaps ? keyboardUpper : keyboardLower));
-//                    break;
-//                case Keyboard.KEYCODE_DONE:
-//                    editable.insert(start, "\n");
-//                    break;
-//                case 32: // Space
-//                    editable.insert(start, " ");
-//                    break;
-//                default:
-//                    editable.insert(start, String.valueOf((char) primaryCode));
-//                    break;
-//            }
-//        }
-//
-//        private void changeCapital(boolean b) {
-//            isCaps = b;
-//            List<Keyboard.Key> lists = keyboardLower.getKeys();
-//            for (Keyboard.Key key : lists) {
-//                if (key.label != null && isKey(key.label.toString())) {
-//                    if (isCaps) {
-//                        key.label = key.label.toString().toUpperCase();
-//                        key.codes[0] = key.codes[0] - 32;
-//                    } else {
-//                        key.label = key.label.toString().toLowerCase();
-//                        key.codes[0] = key.codes[0] + 32;
-//                    }
-//                }
-//            }
-//        }
-//
-//        private boolean isKey(String key) {
-//            String lowercase = "abcdefghijklmnopqrstuvwxyz";
-//            if (lowercase.indexOf(key.toLowerCase()) > -1) {
-//                return true;
-//            }
-//            return false;
-//        }
-//
-//
-//        @Override
-//        public void onPress(int primaryCode) {}
-//        @Override
-//        public void onRelease(int primaryCode) {}
-//        @Override
-//        public void onText(CharSequence text) {}
-//        @Override
-//        public void swipeDown() {}
-//        @Override
-//        public void swipeLeft() {}
-//        @Override
-//        public void swipeRight() {}
-//        @Override
-//        public void swipeUp() {}
-//    }
-//}
-
 package com.example.dual_modekeyboard;
 
 import android.content.Context;
 import android.graphics.Color;
-import android.graphics.drawable.Drawable;
 import android.text.Editable;
 import android.util.AttributeSet;
-import android.util.Xml;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
-
-import androidx.core.content.ContextCompat;
-import androidx.core.graphics.drawable.DrawableCompat;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -204,14 +73,14 @@ public class CustomKeyboardView extends LinearLayout {
                         currentRow = new ArrayList<>();
                         System.out.println("Parsing new Row");
                     } else if ("Key".equals(tag) && currentRow != null) {
-                        // 获取 android:keyLabel
+                        // get android:keyLabel
                         String label = parser.getAttributeValue(ANDROID_NS, "keyLabel");
                         if (label == null) {
                             label = "";
                             System.out.println("Warning: android:keyLabel is missing");
                         }
 
-                        // 获取 android:codes
+                        // get android:codes
                         String codeStr = parser.getAttributeValue(ANDROID_NS, "codes");
                         int code = 0;
                         try {
@@ -220,7 +89,7 @@ public class CustomKeyboardView extends LinearLayout {
                             System.out.println("Warning: Invalid android:codes value: " + codeStr);
                         }
 
-                        // 获取 android:keyWidth
+                        // get android:keyWidth
                         String widthStr = parser.getAttributeValue(ANDROID_NS, "keyWidth");
                         float widthPercent = 10.0f;
                         if (widthStr != null) {
@@ -237,13 +106,10 @@ public class CustomKeyboardView extends LinearLayout {
 
                         int iconResId = 0;
                         if (label.equals("Win")) {
-                            iconResId = R.drawable.windows; // 直接使用 R.drawable.windows
+                            iconResId = R.drawable.windows; // direct use R.drawable.windows
                             System.out.println("Hardcoded icon for Win: " + iconResId);
                         } else if (label.equals("Del")) {
-                            iconResId = R.drawable.backspace; // 直接使用 R.drawable.windows
-                            System.out.println("Hardcoded icon for Del: " + iconResId);
-                        }else if (label.equals("Enter")) {
-                            iconResId = R.drawable.arrow_return_left; // 直接使用 R.drawable.windows
+                            iconResId = R.drawable.backspace; // direct use R.drawable.backspace
                             System.out.println("Hardcoded icon for Del: " + iconResId);
                         }
 
@@ -293,7 +159,7 @@ public class CustomKeyboardView extends LinearLayout {
                 params.setMargins(2, 2, 2, 2);
 
                 if (key.label.equals("Win")) {
-                    // 使用 ImageButton 显示居中图标
+                    // use ImageButton display the centered icon
                     ImageButton imageButton = new ImageButton(getContext());
                     imageButton.setLayoutParams(params);
                     imageButton.setBackgroundResource(R.drawable.key_background);
@@ -304,7 +170,7 @@ public class CustomKeyboardView extends LinearLayout {
                     imageButton.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
                     button = imageButton;
                 }else if (key.label.equals("Del")) {
-                    // 使用 ImageButton 显示居中图标
+                    // use ImageButton display the centered icon
                     ImageButton imageButton = new ImageButton(getContext());
                     imageButton.setLayoutParams(params);
                     imageButton.setBackgroundResource(R.drawable.key_background);
@@ -314,23 +180,8 @@ public class CustomKeyboardView extends LinearLayout {
                     }
                     imageButton.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
                     button = imageButton;
-                } else if (key.label.equals("Enter")) {
-                    Button textButton = new Button(getContext());
-                    textButton.setLayoutParams(params);
-                    if (key.iconResId == 0 || !key.label.isEmpty()) {
-                        textButton.setText(key.label);
-                        textButton.setTextSize(18);
-                    }
-                    textButton.setTextColor(Color.BLACK);
-                    textButton.setBackgroundResource(R.drawable.key_background);
-                    textButton.setGravity(Gravity.CENTER);
-                    if (key.iconResId != 0) {
-                        textButton.setCompoundDrawablesWithIntrinsicBounds(0, 0, key.iconResId, 0);
-                        textButton.setCompoundDrawablePadding(dpToPx(0));
-                    }
-                    button = textButton;
-                }else {
-                    // 其他键使用 Button
+                } else {
+                    // Use of other keys Button
                     Button textButton = new Button(getContext());
                     textButton.setLayoutParams(params);
                     if (key.iconResId == 0 || !key.label.isEmpty()) {
