@@ -3,23 +3,38 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="2dp"
     android:gravity="center_horizontal">
-
     <EditText
         android:id="@+id/editText"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
+        android:layout_weight="3"
         android:hint="Type here"
         android:inputType="text|textMultiLine"
         android:imeOptions="actionNone" />
 
-    <com.example.dual_modekeyboard.CustomKeyboardView
-        android:id="@+id/keyboard_view"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:keyBackground="@drawable/key_background"
-        android:theme="@style/ButtonTheme"/>
+        android:layout_height="0dp"
+        android:layout_weight="8"
+        android:orientation="horizontal">
+
+        <com.example.dual_modekeyboard.TouchPadView
+            android:id="@+id/touchPad"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="4"
+        android:background="#F0F0F0" />
+
+        <com.example.dual_modekeyboard.CustomKeyboardView
+            android:id="@+id/keyboard_view"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="8"
+            android:layout_gravity="center_horizontal"
+            android:keyBackground="@drawable/key_background"
+            android:theme="@style/ButtonTheme" />
+    </LinearLayout>
 
 </LinearLayout>
