@@ -7,7 +7,6 @@ import android.os.Handler;
 import android.text.Editable;
 import android.text.Spannable;
 import android.text.SpannableString;
-import android.text.style.AbsoluteSizeSpan;
 import android.text.style.ForegroundColorSpan;
 import android.util.AttributeSet;
 import android.view.Gravity;
@@ -70,6 +69,7 @@ public class CustomKeyboardView extends LinearLayout {
         upperKeys = parseKeyboard(context, R.xml.keyboard_upper);
         symbolKeys = parseKeyboard(context, R.xml.keyboard_symbol);
         shiftKeys = parseKeyboard(context, R.xml.keyboard_shift);
+        System.out.println("Parsed keyboards: lowerKeys=" + lowerKeys.size() + ", upperKeys=" + upperKeys.size() + ", symbolKeys=" + symbolKeys.size() + ", shiftKeys=" + shiftKeys.size());
         updateKeyboard();
     }
 
@@ -91,18 +91,16 @@ public class CustomKeyboardView extends LinearLayout {
                     String tag = parser.getName();
                     if ("Row".equals(tag)) {
                         currentRow = new ArrayList<>();
-                        System.out.println("Parsing new Row");
+                        System.out.println("Parsing new Row for resource ID: " + resourceId);
                     } else if ("Key".equals(tag) && currentRow != null) {
-                        // Get android:keyLabel
                         String label = parser.getAttributeValue(ANDROID_NS, "keyLabel");
                         if (label == null) {
                             label = "";
                             System.out.println("Warning: android:keyLabel is missing");
                         } else {
                             try {
-                                // Check if label is a resource ID (e.g., "@2131689646")
                                 if (label.startsWith("@") && label.length() > 1) {
-                                    String idStr = label.substring(1); // Remove "@"
+                                    String idStr = label.substring(1);
                                     try {
                                         int resId = Integer.parseInt(idStr);
                                         label = context.getResources().getString(resId);
@@ -114,7 +112,6 @@ public class CustomKeyboardView extends LinearLayout {
                                         e.printStackTrace();
                                     }
                                 } else {
-                                    // Treat as literal string or unresolved resource name
                                     String resourceName = label.startsWith("@string/") ? label.substring("@string/".length()) : label;
                                     int resId = context.getResources().getIdentifier(resourceName, "string", context.getPackageName());
                                     if (resId != 0) {
@@ -122,7 +119,6 @@ public class CustomKeyboardView extends LinearLayout {
                                         System.out.println("Resolved string resource " + resourceName + " to: " + label);
                                     } else {
                                         System.out.println("Warning: String resource not found for keyLabel: " + label);
-                                        // Use label as is (literal string)
                                     }
                                 }
                             } catch (Resources.NotFoundException e) {
@@ -131,14 +127,12 @@ public class CustomKeyboardView extends LinearLayout {
                             }
                         }
 
-                        // Get custom:keySymbolLabel
                         String symbolLabel = parser.getAttributeValue(CUSTOM_NS, "keySymbolLabel");
                         if (symbolLabel == null) {
                             symbolLabel = "";
                             System.out.println("Warning: custom:keySymbolLabel is missing");
                         }
 
-                        // Get android:codes
                         String codeStr = parser.getAttributeValue(ANDROID_NS, "codes");
                         int code = 0;
                         try {
@@ -147,7 +141,6 @@ public class CustomKeyboardView extends LinearLayout {
                             System.out.println("Warning: Invalid android:codes value: " + codeStr);
                         }
 
-                        // Get android:keyWidth
                         String widthStr = parser.getAttributeValue(ANDROID_NS, "keyWidth");
                         float widthPercent = 10.0f;
                         if (widthStr != null) {
@@ -162,7 +155,6 @@ public class CustomKeyboardView extends LinearLayout {
                             }
                         }
 
-                        // Get android:horizontalGap
                         String gapStr = parser.getAttributeValue(ANDROID_NS, "horizontalGap");
                         float horizontalGap = 0.0f;
                         if (gapStr != null) {
@@ -177,7 +169,6 @@ public class CustomKeyboardView extends LinearLayout {
                             }
                         }
 
-                        // Get android:isRepeatable
                         String isRepeatableStr = parser.getAttributeValue(ANDROID_NS, "isRepeatable");
                         boolean isRepeatable = false;
                         if (isRepeatableStr != null) {
@@ -219,17 +210,25 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void updateKeyboard() {
+        System.out.println("Updating keyboard: isSymbolMode=" + isSymbolMode + ", isCaps=" + isCaps);
         removeAllViews();
-        List<List<Key>> currentKeys = isSymbolMode ? shiftKeys : (isCaps ? upperKeys : lowerKeys);
+        List<List<Key>> currentKeys;
+        if (isSymbolMode) {
+            currentKeys = shiftKeys;
+        } else if (isCaps) {
+            currentKeys = upperKeys;
+        } else {
+            currentKeys = lowerKeys;
+        }
 
-        // Obtain the screen height
         int screenHeight = getContext().getResources().getDisplayMetrics().heightPixels;
         int screenWidth = getContext().getResources().getDisplayMetrics().widthPixels;
-        int keyboardHeight = (int)(screenHeight * 1);
-        //Calculate the height of each row (10% of the total keyboard height)
+        int keyboardHeight = screenHeight;
         int rowHeight = keyboardHeight / 10;
 
         System.out.println("Screen Height: " + screenHeight + ", Screen Width: " + screenWidth + ", Row Height: " + rowHeight);
+
+        int[] functionalKeyCodes = {1001, 1002, 121, 124, 3, 92, 112, 1005, 93};
 
         for (List<Key> row : currentKeys) {
             LinearLayout rowLayout = new LinearLayout(getContext());
@@ -247,13 +246,19 @@ public class CustomKeyboardView extends LinearLayout {
                 LayoutParams params = new LayoutParams(0, LayoutParams.MATCH_PARENT, weight);
                 params.setMargins(2, 2, 2, 2);
 
-                // Add horizontal spacing
                 if (key.horizontalGap > 0) {
                     params.setMargins((int)(key.horizontalGap * getContext().getResources().getDisplayMetrics().widthPixels / 100), 2, 2, 2);
                 }
 
+                boolean isFunctionalKey = false;
+                for (int functionCode : functionalKeyCodes) {
+                    if (key.code == functionCode) {
+                        isFunctionalKey = true;
+                        break;
+                    }
+                }
+
                 if (key.label.equals("Win") || key.label.equals("BackSpace")) {
-                    // use ImageButton display the centered icon
                     ImageButton imageButton = new ImageButton(getContext());
                     imageButton.setLayoutParams(params);
                     imageButton.setBackgroundResource(R.drawable.key_background);
@@ -264,32 +269,33 @@ public class CustomKeyboardView extends LinearLayout {
                     imageButton.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
                     button = imageButton;
                 } else {
-                    // Use Button for other keys
                     Button textButton = new Button(getContext());
                     textButton.setLayoutParams(params);
                     textButton.setBackgroundResource(R.drawable.key_background);
                     textButton.setGravity(Gravity.CENTER);
 
-                    if (key.code == 16 && isShiftLeftLocked) {
+                    if (isFunctionalKey) {
+                        textButton.setBackgroundResource(R.drawable.function_button_background);
+                    } else if (key.code == 16 && isShiftLeftLocked) {
                         textButton.setBackgroundResource(R.drawable.press_button_background);
-                        textButton.setSelected(isSymbolMode || isCaps);
+                        textButton.setSelected(isSymbolMode);
                     } else if (key.code == 20 && isCapsLocked) {
                         textButton.setBackgroundResource(R.drawable.press_button_background);
-                        textButton.setSelected(isSymbolMode || isCaps);
-                    } else {
+                        textButton.setSelected(isCaps);
+                    } else if (key.code == 16) {
                         textButton.setBackgroundResource(R.drawable.key_background);
                     }
-                    textButton.setGravity(Gravity.CENTER);
 
                     if (key.iconResId == 0 && !key.label.isEmpty()) {
+                        String displayLabel = key.label;
                         if (!key.symbolLabel.isEmpty() && !isSymbolMode) {
-                            String combinedText = key.symbolLabel + "\n" + key.label;
+                            String combinedText = key.symbolLabel + "\n" + displayLabel;
                             SpannableString spannable = new SpannableString(combinedText);
                             spannable.setSpan(new ForegroundColorSpan(Color.BLACK), 0, key.symbolLabel.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
                             spannable.setSpan(new ForegroundColorSpan(Color.BLACK), key.symbolLabel.length() + 1, combinedText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
                             textButton.setText(spannable);
                         } else {
-                            textButton.setText(isSymbolMode && !key.symbolLabel.isEmpty() ? key.symbolLabel : key.label);
+                            textButton.setText(isSymbolMode && !key.symbolLabel.isEmpty() ? key.symbolLabel : displayLabel);
                             textButton.setTextColor(Color.BLACK);
                         }
                     }
@@ -303,7 +309,6 @@ public class CustomKeyboardView extends LinearLayout {
 
                 button.setOnClickListener(v -> handleKeyPress(key));
 
-                // Add long press processing
                 if (key.isRepeatable) {
                     button.setOnLongClickListener(v -> {
                         startRepeatingDelete(key);
@@ -324,17 +329,21 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void handleKeyPress(Key key) {
-        if (editText == null) return;
+        System.out.println("Key pressed: label=" + key.label + ", code=" + key.code);
+        if (editText == null) {
+            System.out.println("Error: EditText is null");
+            return;
+        }
         Editable editable = editText.getText();
         int start = editText.getSelectionStart();
         int end = editText.getSelectionEnd();
 
+        boolean resetSymbolMode = false;
         if (isSymbolMode && !key.symbolLabel.isEmpty()) {
-            // In symbol mode, insert the symbolLabel
             editable.insert(start, key.symbolLabel);
         } else {
             switch (key.code) {
-                case 8: // BackSpace
+                case -5: // BackSpace
                     if (start > 0 && start == end) {
                         editable.delete(start - 1, start);
                     } else if (start != end) {
@@ -344,15 +353,21 @@ public class CustomKeyboardView extends LinearLayout {
                 case 20: // Caps Lock
                     isCapsLocked = !isCapsLocked;
                     isCaps = isCapsLocked;
+                    isSymbolMode = false; // Reset symbol mode when Caps Lock toggles
+                    isShiftLeftLocked = false;
                     updateKeyboard();
                     break;
                 case 16: // Shift
                     isSymbolMode = !isSymbolMode;
                     isShiftLeftLocked = !isShiftLeftLocked;
+                    isCaps = false; // Reset Caps Lock when Shift toggles
+                    isCapsLocked = false;
+                    resetSymbolMode = isSymbolMode; // Reset symbol mode after one keypress
                     updateKeyboard();
                     break;
-                case 1001: // Symbol/Numeric toggle
+                case 1008: // Symbol toggle
                     isSymbolMode = !isSymbolMode;
+                    isShiftLeftLocked = false;
                     updateKeyboard();
                     break;
                 case -4: // Enter
@@ -364,8 +379,62 @@ public class CustomKeyboardView extends LinearLayout {
                 case 9: // Tab
                     editable.insert(start, "\t");
                     break;
+                case 1001: // PrtSc
+                    editable.insert(start, "[PrtSc]");
+                    break;
+                case 1002: // ScrLk
+                    editable.insert(start, "[ScrLk]");
+                    break;
+                case 1005: // End
+                    editable.insert(start, "[End]");
+                    break;
+                case 1007: // Fn
+                    editable.insert(start, "[Fn]");
+                    break;
+                case 131: // F1
+                    editable.insert(start, "[F1]");
+                    break;
+                case 132: // F2
+                    editable.insert(start, "[F2]");
+                    break;
+                case 133: // F3
+                    editable.insert(start, "[F3]");
+                    break;
+                case 134: // F4
+                    editable.insert(start, "[F4]");
+                    break;
+                case 135: // F5
+                    editable.insert(start, "[F5]");
+                    break;
+                case 136: // F6
+                    editable.insert(start, "[F6]");
+                    break;
+                case 137: // F7
+                    editable.insert(start, "[F7]");
+                    break;
+                case 138: // F8
+                    editable.insert(start, "[F8]");
+                    break;
+                case 139: // F9
+                    editable.insert(start, "[F9]");
+                    break;
+                case 140: // F10
+                    editable.insert(start, "[F10]");
+                    break;
+                case 141: // F11
+                    editable.insert(start, "[F11]");
+                    break;
+                case 142: // F12
+                    editable.insert(start, "[F12]");
+                    break;
                 default:
-                    editable.insert(start, String.valueOf((char) key.code));
+                    String character = String.valueOf((char) key.code);
+                    editable.insert(start, character);
+                    if (resetSymbolMode && !isCapsLocked) {
+                        isSymbolMode = false;
+                        isShiftLeftLocked = false;
+                        updateKeyboard();
+                    }
                     break;
             }
         }
@@ -378,17 +447,17 @@ public class CustomKeyboardView extends LinearLayout {
     private void startRepeatingDelete(Key key) {
         if (isRepeating) return;
         isRepeating = true;
-        
+
         repeatRunnable = new Runnable() {
             @Override
             public void run() {
                 if (isRepeating) {
                     handleKeyPress(key);
-                    repeatHandler.postDelayed(this, 50); // Deletion is performed every 50 milliseconds
+                    repeatHandler.postDelayed(this, 50);
                 }
             }
         };
-        
+
         repeatHandler.post(repeatRunnable);
     }
 

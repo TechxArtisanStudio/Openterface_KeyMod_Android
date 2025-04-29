@@ -145,5 +145,32 @@
     <string name="Left_arrow">←</string>
     <string name="Right_arrow">→</string>
 
+    <string name="Q_Button_Upper">Q</string>
+    <string name="W_Button_Upper">W</string>
+    <string name="E_Button_Upper">E</string>
+    <string name="R_Button_Upper">R</string>
+    <string name="T_Button_Upper">T</string>
+    <string name="Y_Button_Upper">Y</string>
+    <string name="U_Button_Upper">U</string>
+    <string name="I_Button_Upper">I</string>
+    <string name="O_Button_Upper">O</string>
+    <string name="P_Button_Upper">P</string>
+    <string name="A_Button_Upper">A</string>
+    <string name="S_Button_Upper">S</string>
+    <string name="D_Button_Upper">D</string>
+    <string name="F_Button_Upper">F</string>
+    <string name="G_Button_Upper">G</string>
+    <string name="H_Button_Upper">H</string>
+    <string name="J_Button_Upper">J</string>
+    <string name="K_Button_Upper">K</string>
+    <string name="L_Button_Upper">L</string>
+    <string name="Z_Button_Upper">Z</string>
+    <string name="X_Button_Upper">X</string>
+    <string name="C_Button_Upper">C</string>
+    <string name="V_Button_Upper">V</string>
+    <string name="B_Button_Upper">B</string>
+    <string name="N_Button_Upper">N</string>
+    <string name="M_Button_Upper">M</string>
+    <string name="Symbol">Sym</string>
 
 </resources>
