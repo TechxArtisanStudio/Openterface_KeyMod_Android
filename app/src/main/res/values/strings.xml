@@ -173,4 +173,9 @@
     <string name="M_Button_Upper">M</string>
     <string name="Symbol">Sym</string>
 
+
+    <string-array name="planets_array">
+        <item>Touchpad + Keyboard</item>
+        <item>Full KeyBoard</item>
+    </string-array>
 </resources>

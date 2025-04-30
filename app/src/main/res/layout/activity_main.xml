@@ -82,21 +82,32 @@
         android:layout_weight="7"
         android:orientation="vertical">
 
-        <EditText
-            android:id="@+id/editText"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="2.5"
-            android:hint="connect usb here"
-            android:inputType="text|textMultiLine"
-            android:imeOptions="actionNone" />
+            android:layout_weight="1"
+            android:orientation="horizontal">
+            <EditText
+                android:id="@+id/editText"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="5"
+                android:hint="connect usb here"
+                android:inputType="text|textMultiLine"
+                android:imeOptions="actionNone" />
 
+            <Spinner
+                android:id="@+id/planets_spinner"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="5" />
+        </LinearLayout>
 
         <com.example.dual_modekeyboard.CustomKeyboardView
             android:id="@+id/keyboard_view"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="7"
+            android:layout_weight="9"
             android:layout_gravity="center_horizontal"
             android:keyBackground="@drawable/key_background"
             android:theme="@style/ButtonTheme" />
