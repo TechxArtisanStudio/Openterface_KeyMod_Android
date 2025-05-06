@@ -105,7 +105,7 @@
         <Key android:codes="18" android:keyLabel="@string/Alt" android:keyWidth="10%p"/>
         <Key android:codes="32" android:keyLabel="@string/Space_Button" android:keyWidth="30%p"/>
         <Key android:codes="18" android:keyLabel="@string/Alt" android:keyWidth="10%p"/>
-        <Key android:codes="1008" android:keyLabel="@string/Symbol" android:keyWidth="10%p"/>
+        <Key android:codes="1008" android:keyLabel="@string/Win" android:keyWidth="10%p"/>
         <Key android:codes="1007" android:keyLabel="@string/Fn" android:keyWidth="10%p"/>
         <Key android:codes="17" android:keyLabel="@string/Ctrl" android:keyWidth="10%p"/>
     </Row>

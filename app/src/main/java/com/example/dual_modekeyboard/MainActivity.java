@@ -1,5 +1,12 @@
 package com.example.dual_modekeyboard;
 
+import android.annotation.SuppressLint;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbDeviceConnection;
+import android.hardware.usb.UsbManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -7,9 +14,17 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+
+import com.hoho.android.usbserial.driver.UsbSerialDriver;
+import com.hoho.android.usbserial.driver.UsbSerialPort;
+import com.hoho.android.usbserial.driver.UsbSerialProber;
+
+import java.io.IOException;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
 
@@ -18,11 +33,61 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private CustomKeyboardView keyboardView;
     private Spinner spinner;
 
+    private static final String ACTION_USB_PERMISSION = "com.example.ch32v208serial.USB_PERMISSION";
+    private UsbSerialPort port;
+    private TextView textView;
+
+    @SuppressLint("MissingInflatedId")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         initializeUIComponents(R.layout.activity_main);
+        textView = findViewById(R.id.textView);
+        setupUsbSerial();
+    }
+
+    private void setupUsbSerial() {
+
+        UsbManager manager = (UsbManager) getSystemService(Context.USB_SERVICE);
+        List<UsbSerialDriver> availableDrivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager);
+        if (availableDrivers.isEmpty()) {
+            Toast.makeText(this, "No USB serial devices found", Toast.LENGTH_LONG).show();
+            textView.setText("No USB serial devices found");
+            return;
+        }
+
+        UsbSerialDriver driver = availableDrivers.get(0);
+        UsbDevice device = driver.getDevice();
+        PendingIntent permissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), PendingIntent.FLAG_IMMUTABLE);
+        manager.requestPermission(device, permissionIntent);
+
+        port = driver.getPorts().get(0);
+        try {
+            port.open(manager.openDevice(device));
+            port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
+            Toast.makeText(this, "Successful to open serial port", Toast.LENGTH_LONG).show();
+            textView.setText("Successful to open serial port");
+            // Start a thread to read incoming data
+//            new Thread(() -> {
+//                byte[] buffer = new byte[1024];
+//                while (true) {
+//                    try {
+//                        int len = port.read(buffer, 1000);
+//                        if (len > 0) {
+//                            String received = new String(buffer, 0, len);
+//                            runOnUiThread(() -> receivedText.append(received));
+//                        }
+//                    } catch (IOException e) {
+//                        e.printStackTrace();
+//                        break;
+//                    }
+//                }
+//            }).start();
+        } catch (IOException e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Failed to open serial port", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void initializeUIComponents(int layoutResId) {

@@ -175,7 +175,7 @@
 
 
     <string-array name="planets_array">
-        <item>Touchpad + Keyboard</item>
         <item>Full KeyBoard</item>
+        <item>Touchpad + Keyboard</item>
     </string-array>
 </resources>
