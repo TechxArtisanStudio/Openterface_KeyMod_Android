@@ -42,15 +42,17 @@ public class CustomKeyboardView extends LinearLayout {
         String label;
         String symbolLabel;
         int code;
+        String codeStr;
         float widthPercent;
         int iconResId;
         float horizontalGap;
         boolean isRepeatable;
 
-        Key(String label, String symbolLabel, int code, float widthPercent, int iconResId, float horizontalGap, boolean isRepeatable) {
+        Key(String label, String symbolLabel, int code, String codeStr, float widthPercent, int iconResId, float horizontalGap, boolean isRepeatable) {
             this.label = label;
             this.symbolLabel = symbolLabel;
             this.code = code;
+            this.codeStr = codeStr;
             this.widthPercent = widthPercent;
             this.iconResId = iconResId;
             this.horizontalGap = horizontalGap;
@@ -133,12 +135,13 @@ public class CustomKeyboardView extends LinearLayout {
                             System.out.println("Warning: custom:keySymbolLabel is missing");
                         }
 
-                        String codeStr = parser.getAttributeValue(ANDROID_NS, "codes");
+                        String codeStr = parser.getAttributeValue(ANDROID_NS, "codes"); // 保存原始字符串
                         int code = 0;
                         try {
-                            code = codeStr != null ? Integer.parseInt(codeStr) : 0;
+                            code = codeStr != null ? Integer.parseInt(codeStr, 16) : 0; // 解析为十六进制整数
                         } catch (NumberFormatException e) {
                             System.out.println("Warning: Invalid android:codes value: " + codeStr);
+                            e.printStackTrace();
                         }
 
                         String widthStr = parser.getAttributeValue(ANDROID_NS, "keyWidth");
@@ -184,8 +187,8 @@ public class CustomKeyboardView extends LinearLayout {
                             System.out.println("Hardcoded icon for BackSpace: " + iconResId);
                         }
 
-                        System.out.println("Parsed Key: label=" + label + ", symbolLabel=" + symbolLabel + ", code=" + code + ", width=" + widthPercent + ", icon=" + iconResId + ", gap=" + horizontalGap + ", repeatable=" + isRepeatable);
-                        currentRow.add(new Key(label, symbolLabel, code, widthPercent, iconResId, horizontalGap, isRepeatable));
+                        System.out.println("Parsed Key: label=" + label + ", symbolLabel=" + symbolLabel + ", code=0x" + Integer.toHexString(code).toUpperCase() + ", codeStr=" + codeStr + ", width=" + widthPercent + ", icon=" + iconResId + ", gap=" + horizontalGap + ", repeatable=" + isRepeatable);
+                        currentRow.add(new Key(label, symbolLabel, code, codeStr, widthPercent, iconResId, horizontalGap, isRepeatable));
                     }
                 } else if (eventType == XmlPullParser.END_TAG) {
                     if ("Row".equals(parser.getName()) && currentRow != null) {
@@ -224,11 +227,14 @@ public class CustomKeyboardView extends LinearLayout {
         int screenHeight = getContext().getResources().getDisplayMetrics().heightPixels;
         int screenWidth = getContext().getResources().getDisplayMetrics().widthPixels;
         int keyboardHeight = screenHeight;
-        int rowHeight = keyboardHeight / 10;
+        int rowHeight = keyboardHeight / 8;
 
         System.out.println("Screen Height: " + screenHeight + ", Screen Width: " + screenWidth + ", Row Height: " + rowHeight);
 
-        int[] functionalKeyCodes = {1001, 1002, 121, 124, 3, 92, 112, 1005, 93};
+        String[] functionalKeyCodes = {"46", "47", "48", "49", "4A",
+                "4B", "112", "2A", "4E", "3B", "3C", "3D", "3E", "3F", "29", "3A",
+                "40", "41", "42", "43", "44", "45", "3D", "3F", "35","2B", "39",
+                "28", "E0", "E1", "E3", "E2"};
 
         for (List<Key> row : currentKeys) {
             LinearLayout rowLayout = new LinearLayout(getContext());
@@ -251,9 +257,10 @@ public class CustomKeyboardView extends LinearLayout {
                 }
 
                 boolean isFunctionalKey = false;
-                for (int functionCode : functionalKeyCodes) {
-                    if (key.code == functionCode) {
+                for (String functionCode : functionalKeyCodes) {
+                    if (key.codeStr.equals(functionCode)) {
                         isFunctionalKey = true;
+                        System.out.println("Matched functional key: label=" + key.label + ", code=0x" + Integer.toHexString(key.code));
                         break;
                     }
                 }
@@ -350,14 +357,14 @@ public class CustomKeyboardView extends LinearLayout {
                         editable.delete(start, end);
                     }
                     break;
-                case 20: // Caps Lock
+                case 39: // Caps Lock
                     isCapsLocked = !isCapsLocked;
                     isCaps = isCapsLocked;
                     isSymbolMode = false; // Reset symbol mode when Caps Lock toggles
                     isShiftLeftLocked = false;
                     updateKeyboard();
                     break;
-                case 16: // Shift
+                case 225: // Shift
                     isSymbolMode = !isSymbolMode;
                     isShiftLeftLocked = !isShiftLeftLocked;
                     isCaps = false; // Reset Caps Lock when Shift toggles

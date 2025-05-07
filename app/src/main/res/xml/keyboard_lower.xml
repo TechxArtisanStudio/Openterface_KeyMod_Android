@@ -7,106 +7,132 @@
     android:keyHeight="10%p">
 
     <Row>
-        <Key android:codes="1001" android:keyLabel="@string/PrtSc"/>
-        <Key android:codes="1002" android:keyLabel="@string/ScrLk"/>
-        <Key android:codes="121" android:keyLabel="@string/Pause"/>
-        <Key android:codes="124" android:keyLabel="@string/Ins" android:horizontalGap="1%p"/>
-        <Key android:codes="3" android:keyLabel="@string/Home"/>
-        <Key android:codes="92" android:keyLabel="@string/PgUp"/>
+        <Key android:codes="46" android:keyLabel="@string/PrtSc"/>
+        <Key android:codes="47" android:keyLabel="@string/ScrLk"/>
+        <Key android:codes="48" android:keyLabel="@string/Pause"/>
+        <Key android:codes="49" android:keyLabel="@string/Ins" android:horizontalGap="1%p"/>
+        <Key android:codes="4A" android:keyLabel="@string/Home"/>
+        <Key android:codes="4B" android:keyLabel="@string/PgUp"/>
         <Key android:codes="112" android:keyLabel="@string/Delete" android:horizontalGap="1%p"/>
-        <Key android:codes="1005" android:keyLabel="@string/End"/>
-        <Key android:codes="93" android:keyLabel="@string/PgDn"/>
+        <Key android:codes="2A" android:keyLabel="@string/End"/>
+        <Key android:codes="4E" android:keyLabel="@string/PgDn"/>
     </Row>
 
     <Row>
-        <Key android:codes="27" android:keyLabel="@string/Esc"/>
-        <Key android:codes="131" android:keyLabel="@string/Function1" android:horizontalGap="0.5%p"/>
-        <Key android:codes="132" android:keyLabel="@string/Function2"/>
-        <Key android:codes="133" android:keyLabel="@string/Function3"/>
-        <Key android:codes="134" android:keyLabel="@string/Function4"/>
-        <Key android:codes="135" android:keyLabel="@string/Function5" android:horizontalGap="0.5%p"/>
-        <Key android:codes="136" android:keyLabel="@string/Function6"/>
-        <Key android:codes="137" android:keyLabel="@string/Function7"/>
-        <Key android:codes="138" android:keyLabel="@string/Function8"/>
-        <Key android:codes="139" android:keyLabel="@string/Function9" android:horizontalGap="0.5%p"/>
-        <Key android:codes="140" android:keyLabel="@string/Function10"/>
-        <Key android:codes="141" android:keyLabel="@string/Function11"/>
-        <Key android:codes="142" android:keyLabel="@string/Function12"/>
+        <Key android:codes="29" android:keyLabel="@string/Esc"/>
+        <Key android:codes="3A" android:keyLabel="@string/Function1" android:horizontalGap="0.5%p"/>
+        <Key android:codes="3B" android:keyLabel="@string/Function2"/>
+        <Key android:codes="3C" android:keyLabel="@string/Function3"/>
+        <Key android:codes="3D" android:keyLabel="@string/Function4"/>
+        <Key android:codes="3E" android:keyLabel="@string/Function5" android:horizontalGap="0.5%p"/>
+        <Key android:codes="3F" android:keyLabel="@string/Function6"/>
+        <Key android:codes="40" android:keyLabel="@string/Function7"/>
+        <Key android:codes="41" android:keyLabel="@string/Function8"/>
+        <Key android:codes="42" android:keyLabel="@string/Function9" android:horizontalGap="0.5%p"/>
+        <Key android:codes="43" android:keyLabel="@string/Function10"/>
+        <Key android:codes="44" android:keyLabel="@string/Function11"/>
+        <Key android:codes="45" android:keyLabel="@string/Function12"/>
     </Row>
 
     <Row>
-        <Key android:codes="192" android:keyLabel="@string/Tilde_Button"/>
-        <Key android:codes="49" android:keyLabel="@string/One_Button"/>
-        <Key android:codes="50" android:keyLabel="@string/Two_Button"/>
-        <Key android:codes="51" android:keyLabel="@string/Three_Button"/>
-        <Key android:codes="52" android:keyLabel="@string/Four_Button"/>
-        <Key android:codes="53" android:keyLabel="@string/Five_Button"/>
-        <Key android:codes="54" android:keyLabel="@string/Six_Button"/>
-        <Key android:codes="55" android:keyLabel="@string/Seven_Button"/>
-        <Key android:codes="56" android:keyLabel="@string/Eight_Button"/>
-        <Key android:codes="57" android:keyLabel="@string/Nine_Button"/>
-        <Key android:codes="48" android:keyLabel="@string/Zero_Button"/>
-        <Key android:codes="189" android:keyLabel="@string/Minus_Sign_Button"/>
-        <Key android:codes="187" android:keyLabel="@string/Plus_Sign_Button"/>
-        <Key android:codes="-5" android:keyLabel="@string/BackSpace" android:isRepeatable="true" android:keyWidth="15%p"/>
+        <Key android:codes="35" android:keyLabel="@string/Tilde_Button"/>
+        <Key android:codes="1E" android:keyLabel="@string/One_Button"/>
+        <Key android:codes="1F" android:keyLabel="@string/Two_Button"/>
+        <Key android:codes="20" android:keyLabel="@string/Three_Button"/>
+        <Key android:codes="21" android:keyLabel="@string/Four_Button"/>
+        <Key android:codes="22" android:keyLabel="@string/Five_Button"/>
+        <Key android:codes="23" android:keyLabel="@string/Six_Button"/>
+        <Key android:codes="24" android:keyLabel="@string/Seven_Button"/>
+        <Key android:codes="25" android:keyLabel="@string/Eight_Button"/>
+        <Key android:codes="26" android:keyLabel="@string/Nine_Button"/>
+        <Key android:codes="27" android:keyLabel="@string/Zero_Button"/>
+        <Key android:codes="2D" android:keyLabel="@string/Minus_Sign_Button"/>
+        <Key android:codes="2E" android:keyLabel="@string/Plus_Sign_Button"/>
+        <Key android:codes="2C" android:keyLabel="@string/BackSpace" android:isRepeatable="true" android:keyWidth="15%p"/>
     </Row>
 
     <Row android:verticalGap="1%p">
-        <Key android:codes="9" android:keyLabel="@string/TAB" android:keyWidth="15%p"/>
-        <Key android:codes="113" android:keyLabel="@string/q_Button"/>
-        <Key android:codes="119" android:keyLabel="@string/w_Button"/>
-        <Key android:codes="101" android:keyLabel="@string/e_Button"/>
-        <Key android:codes="114" android:keyLabel="@string/r_Button"/>
-        <Key android:codes="116" android:keyLabel="@string/t_Button"/>
-        <Key android:codes="121" android:keyLabel="@string/y_Button"/>
-        <Key android:codes="117" android:keyLabel="@string/u_Button"/>
-        <Key android:codes="105" android:keyLabel="@string/i_Button"/>
-        <Key android:codes="111" android:keyLabel="@string/o_Button"/>
-        <Key android:codes="112" android:keyLabel="@string/p_Button"/>
-        <Key android:codes="219" android:keyLabel="@string/Left_Bracket_Button"/>
-        <Key android:codes="221" android:keyLabel="@string/Right_Bracket_Button"/>
-        <Key android:codes="220" android:keyLabel="@string/Bitwise_OR_Button"/>
+        <Key android:codes="2B" android:keyLabel="@string/TAB" android:keyWidth="15%p"/>
+        <Key android:codes="14" android:keyLabel="@string/q_Button"/>
+        <Key android:codes="1A" android:keyLabel="@string/w_Button"/>
+        <Key android:codes="08" android:keyLabel="@string/e_Button"/>
+        <Key android:codes="15" android:keyLabel="@string/r_Button"/>
+        <Key android:codes="17" android:keyLabel="@string/t_Button"/>
+        <Key android:codes="1C" android:keyLabel="@string/y_Button"/>
+        <Key android:codes="18" android:keyLabel="@string/u_Button"/>
+        <Key android:codes="0C" android:keyLabel="@string/i_Button"/>
+        <Key android:codes="12" android:keyLabel="@string/o_Button"/>
+        <Key android:codes="13" android:keyLabel="@string/p_Button"/>
+        <Key android:codes="2F" android:keyLabel="@string/Left_Bracket_Button"/>
+        <Key android:codes="30" android:keyLabel="@string/Right_Bracket_Button"/>
+        <Key android:codes="64" android:keyLabel="@string/Bitwise_OR_Button"/>
     </Row>
 
     <Row>
-        <Key android:codes="20" android:keyLabel="@string/Caps" android:keyWidth="15%p"/>
-        <Key android:codes="97" android:keyLabel="@string/a_Button"/>
-        <Key android:codes="115" android:keyLabel="@string/s_Button"/>
-        <Key android:codes="100" android:keyLabel="@string/d_Button"/>
-        <Key android:codes="102" android:keyLabel="@string/f_Button"/>
-        <Key android:codes="103" android:keyLabel="@string/g_Button"/>
-        <Key android:codes="104" android:keyLabel="@string/h_Button"/>
-        <Key android:codes="106" android:keyLabel="@string/j_Button"/>
-        <Key android:codes="107" android:keyLabel="@string/k_Button"/>
-        <Key android:codes="108" android:keyLabel="@string/l_Button"/>
-        <Key android:codes="186" android:keyLabel="@string/Colon_Button"/>
-        <Key android:codes="222" android:keyLabel="@string/Quotation_Button"/>
-        <Key android:codes="-4" android:keyLabel="@string/Enter_Button" android:keyWidth="15%p"/>
+        <Key android:codes="39" android:keyLabel="@string/Caps" android:keyWidth="15%p"/>
+        <Key android:codes="04" android:keyLabel="@string/a_Button"/>
+        <Key android:codes="16" android:keyLabel="@string/s_Button"/>
+        <Key android:codes="07" android:keyLabel="@string/d_Button"/>
+        <Key android:codes="09" android:keyLabel="@string/f_Button"/>
+        <Key android:codes="0A" android:keyLabel="@string/g_Button"/>
+        <Key android:codes="0B" android:keyLabel="@string/h_Button"/>
+        <Key android:codes="0D" android:keyLabel="@string/j_Button"/>
+        <Key android:codes="0E" android:keyLabel="@string/k_Button"/>
+        <Key android:codes="0F" android:keyLabel="@string/l_Button"/>
+        <Key android:codes="33" android:keyLabel="@string/Colon_Button"/>
+        <Key android:codes="34" android:keyLabel="@string/Quotation_Button"/>
+        <Key android:codes="28" android:keyLabel="@string/Enter_Button" android:keyWidth="15%p"/>
     </Row>
 
     <Row>
+        <Key android:codes="E1" android:keyLabel="@string/Shift" android:keyWidth="15%p"/>
+        <Key android:codes="1D" android:keyLabel="@string/z_Button"/>
+        <Key android:codes="1B" android:keyLabel="@string/x_Button"/>
+        <Key android:codes="06" android:keyLabel="@string/c_Button"/>
+        <Key android:codes="19" android:keyLabel="@string/v_Button"/>
+        <Key android:codes="05" android:keyLabel="@string/b_Button"/>
+        <Key android:codes="11" android:keyLabel="@string/n_Button"/>
+        <Key android:codes="10" android:keyLabel="@string/m_Button"/>
+        <Key android:codes="36" android:keyLabel="@string/Less_Sign_Button"/>
+        <Key android:codes="37" android:keyLabel="@string/Greater_Sign_Button"/>
+        <Key android:codes="38" android:keyLabel="@string/Question_Mark"/>
+
         <Key android:codes="16" android:keyLabel="@string/Shift" android:keyWidth="15%p"/>
-        <Key android:codes="122" android:keyLabel="@string/z_Button"/>
-        <Key android:codes="120" android:keyLabel="@string/x_Button"/>
-        <Key android:codes="99" android:keyLabel="@string/c_Button"/>
-        <Key android:codes="118" android:keyLabel="@string/v_Button"/>
-        <Key android:codes="98" android:keyLabel="@string/b_Button"/>
-        <Key android:codes="110" android:keyLabel="@string/n_Button"/>
-        <Key android:codes="109" android:keyLabel="@string/m_Button"/>
-        <Key android:codes="188" android:keyLabel="@string/Less_Sign_Button"/>
-        <Key android:codes="190" android:keyLabel="@string/Greater_Sign_Button"/>
-        <Key android:codes="191" android:keyLabel="@string/Question_Mark"/>
-        <Key android:codes="16" android:keyLabel="@string/Shift" android:keyWidth="15%p"/>
     </Row>
 
     <Row>
-        <Key android:codes="17" android:keyLabel="@string/Ctrl" android:keyWidth="10%p"/>
-        <Key android:codes="91" android:keyLabel="@string/Win" android:keyWidth="10%p"/>
-        <Key android:codes="18" android:keyLabel="@string/Alt" android:keyWidth="10%p"/>
-        <Key android:codes="32" android:keyLabel="@string/Space_Button" android:keyWidth="30%p"/>
+        <Key android:codes="E0" android:keyLabel="@string/Ctrl" android:keyWidth="10%p"/>
+        <Key android:codes="E3" android:keyLabel="@string/Win" android:keyWidth="10%p"/>
+        <Key android:codes="E2" android:keyLabel="@string/Alt" android:keyWidth="10%p"/>
+        <Key android:codes="2C" android:keyLabel="@string/Space_Button" android:keyWidth="30%p"/>
+
         <Key android:codes="18" android:keyLabel="@string/Alt" android:keyWidth="10%p"/>
         <Key android:codes="1008" android:keyLabel="@string/Win" android:keyWidth="10%p"/>
         <Key android:codes="1007" android:keyLabel="@string/Fn" android:keyWidth="10%p"/>
         <Key android:codes="17" android:keyLabel="@string/Ctrl" android:keyWidth="10%p"/>
     </Row>
+
+<!--    <Row>-->
+<!--        <Key android:codes="17" android:keyLabel="@string/KeyBoard_Ctrl_Add_C" android:keyWidth="10%p"/>-->
+<!--        <Key android:codes="91" android:keyLabel="@string/KeyBoard_Ctrl_Add_V" android:keyWidth="10%p"/>-->
+<!--        <Key android:codes="18" android:keyLabel="@string/KeyBoard_Ctrl_Add_A" android:keyWidth="10%p"/>-->
+<!--        <Key android:codes="32" android:keyLabel="@string/KeyBoard_Ctrl_Add_X" android:keyWidth="10%p"/>-->
+<!--        <Key android:codes="18" android:keyLabel="@string/KeyBoard_Ctrl_Add_Z" android:keyWidth="10%p"/>-->
+<!--        <Key android:codes="1008" android:keyLabel="@string/KeyBoard_Ctrl_Add_S" android:keyWidth="10%p"/>-->
+<!--    </Row>-->
+
+<!--    <Row>-->
+<!--        <Key android:codes="17" android:keyLabel="@string/KeyBoard_Win_Add_Tab" android:keyWidth="10%p"/>-->
+<!--        <Key android:codes="91" android:keyLabel="@string/KeyBoard_Win_Add_S" android:keyWidth="10%p"/>-->
+<!--        <Key android:codes="18" android:keyLabel="@string/KeyBoard_Win_Add_E" android:keyWidth="10%p"/>-->
+<!--        <Key android:codes="32" android:keyLabel="@string/KeyBoard_Win_Add_R" android:keyWidth="10%p"/>-->
+<!--        <Key android:codes="18" android:keyLabel="@string/KeyBoard_Win_Add_D" android:keyWidth="10%p"/>-->
+<!--        <Key android:codes="1008" android:keyLabel="@string/KeyBoard_Win_Add_L" android:keyWidth="10%p"/>-->
+<!--    </Row>-->
+
+<!--    <Row>-->
+<!--        <Key android:codes="17" android:keyLabel="@string/KeyBoard_Alt_Add_F4" android:keyWidth="10%p"/>-->
+<!--        <Key android:codes="91" android:keyLabel="@string/KeyBoard_Ctrl_Add_Alt_Add_Del" android:keyWidth="10%p"/>-->
+<!--        <Key android:codes="18" android:keyLabel="@string/KeyBoard_Alt_Add_PrtScr" android:keyWidth="10%p"/>-->
+<!--    </Row>-->
 </Keyboard>

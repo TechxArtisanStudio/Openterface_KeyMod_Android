@@ -173,6 +173,25 @@
     <string name="M_Button_Upper">M</string>
     <string name="Symbol">Sym</string>
 
+    //shortCut
+    <string name="KeyBoard_Ctrl_Add_C">Ctrl+C\nCopy</string>
+    <string name="KeyBoard_Ctrl_Add_V">Ctrl+V\nPaste</string>
+    <string name="KeyBoard_Ctrl_Add_A">Ctrl+A\nSelect All</string>
+    <string name="KeyBoard_Ctrl_Add_X">Ctrl+X\nCut</string>
+    <string name="KeyBoard_Ctrl_Add_Z">Ctrl+Z\nRevocation</string>
+    <string name="KeyBoard_Ctrl_Add_S">Ctrl+S\nSave</string>
+
+    <string name="KeyBoard_Win_Add_Tab">Win+Tab\nTask View</string>
+    <string name="KeyBoard_Win_Add_S">Win+S\nSearch</string>
+    <string name="KeyBoard_Win_Add_E">Win+E\nExplorer</string>
+    <string name="KeyBoard_Win_Add_R">Win+R\nCommand</string>
+    <string name="KeyBoard_Win_Add_D">Win+D\nDesktop</string>
+    <string name="KeyBoard_Win_Add_L">Win+L\nLock PC</string>
+
+    <string name="KeyBoard_Alt_Add_F4">Alt+F4\nClose Window</string>
+    <string name="KeyBoard_Ctrl_Add_Alt_Add_Del">Ctrl+Alt+Del\nTask Manager</string>
+    <string name="KeyBoard_Alt_Add_PrtScr">Alt+PrtScr\nWindow Screenshot</string>
+
 
     <string-array name="planets_array">
         <item>Full KeyBoard</item>
