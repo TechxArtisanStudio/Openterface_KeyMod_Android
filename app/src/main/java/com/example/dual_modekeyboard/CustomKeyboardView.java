@@ -8,6 +8,7 @@ import android.text.Editable;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -135,10 +136,10 @@ public class CustomKeyboardView extends LinearLayout {
                             System.out.println("Warning: custom:keySymbolLabel is missing");
                         }
 
-                        String codeStr = parser.getAttributeValue(ANDROID_NS, "codes"); // 保存原始字符串
+                        String codeStr = parser.getAttributeValue(ANDROID_NS, "codes");
                         int code = 0;
                         try {
-                            code = codeStr != null ? Integer.parseInt(codeStr, 16) : 0; // 解析为十六进制整数
+                            code = codeStr != null ? Integer.parseInt(codeStr, 16) : 0;
                         } catch (NumberFormatException e) {
                             System.out.println("Warning: Invalid android:codes value: " + codeStr);
                             e.printStackTrace();
@@ -233,8 +234,7 @@ public class CustomKeyboardView extends LinearLayout {
 
         String[] functionalKeyCodes = {"46", "47", "48", "49", "4A",
                 "4B", "112", "2A", "4E", "3B", "3C", "3D", "3E", "3F", "29", "3A",
-                "40", "41", "42", "43", "44", "45", "3D", "3F", "35","2B", "39",
-                "28", "E0", "E1", "E3", "E2"};
+                "40", "41", "42", "43", "44", "45", "3D", "3F",};
 
         for (List<Key> row : currentKeys) {
             LinearLayout rowLayout = new LinearLayout(getContext());
@@ -268,7 +268,11 @@ public class CustomKeyboardView extends LinearLayout {
                 if (key.label.equals("Win") || key.label.equals("BackSpace")) {
                     ImageButton imageButton = new ImageButton(getContext());
                     imageButton.setLayoutParams(params);
-                    imageButton.setBackgroundResource(R.drawable.key_background);
+                    if (key.code == 0xE3 && isWinLeftLocked) {
+                        imageButton.setBackgroundResource(R.drawable.press_button_background);
+                    } else {
+                        imageButton.setBackgroundResource(R.drawable.key_background);
+                    }
                     if (key.iconResId != 0) {
                         imageButton.setImageResource(key.iconResId);
                         imageButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
@@ -280,29 +284,59 @@ public class CustomKeyboardView extends LinearLayout {
                     textButton.setLayoutParams(params);
                     textButton.setBackgroundResource(R.drawable.key_background);
                     textButton.setGravity(Gravity.CENTER);
+                    textButton.setTextSize(12); // Set smaller base text size to make size difference visible
+                    textButton.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2)); // Adjust padding
 
                     if (isFunctionalKey) {
                         textButton.setBackgroundResource(R.drawable.function_button_background);
-                    } else if (key.code == 16 && isShiftLeftLocked) {
+                    } else if (key.code == 0xE1 && isShiftLeftLocked) {
                         textButton.setBackgroundResource(R.drawable.press_button_background);
                         textButton.setSelected(isSymbolMode);
-                    } else if (key.code == 20 && isCapsLocked) {
+                    } else if (key.code == 0x39 && isCapsLocked) {
                         textButton.setBackgroundResource(R.drawable.press_button_background);
                         textButton.setSelected(isCaps);
+                    } else if (key.code == 0xE0 && isCtrlLeftLocked) {
+                        textButton.setBackgroundResource(R.drawable.press_button_background);
+                    } else if (key.code == 0xE2 && isAltLeftLocked) {
+                        textButton.setBackgroundResource(R.drawable.press_button_background);
                     } else if (key.code == 16) {
                         textButton.setBackgroundResource(R.drawable.key_background);
                     }
 
                     if (key.iconResId == 0 && !key.label.isEmpty()) {
                         String displayLabel = key.label;
-                        if (!key.symbolLabel.isEmpty() && !isSymbolMode) {
-                            String combinedText = key.symbolLabel + "\n" + displayLabel;
+                        String symbolLabel = key.symbolLabel;
+
+                        // Check if the label contains a newline (e.g., "!\n1")
+                        if (!isSymbolMode && displayLabel.contains("\n")) {
+                            String[] parts = displayLabel.split("\n");
+                            if (parts.length == 2) {
+                                symbolLabel = parts[0]; // e.g., "!"
+                                displayLabel = parts[1]; // e.g., "1"
+                            }
+                            String combinedText = symbolLabel + "\n" + displayLabel;
                             SpannableString spannable = new SpannableString(combinedText);
-                            spannable.setSpan(new ForegroundColorSpan(Color.BLACK), 0, key.symbolLabel.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-                            spannable.setSpan(new ForegroundColorSpan(Color.BLACK), key.symbolLabel.length() + 1, combinedText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                            // Apply smaller size to symbolLabel
+//                            if (isShiftLeftLocked) {
+//                                System.out.println("this is shift left true");
+//                                // Symbol larger when Shift is locked
+//                                spannable.setSpan(new RelativeSizeSpan(0.5f), 0, symbolLabel.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+//                                spannable.setSpan(new ForegroundColorSpan(Color.BLACK), 0, symbolLabel.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+//                                spannable.setSpan(new RelativeSizeSpan(1f), symbolLabel.length() + 1, combinedText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+//                                spannable.setSpan(new ForegroundColorSpan(Color.BLACK), symbolLabel.length() + 1, combinedText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+//                            } else {
+//                                System.out.println("this is shift left isShiftLeftLocked: " + isShiftLeftLocked);
+//                                System.out.println("this is shift left false");
+//                                // Main character larger when Shift is not locked
+//                                spannable.setSpan(new RelativeSizeSpan(0.5f), 0, symbolLabel.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+//                                spannable.setSpan(new ForegroundColorSpan(Color.BLACK), 0, symbolLabel.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+//                                spannable.setSpan(new RelativeSizeSpan(1.0f), symbolLabel.length() + 1, combinedText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+//                                spannable.setSpan(new ForegroundColorSpan(Color.BLACK), symbolLabel.length() + 1, combinedText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+//                            }
                             textButton.setText(spannable);
+                            System.out.println("Applied Spannable: combinedText=" + combinedText + ", symbolLabel=" + symbolLabel + ", displayLabel=" + displayLabel);
                         } else {
-                            textButton.setText(isSymbolMode && !key.symbolLabel.isEmpty() ? key.symbolLabel : displayLabel);
+                            textButton.setText(isSymbolMode && !symbolLabel.isEmpty() ? symbolLabel : displayLabel);
                             textButton.setTextColor(Color.BLACK);
                         }
                     }
@@ -357,24 +391,32 @@ public class CustomKeyboardView extends LinearLayout {
                         editable.delete(start, end);
                     }
                     break;
-                case 39: // Caps Lock
+                case 0x39: // Caps Lock
+                    System.out.println("this is caps lock 39");
                     isCapsLocked = !isCapsLocked;
                     isCaps = isCapsLocked;
-                    isSymbolMode = false; // Reset symbol mode when Caps Lock toggles
+                    isSymbolMode = false;
                     isShiftLeftLocked = false;
                     updateKeyboard();
                     break;
-                case 225: // Shift
+                case 0xE1: // Shift
                     isSymbolMode = !isSymbolMode;
                     isShiftLeftLocked = !isShiftLeftLocked;
-                    isCaps = false; // Reset Caps Lock when Shift toggles
+                    isCaps = false;
                     isCapsLocked = false;
-                    resetSymbolMode = isSymbolMode; // Reset symbol mode after one keypress
+                    resetSymbolMode = isSymbolMode;
                     updateKeyboard();
                     break;
-                case 1008: // Symbol toggle
-                    isSymbolMode = !isSymbolMode;
-                    isShiftLeftLocked = false;
+                case 0xE0: // Ctrl
+                    isCtrlLeftLocked = !isCtrlLeftLocked;
+                    updateKeyboard();
+                    break;
+                case 0xE2: // Alt
+                    isAltLeftLocked = !isAltLeftLocked;
+                    updateKeyboard();
+                    break;
+                case 0xE3: // Win
+                    isWinLeftLocked = !isWinLeftLocked;
                     updateKeyboard();
                     break;
                 case -4: // Enter

@@ -23,51 +23,28 @@
     <string name="Function11">F11</string>
     <string name="Function12">F12</string>
 
-    <string name="One_Button">1</string>
-    <string name="Two_Button">2</string>
-    <string name="Three_Button">3</string>
-    <string name="Four_Button">4</string>
-    <string name="Five_Button">5</string>
-    <string name="Six_Button">6</string>
-    <string name="Seven_Button">7</string>
-    <string name="Eight_Button">8</string>
-    <string name="Nine_Button">9</string>
-    <string name="Zero_Button">0</string>
+    <string name="One_Sigh_Button">!\n1</string>
+    <string name="Two_At_Button">@\n2</string>
+    <string name="Three_Pound_Button">#\n3</string>
+    <string name="Four_Dollar_Button">$\n4</string>
+    <string name="Five_Percent_Button">%\n5</string>
+    <string name="Six_Caret_Button">^\n6</string>
+    <string name="Seven_Ampersand_Button">&amp;\n7</string>
+    <string name="Eight_Asterisk_Button">*\n8</string>
+    <string name="Nine_Left_Parenthesis_Button">(\n9</string>
+    <string name="Zero_Right_Parenthesis_Button">)\n0</string>
 
-    <string name="One_Sigh_Button">!</string>
-    <string name="Two_At_Button">@</string>
-    <string name="Three_Pound_Button">#</string>
-    <string name="Four_Dollar_Button">$</string>
-    <string name="Five_Percent_Button">%</string>
-    <string name="Six_Caret_Button">^</string>
-    <string name="Seven_Ampersand_Button">&amp;</string>
-    <string name="Eight_Asterisk_Button">*</string>
-    <string name="Nine_Left_Parenthesis_Button">(</string>
-    <string name="Zero_Right_Parenthesis_Button">)</string>
-
-    <string name="Tilde_Button">`</string>
-    <string name="Minus_Sign_Button">-</string>
-    <string name="Plus_Sign_Button">=</string>
-    <string name="Left_Bracket_Button">[</string>
-    <string name="Right_Bracket_Button">]</string>
-    <string name="Colon_Button">;</string>
-    <string name="Quotation_Button">\'</string>
-    <string name="Bitwise_OR_Button">\\</string>
-    <string name="Less_Sign_Button">,</string>
-    <string name="Greater_Sign_Button">.</string>
-    <string name="Question_Mark">/</string>
-
-    <string name="Tilde_shift_Button">~</string>
-    <string name="Minus_shift_Sign_Button">_</string>
-    <string name="Plus_shift_Sign_Button">+</string>
-    <string name="Left_shift_Bracket_Button">{</string>
-    <string name="Right_shift_Bracket_Button">}</string>
-    <string name="Colon_shift_Button">:</string>
-    <string name="Quotation_shift_Button">\"</string>
-    <string name="Bitwise_shift_OR_Button">|</string>
-    <string name="Less_shift_Sign_Button">&lt;</string>
-    <string name="Greater_shift_Sign_Button">&gt;</string>
-    <string name="Question_shift_Mark">\?</string>
+    <string name="Tilde">~\n`</string>
+    <string name="Minus_Sign_Button">_\n-</string>
+    <string name="Plus_Sign_Button">+\n=</string>
+    <string name="Left_Bracket_Button">{\n[</string>
+    <string name="Right_Bracket_Button">}\n]</string>
+    <string name="Colon_Button">:\n;</string>
+    <string name="Quotation_Button">\""\n'</string>
+    <string name="Bitwise_OR_Button">|\n\\</string>
+    <string name="Less_Sign_Button">&lt;\n,</string>
+    <string name="Greater_Sign_Button">&gt;\n.</string>
+    <string name="Question_Mark">\?\n/</string>
 
     <string name="Q_Button">Q</string>
     <string name="W_Button">W</string>

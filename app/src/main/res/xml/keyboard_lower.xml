@@ -35,17 +35,17 @@
     </Row>
 
     <Row>
-        <Key android:codes="35" android:keyLabel="@string/Tilde_Button"/>
-        <Key android:codes="1E" android:keyLabel="@string/One_Button"/>
-        <Key android:codes="1F" android:keyLabel="@string/Two_Button"/>
-        <Key android:codes="20" android:keyLabel="@string/Three_Button"/>
-        <Key android:codes="21" android:keyLabel="@string/Four_Button"/>
-        <Key android:codes="22" android:keyLabel="@string/Five_Button"/>
-        <Key android:codes="23" android:keyLabel="@string/Six_Button"/>
-        <Key android:codes="24" android:keyLabel="@string/Seven_Button"/>
-        <Key android:codes="25" android:keyLabel="@string/Eight_Button"/>
-        <Key android:codes="26" android:keyLabel="@string/Nine_Button"/>
-        <Key android:codes="27" android:keyLabel="@string/Zero_Button"/>
+        <Key android:codes="35" android:keyLabel="@string/Tilde"/>
+        <Key android:codes="1E" android:keyLabel="@string/One_Sigh_Button"/>
+        <Key android:codes="1F" android:keyLabel="@string/Two_At_Button"/>
+        <Key android:codes="20" android:keyLabel="@string/Three_Pound_Button"/>
+        <Key android:codes="21" android:keyLabel="@string/Four_Dollar_Button"/>
+        <Key android:codes="22" android:keyLabel="@string/Five_Percent_Button"/>
+        <Key android:codes="23" android:keyLabel="@string/Six_Caret_Button"/>
+        <Key android:codes="24" android:keyLabel="@string/Seven_Ampersand_Button"/>
+        <Key android:codes="25" android:keyLabel="@string/Eight_Asterisk_Button"/>
+        <Key android:codes="26" android:keyLabel="@string/Nine_Left_Parenthesis_Button"/>
+        <Key android:codes="27" android:keyLabel="@string/Zero_Right_Parenthesis_Button"/>
         <Key android:codes="2D" android:keyLabel="@string/Minus_Sign_Button"/>
         <Key android:codes="2E" android:keyLabel="@string/Plus_Sign_Button"/>
         <Key android:codes="2C" android:keyLabel="@string/BackSpace" android:isRepeatable="true" android:keyWidth="15%p"/>
@@ -97,7 +97,7 @@
         <Key android:codes="37" android:keyLabel="@string/Greater_Sign_Button"/>
         <Key android:codes="38" android:keyLabel="@string/Question_Mark"/>
 
-        <Key android:codes="16" android:keyLabel="@string/Shift" android:keyWidth="15%p"/>
+        <Key android:codes="E1" android:keyLabel="@string/Shift" android:keyWidth="15%p"/>
     </Row>
 
     <Row>
@@ -106,9 +106,9 @@
         <Key android:codes="E2" android:keyLabel="@string/Alt" android:keyWidth="10%p"/>
         <Key android:codes="2C" android:keyLabel="@string/Space_Button" android:keyWidth="30%p"/>
 
+        <Key android:codes="1007" android:keyLabel="@string/Fn" android:keyWidth="10%p"/>
         <Key android:codes="18" android:keyLabel="@string/Alt" android:keyWidth="10%p"/>
         <Key android:codes="1008" android:keyLabel="@string/Win" android:keyWidth="10%p"/>
-        <Key android:codes="1007" android:keyLabel="@string/Fn" android:keyWidth="10%p"/>
         <Key android:codes="17" android:keyLabel="@string/Ctrl" android:keyWidth="10%p"/>
     </Row>
 
