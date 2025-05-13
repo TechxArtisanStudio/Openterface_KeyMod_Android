@@ -1,5 +1,7 @@
 package com.example.dual_modekeyboard;
 
+import static com.example.serial.UsbDeviceManager.port;
+
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Color;
@@ -18,11 +20,15 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 
+import com.example.target.CH9329MSKBMap;
+import com.hoho.android.usbserial.driver.UsbSerialPort;
+
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class CustomKeyboardView extends LinearLayout {
@@ -38,6 +44,9 @@ public class CustomKeyboardView extends LinearLayout {
     private List<List<Key>> upperKeys;
     private List<List<Key>> symbolKeys;
     private List<List<Key>> shiftKeys;
+    private UsbSerialPort port;
+
+//    private static UsbDeviceManager usbDeviceManager;
 
     private static class Key {
         String label;
@@ -369,6 +378,26 @@ public class CustomKeyboardView extends LinearLayout {
         }
     }
 
+    public static byte[] hexStringToByteArray(String ByteData) {
+        if (ByteData.length() % 2 != 0) {
+            throw new IllegalArgumentException("Hex string must have an even length");
+        }
+
+        int len = ByteData.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(ByteData.charAt(i), 16) << 4)
+                    + Character.digit(ByteData.charAt(i + 1), 16));
+        }
+        System.out.println("Data: " + Arrays.toString(data));
+        return data;
+    }
+
+    public void setPort(UsbSerialPort port) {
+        this.port = port;
+        System.out.println("Port set in CustomKeyboardView: " + (port != null ? "Valid" : "Null"));
+    }
+
     private void handleKeyPress(Key key) {
         System.out.println("Key pressed: label=" + key.label + ", code=" + key.code);
         if (editText == null) {
@@ -383,108 +412,74 @@ public class CustomKeyboardView extends LinearLayout {
         if (isSymbolMode && !key.symbolLabel.isEmpty()) {
             editable.insert(start, key.symbolLabel);
         } else {
-            switch (key.code) {
-                case -5: // BackSpace
-                    if (start > 0 && start == end) {
-                        editable.delete(start - 1, start);
-                    } else if (start != end) {
-                        editable.delete(start, end);
-                    }
-                    break;
-                case 0x39: // Caps Lock
-                    System.out.println("this is caps lock 39");
-                    isCapsLocked = !isCapsLocked;
-                    isCaps = isCapsLocked;
-                    isSymbolMode = false;
-                    isShiftLeftLocked = false;
-                    updateKeyboard();
-                    break;
-                case 0xE1: // Shift
-                    isSymbolMode = !isSymbolMode;
-                    isShiftLeftLocked = !isShiftLeftLocked;
-                    isCaps = false;
-                    isCapsLocked = false;
-                    resetSymbolMode = isSymbolMode;
-                    updateKeyboard();
-                    break;
-                case 0xE0: // Ctrl
-                    isCtrlLeftLocked = !isCtrlLeftLocked;
-                    updateKeyboard();
-                    break;
-                case 0xE2: // Alt
-                    isAltLeftLocked = !isAltLeftLocked;
-                    updateKeyboard();
-                    break;
-                case 0xE3: // Win
-                    isWinLeftLocked = !isWinLeftLocked;
-                    updateKeyboard();
-                    break;
-                case -4: // Enter
-                    editable.insert(start, "\n");
-                    break;
-                case 32: // Space
-                    editable.insert(start, " ");
-                    break;
-                case 9: // Tab
-                    editable.insert(start, "\t");
-                    break;
-                case 1001: // PrtSc
-                    editable.insert(start, "[PrtSc]");
-                    break;
-                case 1002: // ScrLk
-                    editable.insert(start, "[ScrLk]");
-                    break;
-                case 1005: // End
-                    editable.insert(start, "[End]");
-                    break;
-                case 1007: // Fn
-                    editable.insert(start, "[Fn]");
-                    break;
-                case 131: // F1
-                    editable.insert(start, "[F1]");
-                    break;
-                case 132: // F2
-                    editable.insert(start, "[F2]");
-                    break;
-                case 133: // F3
-                    editable.insert(start, "[F3]");
-                    break;
-                case 134: // F4
-                    editable.insert(start, "[F4]");
-                    break;
-                case 135: // F5
-                    editable.insert(start, "[F5]");
-                    break;
-                case 136: // F6
-                    editable.insert(start, "[F6]");
-                    break;
-                case 137: // F7
-                    editable.insert(start, "[F7]");
-                    break;
-                case 138: // F8
-                    editable.insert(start, "[F8]");
-                    break;
-                case 139: // F9
-                    editable.insert(start, "[F9]");
-                    break;
-                case 140: // F10
-                    editable.insert(start, "[F10]");
-                    break;
-                case 141: // F11
-                    editable.insert(start, "[F11]");
-                    break;
-                case 142: // F12
-                    editable.insert(start, "[F12]");
-                    break;
-                default:
-                    String character = String.valueOf((char) key.code);
-                    editable.insert(start, character);
-                    if (resetSymbolMode && !isCapsLocked) {
+            // Handle keys that send USB HID data (e.g., printable keys like A, T, etc.)
+            if (key.code >= 0x04 && key.code <= 0x1D) { // Example range for letter keys (A-Z)
+                System.out.println("key.code: " + key.code);
+                // Dynamically insert key.code into sendMSData
+                String sendMSData = String.format("57AB0002080000%02X000000000010", key.code);
+                byte[] sendKBDataBytes = hexStringToByteArray(sendMSData);
+                String releaseSendMSData = "57AB00020800000000000000000C";
+                byte[] releaseSendKBDataBytes = hexStringToByteArray(releaseSendMSData);
+                try {
+                    port.write(sendKBDataBytes, 20);
+                    System.out.println("Successfully sent data for key code: " + String.format("0x%02X", key.code));
+                    Thread.sleep(10);
+                    port.write(releaseSendKBDataBytes, 20);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                System.out.println("This is key code: " + String.format("0x%02X", key.code));
+            } else {
+                // Handle special keys via switch
+                switch (key.code) {
+                    case -5: // BackSpace
+                        if (start > 0 && start == end) {
+                            editable.delete(start - 1, start);
+                        } else if (start != end) {
+                            editable.delete(start, end);
+                        }
+                        break;
+                    case 0x39: // Caps Lock
+                        System.out.println("this is caps lock 39");
+                        isCapsLocked = !isCapsLocked;
+                        isCaps = isCapsLocked;
                         isSymbolMode = false;
                         isShiftLeftLocked = false;
                         updateKeyboard();
-                    }
-                    break;
+                        break;
+                    case 0xE1: // Shift
+                        isSymbolMode = !isSymbolMode;
+                        isShiftLeftLocked = !isShiftLeftLocked;
+                        isCaps = false;
+                        isCapsLocked = false;
+                        resetSymbolMode = isSymbolMode;
+                        updateKeyboard();
+                        break;
+                    case 0xE0: // Ctrl
+                        isCtrlLeftLocked = !isCtrlLeftLocked;
+                        updateKeyboard();
+                        break;
+                    case 0xE2: // Alt
+                        isAltLeftLocked = !isAltLeftLocked;
+                        updateKeyboard();
+                        break;
+                    case 0xE3: // Win
+                        isWinLeftLocked = !isWinLeftLocked;
+                        updateKeyboard();
+                        break;
+                    default:
+                        // Insert character for other keys (if applicable)
+                        String character = String.valueOf((char) key.code);
+                        editable.insert(start, character);
+                        if (resetSymbolMode && !isCapsLocked) {
+                            isSymbolMode = false;
+                            isShiftLeftLocked = false;
+                            updateKeyboard();
+                        }
+                        break;
+                }
             }
         }
     }

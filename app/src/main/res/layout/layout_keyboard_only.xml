@@ -20,6 +20,18 @@
             android:gravity="center">
         </TextView>
 
+<!--        <android.widget.Button-->
+<!--            android:id="@+id/action_device"-->
+<!--            android:layout_width="0dp"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_marginHorizontal="5dp"-->
+<!--            android:layout_weight="1"-->
+<!--            android:background="@android:color/transparent"-->
+<!--            android:drawableTop="@drawable/baseline_link_24"-->
+<!--            android:text="@string/Device_Connect_Setting"-->
+<!--            android:textColor="@color/white"-->
+<!--            android:theme="@style/FontStyle" />-->
+
 
         <EditText
             android:id="@+id/editText"

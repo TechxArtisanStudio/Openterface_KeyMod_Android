@@ -2,12 +2,15 @@ package com.example.dual_modekeyboard;
 
 import android.annotation.SuppressLint;
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -19,6 +22,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.serial.UsbDeviceManager;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
@@ -28,14 +32,45 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
 
+    private static final String TAG = "MainActivity";
     private EditText editText;
     private TouchPadView touchPad;
     private CustomKeyboardView keyboardView;
     private Spinner spinner;
-
-    private static final String ACTION_USB_PERMISSION = "com.example.ch32v208serial.USB_PERMISSION";
-    private UsbSerialPort port;
     private TextView textView;
+    private UsbSerialPort port;
+
+    private boolean isReading = false;
+    private Handler mSerialAsyncHandler;
+    private UsbDeviceManager.OnDataReadListener onDataReadListener;
+    private static final String ACTION_USB_PERMISSION = "com.example.ch32v208serial.USB_PERMISSION";
+
+    private final BroadcastReceiver usbReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
+                UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                if (device != null) {
+                    setupUsbSerial(); // Call your setup method to handle the new device
+                }
+            } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
+                if (port != null) {
+                    try {
+                        port.close(); // Close the port when device is detached
+                        port = null;
+                        if (keyboardView != null) {
+                            keyboardView.setPort(null); // Clear port in keyboardView
+                        }
+                        Toast.makeText(context, "USB device disconnected", Toast.LENGTH_SHORT).show();
+                        textView.setText("USB device disconnected");
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+    };
 
     @SuppressLint("MissingInflatedId")
     @Override
@@ -45,10 +80,86 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         initializeUIComponents(R.layout.activity_main);
         textView = findViewById(R.id.textView);
         setupUsbSerial();
+
+        // Register the BroadcastReceiver for USB device events
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        filter.addAction(ACTION_USB_PERMISSION);
+        registerReceiver(usbReceiver, filter);
     }
 
-    private void setupUsbSerial() {
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(usbReceiver); // Unregister the receiver
+    }
 
+    private void startReading() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    while (true) {
+                        byte[] buffer = new byte[1024];
+                        int numBytesRead = port.read(buffer, 5);
+                        if (numBytesRead > 0) {
+                            StringBuilder allReadData = new StringBuilder();
+                            for (int i = 0; i < numBytesRead; i++) {
+                                allReadData.append(String.format("%02X ", buffer[i]));
+                            }
+                            Log.d(TAG, "Read data: " + allReadData.toString().trim());
+
+                            if (onDataReadListener != null) {
+                                onDataReadListener.onDataRead();
+                            }
+                        }
+
+//
+//                        if (numBytesRead > 0) {
+//                            // 处理接收到的数据
+//                            String receivedData = new String(buffer, 0, numBytesRead);
+//                            // 在主线程中更新UI
+//                            runOnUiThread(() -> {
+//                                // 例如更新TextView显示接收到的数据
+//                                textView.setText(receivedData);
+//                            });
+//                        }
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+    }
+//
+//    private void startReading() {
+//        isReading = true;
+//        mSerialAsyncHandler.post(() -> {
+//            byte[] buffer = new byte[1024];
+//            while (isReading) {
+//                try {
+//                    int numBytesRead = port.read(buffer, 5);
+//                    if (numBytesRead > 0) {
+//                        StringBuilder allReadData = new StringBuilder();
+//                        for (int i = 0; i < numBytesRead; i++) {
+//                            allReadData.append(String.format("%02X ", buffer[i]));
+//                        }
+//                        Log.d(TAG, "Read data: " + allReadData.toString().trim());
+//
+//                        if (onDataReadListener != null) {
+//                            onDataReadListener.onDataRead();
+//                        }
+//                    }
+//                } catch (IOException e) {
+//                    Log.e(TAG, "Error reading from port", e);
+//                    break;
+//                }
+//            }
+//        });
+//    }
+
+    private void setupUsbSerial() {
         UsbManager manager = (UsbManager) getSystemService(Context.USB_SERVICE);
         List<UsbSerialDriver> availableDrivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager);
         if (availableDrivers.isEmpty()) {
@@ -62,28 +173,25 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         PendingIntent permissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), PendingIntent.FLAG_IMMUTABLE);
         manager.requestPermission(device, permissionIntent);
 
+        if (!manager.hasPermission(device)) {
+            Toast.makeText(this, "Permission not granted for USB device", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        UsbDeviceConnection connection = manager.openDevice(device);
+        if (connection == null) {
+            Toast.makeText(this, "Failed to open USB device connection", Toast.LENGTH_LONG).show();
+            return;
+        }
+
         port = driver.getPorts().get(0);
         try {
             port.open(manager.openDevice(device));
             port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
             Toast.makeText(this, "Successful to open serial port", Toast.LENGTH_LONG).show();
             textView.setText("Successful to open serial port");
-            // Start a thread to read incoming data
-//            new Thread(() -> {
-//                byte[] buffer = new byte[1024];
-//                while (true) {
-//                    try {
-//                        int len = port.read(buffer, 1000);
-//                        if (len > 0) {
-//                            String received = new String(buffer, 0, len);
-//                            runOnUiThread(() -> receivedText.append(received));
-//                        }
-//                    } catch (IOException e) {
-//                        e.printStackTrace();
-//                        break;
-//                    }
-//                }
-//            }).start();
+            keyboardView.setPort(port);
+            startReading();
         } catch (IOException e) {
             e.printStackTrace();
             Toast.makeText(this, "Failed to open serial port", Toast.LENGTH_LONG).show();
@@ -156,7 +264,7 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     @Override
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
         String selectedPlanet = parent.getItemAtPosition(position).toString();
-        Toast.makeText(this, "Selected: " + selectedPlanet, Toast.LENGTH_SHORT).show();
+//        Toast.makeText(this, "Selected: " + selectedPlanet, Toast.LENGTH_SHORT).show();
         Log.d("Spinner", "Selected planet: " + selectedPlanet);
 
         if (selectedPlanet.equals("Touchpad + Keyboard")) {
