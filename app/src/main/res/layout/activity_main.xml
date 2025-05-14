@@ -2,125 +2,198 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
-    android:padding="2dp"
-    android:gravity="center_horizontal">
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
+    android:padding="2dp">
 
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="3"
-        android:orientation="vertical">
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/textView"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="3"
+            android:text="this is textView"
+            android:gravity="center">
+        </TextView>
+
+        <android.widget.Button
+            android:id="@+id/keyBoard"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
             android:layout_weight="2"
-            android:orientation="horizontal">
-            <android.widget.Button
-                android:id="@+id/leftClickButton"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="4"
-                android:text="Left"
-                android:textColor="@color/black"
-                android:background="@drawable/key_background"
-                android:theme="@style/ButtonTheme"/>
+            android:background="@android:color/transparent"
+            android:drawableTop="@drawable/keyboard"
+            android:scaleType="fitCenter"
+            android:text="@string/KeyBoard"
+            android:textSize="12sp"
+            android:textColor="@color/black"
+            android:theme="@style/FontStyle"/>
 
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="2"
-                android:orientation="vertical">
-                <ImageButton
-                    android:id="@+id/slideUpButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="5"
-                    android:text="1"
-                    android:textColor="@color/black"
-                    android:background="@drawable/key_background"
-                    android:theme="@style/ButtonTheme"
-                    android:src="@drawable/chevron_double_up"/>
+        <android.widget.Button
+            android:id="@+id/mouse"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:background="@android:color/transparent"
+            android:drawableTop="@drawable/mouse2"
+            android:scaleType="fitCenter"
+            android:text="@string/Mouse"
+            android:textSize="12sp"
+            android:textColor="@color/black"
+            android:theme="@style/FontStyle"/>
 
-                <ImageButton
-                    android:id="@+id/slideDownButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="5"
-                    android:text="2"
-                    android:textColor="@color/black"
-                    android:background="@drawable/key_background"
-                    android:theme="@style/ButtonTheme"
-                    android:src="@drawable/chevron_double_down"/>
+        <android.widget.Button
+            android:id="@+id/keyBoardMouse"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="3"
+            android:background="@android:color/transparent"
+            android:drawableTop="@drawable/keyboard_mouse"
+            android:scaleType="fitCenter"
+            android:text="@string/CompositeMode"
+            android:textSize="12sp"
+            android:textColor="@color/black"
+            android:theme="@style/FontStyle"/>
 
-            </LinearLayout>
+        <android.widget.Button
+            android:id="@+id/question"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:background="@android:color/transparent"
+            android:drawableTop="@drawable/question_lg"
+            android:scaleType="fitCenter"
+            android:text="@string/Instructions"
+            android:textSize="12sp"
+            android:textColor="@color/black"
+            android:theme="@style/FontStyle"/>
 
-            <android.widget.Button
-                android:id="@+id/RightClickButton"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="4"
-                android:text="Right"
-                android:textColor="@color/black"
-                android:background="@drawable/key_background"
-                android:theme="@style/ButtonTheme"/>
-        </LinearLayout>
+        <android.widget.Button
+            android:id="@+id/info"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:background="@android:color/transparent"
+            android:drawableTop="@drawable/info_lg"
+            android:scaleType="fitCenter"
+            android:text="@string/About"
+            android:textSize="12sp"
+            android:textColor="@color/black"
+            android:theme="@style/FontStyle"/>
 
-        <com.example.dual_modekeyboard.TouchPadView
-            android:id="@+id/touchPad"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="8"
-            android:background="#F0F0F0" />
+        <EditText
+            android:id="@+id/editText"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="2"
+            android:hint="connect usb here"
+            android:inputType="text|textMultiLine"
+            android:imeOptions="actionNone" />
+
+        <Spinner
+            android:id="@+id/planets_spinner"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="5" />
     </LinearLayout>
 
-
-
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="7"
-        android:orientation="vertical">
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="9"
+        android:orientation="horizontal">
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/textView"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="5"
-                android:text="this is textView"
-                android:gravity="center">
-            </TextView>
-
-            <EditText
-                android:id="@+id/editText"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="3"
+            android:orientation="vertical">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
                 android:layout_weight="2"
-                android:hint="connect usb here"
-                android:inputType="text|textMultiLine"
-                android:imeOptions="actionNone" />
+                android:orientation="horizontal">
+                <android.widget.Button
+                    android:id="@+id/leftClickButton"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="4"
+                    android:text="Left"
+                    android:textColor="@color/black"
+                    android:background="@drawable/key_background"
+                    android:theme="@style/ButtonTheme"/>
 
-            <Spinner
-                android:id="@+id/planets_spinner"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="5" />
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="2"
+                    android:orientation="vertical">
+                    <ImageButton
+                        android:id="@+id/slideUpButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="5"
+                        android:text="1"
+                        android:textColor="@color/black"
+                        android:background="@drawable/key_background"
+                        android:theme="@style/ButtonTheme"
+                        android:src="@drawable/chevron_double_up"/>
+
+                    <ImageButton
+                        android:id="@+id/slideDownButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="5"
+                        android:text="2"
+                        android:textColor="@color/black"
+                        android:background="@drawable/key_background"
+                        android:theme="@style/ButtonTheme"
+                        android:src="@drawable/chevron_double_down"/>
+
+                </LinearLayout>
+
+                <android.widget.Button
+                    android:id="@+id/RightClickButton"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="4"
+                    android:text="Right"
+                    android:textColor="@color/black"
+                    android:background="@drawable/key_background"
+                    android:theme="@style/ButtonTheme"/>
+            </LinearLayout>
+
+            <com.example.dual_modekeyboard.TouchPadView
+                android:id="@+id/touchPad"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="8"
+                android:background="#F0F0F0" />
         </LinearLayout>
 
-        <com.example.dual_modekeyboard.CustomKeyboardView
-            android:id="@+id/keyboard_view"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="9"
-            android:layout_gravity="center_horizontal"
-            android:keyBackground="@drawable/key_background"
-            android:theme="@style/ButtonTheme" />
+
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="7"
+            android:orientation="vertical">
+
+            <com.example.dual_modekeyboard.CustomKeyboardView
+                android:id="@+id/keyboard_view"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="9"
+                android:layout_gravity="center_horizontal"
+                android:keyBackground="@drawable/key_background"
+                android:theme="@style/ButtonTheme" />
+        </LinearLayout>
+
     </LinearLayout>
 
 </LinearLayout>

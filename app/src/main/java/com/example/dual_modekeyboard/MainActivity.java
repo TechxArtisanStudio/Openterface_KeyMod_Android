@@ -6,6 +6,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
@@ -15,7 +17,9 @@ import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -44,6 +48,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
     private Handler mSerialAsyncHandler;
     private UsbDeviceManager.OnDataReadListener onDataReadListener;
     private static final String ACTION_USB_PERMISSION = "com.example.ch32v208serial.USB_PERMISSION";
+
+    private Button keyBoard, mouse, keyBoardMouse, question, info;
+    private Drawable keyBoardDrawable, mouseDrawable, keyBoardMouseDrawable, questionDrawable, infoDrawable;
 
     private final BroadcastReceiver usbReceiver = new BroadcastReceiver() {
         @Override
@@ -79,14 +86,48 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         setContentView(R.layout.activity_main);
         initializeUIComponents(R.layout.activity_main);
         textView = findViewById(R.id.textView);
+
+        keyBoard = findViewById(R.id.keyBoard);
+        mouse = findViewById(R.id.mouse);
+        keyBoardMouse = findViewById(R.id.keyBoardMouse);
+        question = findViewById(R.id.question);
+        info = findViewById(R.id.info);
+
+        keyBoardDrawable = keyBoard.getCompoundDrawables()[1];
+        mouseDrawable = mouse.getCompoundDrawables()[1];
+        keyBoardMouseDrawable = keyBoardMouse.getCompoundDrawables()[1];
+        questionDrawable = question.getCompoundDrawables()[1];
+        infoDrawable = info.getCompoundDrawables()[1];
         setupUsbSerial();
 
         // Register the BroadcastReceiver for USB device events
         IntentFilter filter = new IntentFilter();
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-        filter.addAction(ACTION_USB_PERMISSION);
+//        filter.addAction(ACTION_USB_PERMISSION);
         registerReceiver(usbReceiver, filter);
+
+        upDataUIComponents();
+
+    }
+
+    private void upDataUIComponents() {
+        setOnClickListener(keyBoard, keyBoardDrawable);
+        setOnClickListener(mouse, mouseDrawable);
+        setOnClickListener(keyBoardMouse, keyBoardMouseDrawable);
+        setOnClickListener(question, questionDrawable);
+        setOnClickListener(info, infoDrawable);
+    }
+
+    private void setOnClickListener(TextView textView, Drawable drawable) {
+        textView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                int color = getResources().getColor(android.R.color.holo_blue_light);
+                textView.setTextColor(color);
+                drawable.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+            }
+        });
     }
 
     @Override
@@ -114,17 +155,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
                                 onDataReadListener.onDataRead();
                             }
                         }
-
-//
-//                        if (numBytesRead > 0) {
-//                            // 处理接收到的数据
-//                            String receivedData = new String(buffer, 0, numBytesRead);
-//                            // 在主线程中更新UI
-//                            runOnUiThread(() -> {
-//                                // 例如更新TextView显示接收到的数据
-//                                textView.setText(receivedData);
-//                            });
-//                        }
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -132,32 +162,6 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             }
         }).start();
     }
-//
-//    private void startReading() {
-//        isReading = true;
-//        mSerialAsyncHandler.post(() -> {
-//            byte[] buffer = new byte[1024];
-//            while (isReading) {
-//                try {
-//                    int numBytesRead = port.read(buffer, 5);
-//                    if (numBytesRead > 0) {
-//                        StringBuilder allReadData = new StringBuilder();
-//                        for (int i = 0; i < numBytesRead; i++) {
-//                            allReadData.append(String.format("%02X ", buffer[i]));
-//                        }
-//                        Log.d(TAG, "Read data: " + allReadData.toString().trim());
-//
-//                        if (onDataReadListener != null) {
-//                            onDataReadListener.onDataRead();
-//                        }
-//                    }
-//                } catch (IOException e) {
-//                    Log.e(TAG, "Error reading from port", e);
-//                    break;
-//                }
-//            }
-//        });
-//    }
 
     private void setupUsbSerial() {
         UsbManager manager = (UsbManager) getSystemService(Context.USB_SERVICE);

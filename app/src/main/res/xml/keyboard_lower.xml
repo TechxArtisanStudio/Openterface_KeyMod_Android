@@ -13,8 +13,8 @@
         <Key android:codes="49" android:keyLabel="@string/Ins" android:horizontalGap="1%p"/>
         <Key android:codes="4A" android:keyLabel="@string/Home"/>
         <Key android:codes="4B" android:keyLabel="@string/PgUp"/>
-        <Key android:codes="112" android:keyLabel="@string/Delete" android:horizontalGap="1%p"/>
-        <Key android:codes="2A" android:keyLabel="@string/End"/>
+        <Key android:codes="4C" android:keyLabel="@string/Delete" android:horizontalGap="1%p"/>
+        <Key android:codes="4D" android:keyLabel="@string/End"/>
         <Key android:codes="4E" android:keyLabel="@string/PgDn"/>
     </Row>
 
@@ -48,7 +48,7 @@
         <Key android:codes="27" android:keyLabel="@string/Zero_Right_Parenthesis_Button"/>
         <Key android:codes="2D" android:keyLabel="@string/Minus_Sign_Button"/>
         <Key android:codes="2E" android:keyLabel="@string/Plus_Sign_Button"/>
-        <Key android:codes="2C" android:keyLabel="@string/BackSpace" android:isRepeatable="true" android:keyWidth="15%p"/>
+        <Key android:codes="2A" android:keyLabel="@string/BackSpace" android:isRepeatable="true" android:keyWidth="15%p"/>
     </Row>
 
     <Row android:verticalGap="1%p">

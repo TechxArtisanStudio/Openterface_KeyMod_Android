@@ -242,7 +242,7 @@ public class CustomKeyboardView extends LinearLayout {
         System.out.println("Screen Height: " + screenHeight + ", Screen Width: " + screenWidth + ", Row Height: " + rowHeight);
 
         String[] functionalKeyCodes = {"46", "47", "48", "49", "4A",
-                "4B", "112", "2A", "4E", "3B", "3C", "3D", "3E", "3F", "29", "3A",
+                "4B", "4C", "4D", "4E", "3B", "3C", "3D", "3E", "3F", "29", "3A",
                 "40", "41", "42", "43", "44", "45", "3D", "3F",};
 
         for (List<Key> row : currentKeys) {
@@ -412,75 +412,81 @@ public class CustomKeyboardView extends LinearLayout {
         if (isSymbolMode && !key.symbolLabel.isEmpty()) {
             editable.insert(start, key.symbolLabel);
         } else {
-            // Handle keys that send USB HID data (e.g., printable keys like A, T, etc.)
-            if (key.code >= 0x04 && key.code <= 0x1D) { // Example range for letter keys (A-Z)
-                System.out.println("key.code: " + key.code);
-                // Dynamically insert key.code into sendMSData
-                String sendMSData = String.format("57AB0002080000%02X000000000010", key.code);
-                byte[] sendKBDataBytes = hexStringToByteArray(sendMSData);
-                String releaseSendMSData = "57AB00020800000000000000000C";
-                byte[] releaseSendKBDataBytes = hexStringToByteArray(releaseSendMSData);
-                try {
-                    port.write(sendKBDataBytes, 20);
-                    System.out.println("Successfully sent data for key code: " + String.format("0x%02X", key.code));
-                    Thread.sleep(10);
-                    port.write(releaseSendKBDataBytes, 20);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-                System.out.println("This is key code: " + String.format("0x%02X", key.code));
-            } else {
-                // Handle special keys via switch
-                switch (key.code) {
-                    case -5: // BackSpace
-                        if (start > 0 && start == end) {
-                            editable.delete(start - 1, start);
-                        } else if (start != end) {
-                            editable.delete(start, end);
-                        }
-                        break;
-                    case 0x39: // Caps Lock
-                        System.out.println("this is caps lock 39");
-                        isCapsLocked = !isCapsLocked;
-                        isCaps = isCapsLocked;
-                        isSymbolMode = false;
-                        isShiftLeftLocked = false;
-                        updateKeyboard();
-                        break;
-                    case 0xE1: // Shift
-                        isSymbolMode = !isSymbolMode;
-                        isShiftLeftLocked = !isShiftLeftLocked;
-                        isCaps = false;
-                        isCapsLocked = false;
-                        resetSymbolMode = isSymbolMode;
-                        updateKeyboard();
-                        break;
-                    case 0xE0: // Ctrl
-                        isCtrlLeftLocked = !isCtrlLeftLocked;
-                        updateKeyboard();
-                        break;
-                    case 0xE2: // Alt
-                        isAltLeftLocked = !isAltLeftLocked;
-                        updateKeyboard();
-                        break;
-                    case 0xE3: // Win
-                        isWinLeftLocked = !isWinLeftLocked;
-                        updateKeyboard();
-                        break;
-                    default:
-                        // Insert character for other keys (if applicable)
-                        String character = String.valueOf((char) key.code);
-                        editable.insert(start, character);
-                        if (resetSymbolMode && !isCapsLocked) {
-                            isSymbolMode = false;
-                            isShiftLeftLocked = false;
-                            updateKeyboard();
-                        }
-                        break;
-                }
+            if(port == null){
+                return;
             }
+
+            String sendMSData = String.format("57AB0002080000%02X000000000010", key.code);
+            byte[] sendKBDataBytes = hexStringToByteArray(sendMSData);
+            String releaseSendMSData = "57AB00020800000000000000000C";
+            byte[] releaseSendKBDataBytes = hexStringToByteArray(releaseSendMSData);
+            try {
+                port.write(sendKBDataBytes, 20);
+                System.out.println("Successfully sent data for key code: " + String.format("0x%02X", key.code));
+                Thread.sleep(10);
+                port.write(releaseSendKBDataBytes, 20);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            // Handle keys that send USB HID data (e.g., printable keys like A, T, etc.)
+//            if (key.code >= 0x04 && key.code <= 0x1D) { // Example range for letter keys (A-Z)
+//                System.out.println("key.code: " + key.code);
+//                // Dynamically insert key.code into sendMSData
+//
+//                System.out.println("This is key code: " + String.format("0x%02X", key.code));
+//            } else {
+//                // Handle special keys via switch
+//                switch (key.code) {
+//                    case -5: // BackSpace
+//                        if (start > 0 && start == end) {
+//                            editable.delete(start - 1, start);
+//                        } else if (start != end) {
+//                            editable.delete(start, end);
+//                        }
+//                        break;
+//                    case 0x39: // Caps Lock
+//                        System.out.println("this is caps lock 39");
+//                        isCapsLocked = !isCapsLocked;
+//                        isCaps = isCapsLocked;
+//                        isSymbolMode = false;
+//                        isShiftLeftLocked = false;
+//                        updateKeyboard();
+//                        break;
+//                    case 0xE1: // Shift
+//                        isSymbolMode = !isSymbolMode;
+//                        isShiftLeftLocked = !isShiftLeftLocked;
+//                        isCaps = false;
+//                        isCapsLocked = false;
+//                        resetSymbolMode = isSymbolMode;
+//                        updateKeyboard();
+//                        break;
+//                    case 0xE0: // Ctrl
+//                        isCtrlLeftLocked = !isCtrlLeftLocked;
+//                        updateKeyboard();
+//                        break;
+//                    case 0xE2: // Alt
+//                        isAltLeftLocked = !isAltLeftLocked;
+//                        updateKeyboard();
+//                        break;
+//                    case 0xE3: // Win
+//                        isWinLeftLocked = !isWinLeftLocked;
+//                        updateKeyboard();
+//                        break;
+//                    default:
+//                        // Insert character for other keys (if applicable)
+//                        String character = String.valueOf((char) key.code);
+//                        editable.insert(start, character);
+//                        if (resetSymbolMode && !isCapsLocked) {
+//                            isSymbolMode = false;
+//                            isShiftLeftLocked = false;
+//                            updateKeyboard();
+//                        }
+//                        break;
+//                }
+//            }
         }
     }
 
