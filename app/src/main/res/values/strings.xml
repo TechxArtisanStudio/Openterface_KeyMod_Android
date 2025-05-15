@@ -117,10 +117,10 @@
     <string name="Space_Button">Space</string>
     <string name="Enter_Button">Enter</string>
 
-    <string name="Up_arrow">↑</string>
-    <string name="Down_arrow">↓</string>
-    <string name="Left_arrow">←</string>
-    <string name="Right_arrow">→</string>
+    <string name="Up_arrow">Up_arrow</string>
+    <string name="Down_arrow">Down_arrow</string>
+    <string name="Left_arrow">Left_arrow</string>
+    <string name="Right_arrow">Right_arrow</string>
 
     <string name="Q_Button_Upper">Q</string>
     <string name="W_Button_Upper">W</string>

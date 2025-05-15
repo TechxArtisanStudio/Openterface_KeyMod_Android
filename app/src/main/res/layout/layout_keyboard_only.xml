@@ -15,44 +15,76 @@
             android:id="@+id/textView"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="7"
+            android:layout_weight="3"
             android:text="this is textView"
             android:gravity="center">
         </TextView>
 
-<!--        <android.widget.Button-->
-<!--            android:id="@+id/action_device"-->
-<!--            android:layout_width="0dp"-->
-<!--            android:layout_height="wrap_content"-->
-<!--            android:layout_marginHorizontal="5dp"-->
-<!--            android:layout_weight="1"-->
-<!--            android:background="@android:color/transparent"-->
-<!--            android:drawableTop="@drawable/baseline_link_24"-->
-<!--            android:text="@string/Device_Connect_Setting"-->
-<!--            android:textColor="@color/white"-->
-<!--            android:theme="@style/FontStyle" />-->
-
-
-        <EditText
-            android:id="@+id/editText"
+        <android.widget.Button
+            android:id="@+id/keyBoard"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:background="@android:color/transparent"
+            android:drawableTop="@drawable/keyboard"
+            android:scaleType="fitCenter"
+            android:text="@string/KeyBoard"
+            android:textSize="12sp"
+            android:textColor="@color/black"
+            android:theme="@style/FontStyle"/>
+
+        <android.widget.Button
+            android:id="@+id/mouse"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:background="@android:color/transparent"
+            android:drawableTop="@drawable/mouse2"
+            android:scaleType="fitCenter"
+            android:text="@string/Mouse"
+            android:textSize="12sp"
+            android:textColor="@color/black"
+            android:theme="@style/FontStyle"/>
+
+        <android.widget.Button
+            android:id="@+id/keyBoardMouse"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
             android:layout_weight="3"
-            android:hint="connect usb here"
-            android:inputType="text|textMultiLine"
-            android:imeOptions="actionNone"
-            android:gravity="bottom|start"
-            android:paddingBottom="2dp"/>
+            android:background="@android:color/transparent"
+            android:drawableTop="@drawable/keyboard_mouse"
+            android:scaleType="fitCenter"
+            android:text="@string/CompositeMode"
+            android:textSize="12sp"
+            android:textColor="@color/black"
+            android:theme="@style/FontStyle"/>
 
-        <Spinner
-            android:id="@+id/planets_spinner"
+        <android.widget.Button
+            android:id="@+id/question"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="5"
-            android:spinnerMode="dropdown"
-            android:popupBackground="#FFFFFF"
-            android:dropDownVerticalOffset="0dp"
-            android:dropDownWidth="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:background="@android:color/transparent"
+            android:drawableTop="@drawable/question_lg"
+            android:scaleType="fitCenter"
+            android:text="@string/Instructions"
+            android:textSize="12sp"
+            android:textColor="@color/black"
+            android:theme="@style/FontStyle"/>
+
+        <android.widget.Button
+            android:id="@+id/info"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:background="@android:color/transparent"
+            android:drawableTop="@drawable/info_lg"
+            android:scaleType="fitCenter"
+            android:text="@string/About"
+            android:textSize="12sp"
+            android:textColor="@color/black"
+            android:theme="@style/FontStyle"/>
+
     </LinearLayout>
 
     <com.example.dual_modekeyboard.CustomKeyboardView

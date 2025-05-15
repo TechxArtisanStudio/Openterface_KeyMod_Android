@@ -32,7 +32,6 @@ import java.util.Arrays;
 import java.util.List;
 
 public class CustomKeyboardView extends LinearLayout {
-    private EditText editText;
     private boolean isCaps = false;
     private boolean isCapsLocked = false;
     private boolean isShiftLeftLocked = false;
@@ -41,10 +40,11 @@ public class CustomKeyboardView extends LinearLayout {
     private boolean isWinLeftLocked = false;
     private boolean isSymbolMode = false;
     private List<List<Key>> lowerKeys;
-    private List<List<Key>> upperKeys;
-    private List<List<Key>> symbolKeys;
-    private List<List<Key>> shiftKeys;
-    private UsbSerialPort port;
+    private static UsbSerialPort port;
+
+    private Handler repeatHandler = new Handler();
+    private Runnable repeatRunnable;
+    private boolean isRepeating = false;
 
 //    private static UsbDeviceManager usbDeviceManager;
 
@@ -78,16 +78,10 @@ public class CustomKeyboardView extends LinearLayout {
     private void init(Context context) {
         setOrientation(VERTICAL);
         lowerKeys = parseKeyboard(context, R.xml.keyboard_lower);
-        upperKeys = parseKeyboard(context, R.xml.keyboard_upper);
-        symbolKeys = parseKeyboard(context, R.xml.keyboard_symbol);
-        shiftKeys = parseKeyboard(context, R.xml.keyboard_shift);
-        System.out.println("Parsed keyboards: lowerKeys=" + lowerKeys.size() + ", upperKeys=" + upperKeys.size() + ", symbolKeys=" + symbolKeys.size() + ", shiftKeys=" + shiftKeys.size());
+        System.out.println("Parsed keyboards: lowerKeys=" + lowerKeys.size());
         updateKeyboard();
     }
 
-    public void setEditText(EditText editText) {
-        this.editText = editText;
-    }
 
     private List<List<Key>> parseKeyboard(Context context, int resourceId) {
         List<List<Key>> rows = new ArrayList<>();
@@ -195,6 +189,18 @@ public class CustomKeyboardView extends LinearLayout {
                         } else if (label.equals("BackSpace")) {
                             iconResId = R.drawable.backspace;
                             System.out.println("Hardcoded icon for BackSpace: " + iconResId);
+                        } else if (label.equals("Up_arrow")) {
+                            iconResId = R.drawable.caret_up_fill;
+                            System.out.println("Hardcoded icon for arrow_up: " + iconResId);
+                        } else if (label.equals("Down_arrow")) {
+                            iconResId = R.drawable.caret_down_fill;
+                            System.out.println("Hardcoded icon for arrow_up: " + iconResId);
+                        } else if (label.equals("Left_arrow")) {
+                            iconResId = R.drawable.caret_left_fill;
+                            System.out.println("Hardcoded icon for arrow_up: " + iconResId);
+                        } else if (label.equals("Right_arrow")) {
+                            iconResId = R.drawable.caret_right_fill;
+                            System.out.println("Hardcoded icon for arrow_up: " + iconResId);
                         }
 
                         System.out.println("Parsed Key: label=" + label + ", symbolLabel=" + symbolLabel + ", code=0x" + Integer.toHexString(code).toUpperCase() + ", codeStr=" + codeStr + ", width=" + widthPercent + ", icon=" + iconResId + ", gap=" + horizontalGap + ", repeatable=" + isRepeatable);
@@ -223,16 +229,10 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void updateKeyboard() {
-        System.out.println("Updating keyboard: isSymbolMode=" + isSymbolMode + ", isCaps=" + isCaps);
+
         removeAllViews();
         List<List<Key>> currentKeys;
-        if (isSymbolMode) {
-            currentKeys = shiftKeys;
-        } else if (isCaps) {
-            currentKeys = upperKeys;
-        } else {
-            currentKeys = lowerKeys;
-        }
+        currentKeys = lowerKeys;
 
         int screenHeight = getContext().getResources().getDisplayMetrics().heightPixels;
         int screenWidth = getContext().getResources().getDisplayMetrics().widthPixels;
@@ -274,7 +274,9 @@ public class CustomKeyboardView extends LinearLayout {
                     }
                 }
 
-                if (key.label.equals("Win") || key.label.equals("BackSpace")) {
+                if (key.label.equals("Win") || key.label.equals("BackSpace") ||
+                        key.label.equals("Up_arrow") || key.label.equals("Down_arrow") ||
+                        key.label.equals("Left_arrow") || key.label.equals("Right_arrow")) {
                     ImageButton imageButton = new ImageButton(getContext());
                     imageButton.setLayoutParams(params);
                     if (key.code == 0xE3 && isWinLeftLocked) {
@@ -301,10 +303,7 @@ public class CustomKeyboardView extends LinearLayout {
                     } else if (key.code == 0xE1 && isShiftLeftLocked) {
                         textButton.setBackgroundResource(R.drawable.press_button_background);
                         textButton.setSelected(isSymbolMode);
-                    } else if (key.code == 0x39 && isCapsLocked) {
-                        textButton.setBackgroundResource(R.drawable.press_button_background);
-                        textButton.setSelected(isCaps);
-                    } else if (key.code == 0xE0 && isCtrlLeftLocked) {
+                    }  else if (key.code == 0xE0 && isCtrlLeftLocked) {
                         textButton.setBackgroundResource(R.drawable.press_button_background);
                     } else if (key.code == 0xE2 && isAltLeftLocked) {
                         textButton.setBackgroundResource(R.drawable.press_button_background);
@@ -325,23 +324,6 @@ public class CustomKeyboardView extends LinearLayout {
                             }
                             String combinedText = symbolLabel + "\n" + displayLabel;
                             SpannableString spannable = new SpannableString(combinedText);
-                            // Apply smaller size to symbolLabel
-//                            if (isShiftLeftLocked) {
-//                                System.out.println("this is shift left true");
-//                                // Symbol larger when Shift is locked
-//                                spannable.setSpan(new RelativeSizeSpan(0.5f), 0, symbolLabel.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-//                                spannable.setSpan(new ForegroundColorSpan(Color.BLACK), 0, symbolLabel.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-//                                spannable.setSpan(new RelativeSizeSpan(1f), symbolLabel.length() + 1, combinedText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-//                                spannable.setSpan(new ForegroundColorSpan(Color.BLACK), symbolLabel.length() + 1, combinedText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-//                            } else {
-//                                System.out.println("this is shift left isShiftLeftLocked: " + isShiftLeftLocked);
-//                                System.out.println("this is shift left false");
-//                                // Main character larger when Shift is not locked
-//                                spannable.setSpan(new RelativeSizeSpan(0.5f), 0, symbolLabel.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-//                                spannable.setSpan(new ForegroundColorSpan(Color.BLACK), 0, symbolLabel.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-//                                spannable.setSpan(new RelativeSizeSpan(1.0f), symbolLabel.length() + 1, combinedText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-//                                spannable.setSpan(new ForegroundColorSpan(Color.BLACK), symbolLabel.length() + 1, combinedText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-//                            }
                             textButton.setText(spannable);
                             System.out.println("Applied Spannable: combinedText=" + combinedText + ", symbolLabel=" + symbolLabel + ", displayLabel=" + displayLabel);
                         } else {
@@ -398,101 +380,90 @@ public class CustomKeyboardView extends LinearLayout {
         System.out.println("Port set in CustomKeyboardView: " + (port != null ? "Valid" : "Null"));
     }
 
-    private void handleKeyPress(Key key) {
-        System.out.println("Key pressed: label=" + key.label + ", code=" + key.code);
-        if (editText == null) {
-            System.out.println("Error: EditText is null");
-            return;
+    public static String makeChecksum(String data) {
+        int total = 0;
+
+        for (int i = 0; i < data.length(); i += 2) {
+            String byteStr = data.substring(i, Math.min(i + 2, data.length()));
+            total += Integer.parseInt(byteStr, 16);
         }
-        Editable editable = editText.getText();
-        int start = editText.getSelectionStart();
-        int end = editText.getSelectionEnd();
 
-        boolean resetSymbolMode = false;
-        if (isSymbolMode && !key.symbolLabel.isEmpty()) {
-            editable.insert(start, key.symbolLabel);
-        } else {
-            if(port == null){
-                return;
-            }
+        int mod = total % 256;
 
-            String sendMSData = String.format("57AB0002080000%02X000000000010", key.code);
-            byte[] sendKBDataBytes = hexStringToByteArray(sendMSData);
-            String releaseSendMSData = "57AB00020800000000000000000C";
-            byte[] releaseSendKBDataBytes = hexStringToByteArray(releaseSendMSData);
-            try {
-                port.write(sendKBDataBytes, 20);
-                System.out.println("Successfully sent data for key code: " + String.format("0x%02X", key.code));
-                Thread.sleep(10);
-                port.write(releaseSendKBDataBytes, 20);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+        return String.format("%02X", mod);
+    }
 
-            // Handle keys that send USB HID data (e.g., printable keys like A, T, etc.)
-//            if (key.code >= 0x04 && key.code <= 0x1D) { // Example range for letter keys (A-Z)
-//                System.out.println("key.code: " + key.code);
-//                // Dynamically insert key.code into sendMSData
-//
-//                System.out.println("This is key code: " + String.format("0x%02X", key.code));
-//            } else {
-//                // Handle special keys via switch
-//                switch (key.code) {
-//                    case -5: // BackSpace
-//                        if (start > 0 && start == end) {
-//                            editable.delete(start - 1, start);
-//                        } else if (start != end) {
-//                            editable.delete(start, end);
-//                        }
-//                        break;
-//                    case 0x39: // Caps Lock
-//                        System.out.println("this is caps lock 39");
-//                        isCapsLocked = !isCapsLocked;
-//                        isCaps = isCapsLocked;
-//                        isSymbolMode = false;
-//                        isShiftLeftLocked = false;
-//                        updateKeyboard();
-//                        break;
-//                    case 0xE1: // Shift
-//                        isSymbolMode = !isSymbolMode;
-//                        isShiftLeftLocked = !isShiftLeftLocked;
-//                        isCaps = false;
-//                        isCapsLocked = false;
-//                        resetSymbolMode = isSymbolMode;
-//                        updateKeyboard();
-//                        break;
-//                    case 0xE0: // Ctrl
-//                        isCtrlLeftLocked = !isCtrlLeftLocked;
-//                        updateKeyboard();
-//                        break;
-//                    case 0xE2: // Alt
-//                        isAltLeftLocked = !isAltLeftLocked;
-//                        updateKeyboard();
-//                        break;
-//                    case 0xE3: // Win
-//                        isWinLeftLocked = !isWinLeftLocked;
-//                        updateKeyboard();
-//                        break;
-//                    default:
-//                        // Insert character for other keys (if applicable)
-//                        String character = String.valueOf((char) key.code);
-//                        editable.insert(start, character);
-//                        if (resetSymbolMode && !isCapsLocked) {
-//                            isSymbolMode = false;
-//                            isShiftLeftLocked = false;
-//                            updateKeyboard();
-//                        }
-//                        break;
-//                }
-//            }
+    public static void releaseAllData(){
+        String releaseSendMSData = "57AB00020800000000000000000C";
+        byte[] releaseSendKBDataBytes = hexStringToByteArray(releaseSendMSData);
+        try {
+            Thread.sleep(10);
+            port.write(releaseSendKBDataBytes, 20);
+            System.out.println("Successfully sent release data");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 
-    private Handler repeatHandler = new Handler();
-    private Runnable repeatRunnable;
-    private boolean isRepeating = false;
+    private int parseHex(String hex) {
+        return hex != null ? Integer.parseInt(hex.replace("0x", ""), 16) : 0;
+    }
+
+    private void handleKeyPress(Key key) {
+        System.out.println("Key pressed: label=" + key.label + ", code=" + key.code);
+        if (port == null) {
+            return;
+        }
+
+        // Handle modifier key toggles (Shift, Ctrl, Alt, Win)
+        boolean updateRequired = false;
+        switch (key.code) {
+            case 0xE1: // Shift Left
+                isSymbolMode = !isSymbolMode;
+                isShiftLeftLocked = !isShiftLeftLocked;
+                isCaps = false;
+                isCapsLocked = false;
+                updateRequired = true;
+                break;
+            case 0xE0: // Ctrl Left
+                isCtrlLeftLocked = !isCtrlLeftLocked;
+                updateRequired = true;
+                break;
+            case 0xE2: // Alt Left
+                isAltLeftLocked = !isAltLeftLocked;
+                updateRequired = true;
+                break;
+            case 0xE3: // Win Left
+                isWinLeftLocked = !isWinLeftLocked;
+                updateRequired = true;
+                break;
+        }
+
+        if (updateRequired) {
+            updateKeyboard();
+        }
+
+        // Calculate combined modifier value
+        int combinedValue = 0;
+        combinedValue += isCtrlLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Ctrl")) : 0;
+        combinedValue += isShiftLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift")) : 0;
+        combinedValue += isAltLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Alt")) : 0;
+        combinedValue += isWinLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Win")) : 0;
+
+        // Send key data
+        try {
+            String sendMSData = String.format("57AB000208%02X00%02X0000000000", combinedValue, key.code);
+            sendMSData += makeChecksum(sendMSData);
+            byte[] sendKBDataBytes = hexStringToByteArray(sendMSData);
+            port.write(sendKBDataBytes, 20);
+            System.out.println("Successfully sent data for key code: 0x" + String.format("%02X", key.code));
+            releaseAllData();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     private void startRepeatingDelete(Key key) {
         if (isRepeating) return;
