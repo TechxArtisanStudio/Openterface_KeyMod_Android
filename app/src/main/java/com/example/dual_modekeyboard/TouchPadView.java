@@ -13,9 +13,11 @@ public class TouchPadView extends View {
     private float lastX, lastY;
     private boolean isMoving = false;
     private OnTouchPadListener listener;
+    private float lastMoveMSX, lastMoveMSY;
+    private float startMoveMSX, startMoveMSY;
 
     public interface OnTouchPadListener {
-        void onTouchMove(float deltaX, float deltaY);
+        void onTouchMove(float startMoveMSX, float startMoveMSY, float lastMoveMSX, float lastMoveMSY);
         void onTouchClick();
         void onTouchDoubleClick();
         void onTouchRightClick();
@@ -57,33 +59,32 @@ public class TouchPadView extends View {
             case MotionEvent.ACTION_DOWN:
                 lastX = x;
                 lastY = y;
+                lastMoveMSX = x;
+                lastMoveMSY = y;
                 isMoving = false;
                 break;
 
             case MotionEvent.ACTION_MOVE:
+                startMoveMSX = event.getX();
+                startMoveMSY = event.getY();
                 if (listener != null) {
-                    float deltaX = x - lastX;
-                    float deltaY = y - lastY;
-                    
-                    // The movement event is triggered only when the movement distance exceeds the threshold
-                    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
-                        isMoving = true;
-                        listener.onTouchMove(deltaX, deltaY);
-                    }
+                    isMoving = true;
+                    listener.onTouchMove(startMoveMSX, startMoveMSY, lastMoveMSX, lastMoveMSY);
                 }
-                lastX = x;
-                lastY = y;
+                lastMoveMSX = startMoveMSX;
+                lastMoveMSY = startMoveMSY;
                 break;
 
             case MotionEvent.ACTION_UP:
                 if (!isMoving) {
                     if (event.getEventTime() - event.getDownTime() < 200) {
-                        // short press
                         if (listener != null) {
                             listener.onTouchClick();
                         }
                     }
                 }
+                lastMoveMSX = 0;
+                lastMoveMSY = 0;
                 break;
         }
 

@@ -15,7 +15,7 @@ import android.os.Handler;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -47,6 +47,8 @@ public class MainActivity extends AppCompatActivity {
 
     private Button keyBoard, mouse, keyBoardMouse, question, info;
     private Drawable keyBoardDrawable, mouseDrawable, keyBoardMouseDrawable, questionDrawable, infoDrawable;
+    private Button activeButton; // Track the currently active button
+
 
     private final BroadcastReceiver usbReceiver = new BroadcastReceiver() {
         @Override
@@ -88,8 +90,31 @@ public class MainActivity extends AppCompatActivity {
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         registerReceiver(usbReceiver, filter);
 
-        // Set default fragment
+        // Set default fragment and button state
+        setActiveButton(keyBoardMouse, keyBoardMouseDrawable);
         showCompositeFragment();
+
+
+
+//        RightClickButton.setOnClickListener(new View.OnClickListener() {
+//           @Override
+//           public void onClick(View v) {
+//
+//           }
+//       });
+//
+//        leftClickButton.setOnClickListener(v -> {
+//            // Handle left click action
+//            String sendKBData = String.format("57AB00050501010000000E");
+////            sendKBData += CompositeFragment.makeChecksum(sendKBData);
+//            byte[] sendKBDataBytes = CompositeFragment.hexStringToByteArray(sendKBData);
+//            try {
+//                port.write(sendKBDataBytes, 20);
+//            } catch (IOException e) {
+//                throw new RuntimeException(e);
+//            }
+//            CustomKeyboardView.releaseAllData();
+//        });
     }
 
     private void initializeUIComponents() {
@@ -130,19 +155,19 @@ public class MainActivity extends AppCompatActivity {
 
         if (mouse != null) {
             setOnClickListener(mouse, mouseDrawable, () -> {
-                Toast.makeText(this, "Mouse button clicked", Toast.LENGTH_SHORT).show();
+                // Toast.makeText(this, "Mouse button clicked", Toast.LENGTH_SHORT).show();
             });
         }
 
         if (question != null) {
-            setOnClickListener(question, questionDrawable, () -> {
-                Toast.makeText(this, "Question button clicked", Toast.LENGTH_SHORT).show();
+            question.setOnClickListener(v -> {
+                // Toast.makeText(this, "Question button clicked", Toast.LENGTH_SHORT).show();
             });
         }
 
         if (info != null) {
-            setOnClickListener(info, infoDrawable, () -> {
-                Toast.makeText(this, "Info button clicked", Toast.LENGTH_SHORT).show();
+            info.setOnClickListener(v -> {
+                // Toast.makeText(this, "Info button clicked", Toast.LENGTH_SHORT).show();
             });
         }
     }
@@ -150,11 +175,33 @@ public class MainActivity extends AppCompatActivity {
     private void setOnClickListener(Button button, Drawable drawable, Runnable onClickAction) {
         if (button == null || drawable == null) return;
         button.setOnClickListener(v -> {
-            int color = getResources().getColor(android.R.color.holo_blue_light);
-            button.setTextColor(color);
-            drawable.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+            resetButtonColors(); // Reset colors of keyBoard, mouse, and keyBoardMouse
+            setActiveButton(button, drawable); // Set the clicked button as active
             onClickAction.run();
         });
+    }
+
+    private void setActiveButton(Button button, Drawable drawable) {
+        if (button == null || drawable == null) return;
+        int activeColor = getResources().getColor(android.R.color.holo_blue_light);
+        button.setTextColor(activeColor);
+        drawable.setColorFilter(activeColor, PorterDuff.Mode.SRC_IN);
+        activeButton = button; // Update the active button
+    }
+
+    private void resetButtonColors() {
+        // Reset only keyBoard, mouse, and keyBoardMouse to their initial colors
+        int defaultColor = getResources().getColor(android.R.color.black); // Assuming white as default text color
+        resetButton(keyBoard, keyBoardDrawable, defaultColor);
+        resetButton(mouse, mouseDrawable, defaultColor);
+        resetButton(keyBoardMouse, keyBoardMouseDrawable, defaultColor);
+    }
+
+    private void resetButton(Button button, Drawable drawable, int defaultColor) {
+        if (button != null && drawable != null) {
+            button.setTextColor(defaultColor);
+            drawable.clearColorFilter(); // Reset drawable to original color
+        }
     }
 
     private void showKeyboardFragment() {
@@ -175,13 +222,15 @@ public class MainActivity extends AppCompatActivity {
         Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
         if (currentFragment instanceof KeyboardFragment) {
             ((KeyboardFragment) currentFragment).port = newPort;
-            CustomKeyboardView keyboardView = currentFragment.getView().findViewById(R.id.keyboard_view);
+            CustomKeyboardView keyboardView = currentFragment.getView() != null ?
+                    currentFragment.getView().findViewById(R.id.keyboard_view) : null;
             if (keyboardView != null) {
                 keyboardView.setPort(newPort);
             }
         } else if (currentFragment instanceof CompositeFragment) {
             ((CompositeFragment) currentFragment).port = newPort;
-            CustomKeyboardView keyboardView = currentFragment.getView().findViewById(R.id.keyboard_view);
+            CustomKeyboardView keyboardView = currentFragment.getView() != null ?
+                    currentFragment.getView().findViewById(R.id.keyboard_view) : null;
             if (keyboardView != null) {
                 keyboardView.setPort(newPort);
             }

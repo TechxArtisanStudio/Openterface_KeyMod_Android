@@ -454,9 +454,9 @@ public class CustomKeyboardView extends LinearLayout {
 
         // Send key data
         try {
-            String sendMSData = String.format("57AB000208%02X00%02X0000000000", combinedValue, key.code);
-            sendMSData += makeChecksum(sendMSData);
-            byte[] sendKBDataBytes = hexStringToByteArray(sendMSData);
+            String sendKBData = String.format("57AB000208%02X00%02X0000000000", combinedValue, key.code);
+            sendKBData += makeChecksum(sendKBData);
+            byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
             port.write(sendKBDataBytes, 20);
             System.out.println("Successfully sent data for key code: 0x" + String.format("%02X", key.code));
             releaseAllData();
