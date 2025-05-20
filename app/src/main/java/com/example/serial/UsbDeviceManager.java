@@ -1,6 +1,7 @@
 package com.example.serial;
 
 
+import android.annotation.SuppressLint;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -129,6 +130,7 @@ public class UsbDeviceManager {
         Log.d(TAG, "serial is close");
     }
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private void requestUsbPermission(UsbDevice serialDevice) {
         PendingIntent permissionIntent = PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), PendingIntent.FLAG_IMMUTABLE);
         IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
