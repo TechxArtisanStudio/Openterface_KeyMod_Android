@@ -132,7 +132,11 @@ public class UsbDeviceManager {
     private void requestUsbPermission(UsbDevice serialDevice) {
         PendingIntent permissionIntent = PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), PendingIntent.FLAG_IMMUTABLE);
         IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
-        context.registerReceiver(usbReceiver, filter, Context.RECEIVER_EXPORTED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(usbReceiver, filter, Context.RECEIVER_EXPORTED);
+        } else {
+            context.registerReceiver(usbReceiver, filter);
+        }
         usbManager.requestPermission(serialDevice, permissionIntent);
         Log.e(TAG, "requestUsbPermission serialDevice");
 
