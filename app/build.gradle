@@ -4,12 +4,12 @@ plugins {
 
 android {
     namespace 'com.example.dual_modekeyboard'
-    compileSdk 34
+    compileSdkVersion 34
 
     defaultConfig {
         applicationId "com.example.dual_modekeyboard"
         minSdk 26
-        targetSdk 34
+        targetSdkVersion 34
         versionCode 1
         versionName "1.0"
 
