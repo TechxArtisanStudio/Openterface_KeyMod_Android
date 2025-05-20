@@ -106,7 +106,7 @@ public class UsbDeviceManager {
         IntentFilter filter = new IntentFilter();
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(usbReceiver, filter, Context.RECEIVER_EXPORTED);
         } else {
             context.registerReceiver(usbReceiver, filter);
