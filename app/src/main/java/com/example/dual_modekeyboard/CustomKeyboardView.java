@@ -1,5 +1,6 @@
 package com.example.dual_modekeyboard;
 
+import static android.content.ContentValues.TAG;
 import static com.example.serial.UsbDeviceManager.port;
 
 import android.content.Context;
@@ -12,6 +13,7 @@ import android.text.SpannableString;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -203,7 +205,7 @@ public class CustomKeyboardView extends LinearLayout {
                             System.out.println("Hardcoded icon for arrow_up: " + iconResId);
                         }
 
-                        System.out.println("Parsed Key: label=" + label + ", symbolLabel=" + symbolLabel + ", code=0x" + Integer.toHexString(code).toUpperCase() + ", codeStr=" + codeStr + ", width=" + widthPercent + ", icon=" + iconResId + ", gap=" + horizontalGap + ", repeatable=" + isRepeatable);
+                        Log.d(TAG,"Parsed Key: label=" + label + ", symbolLabel=" + symbolLabel + ", code=0x" + Integer.toHexString(code).toUpperCase() + ", codeStr=" + codeStr + ", width=" + widthPercent + ", icon=" + iconResId + ", gap=" + horizontalGap + ", repeatable=" + isRepeatable);
                         currentRow.add(new Key(label, symbolLabel, code, codeStr, widthPercent, iconResId, horizontalGap, isRepeatable));
                     }
                 } else if (eventType == XmlPullParser.END_TAG) {
