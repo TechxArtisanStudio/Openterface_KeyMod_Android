@@ -45,5 +45,5 @@ jobs:
         with:
           name: DualModeKeyBoard
           path: |
-            app/build/outputs/apk/release/*.apk
+            app/release/*.apk
           retention-days: 90
