@@ -1,4 +1,4 @@
-name: Android CI
+name: Build APK
 
 on:
   push:
@@ -49,5 +49,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: APK
+          name: DualModeKeyBoard
           path: app/build/outputs/apk/release/
