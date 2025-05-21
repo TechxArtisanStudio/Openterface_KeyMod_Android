@@ -26,7 +26,7 @@ jobs:
       run: ./gradlew build
 
     - name: Set up Android SDK
-      uses: actions/setup-android@v1
+      uses: actions/setup-android@v4
       with:
         android-version: '30'
 
