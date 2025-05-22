@@ -29,22 +29,24 @@ jobs:
         env:
           ENCODED_STRING: ${{ secrets.SIGNING_KEY }}
         run: |
-          echo $ENCODED_STRING | base64 -di > app/keystore.jks
+          echo $ENCODED_STRING | base64 -d > app/keystore.jks
+          ls -l app/keystore.jks
+          file app/keystore.jks
 
       - name: Clean Gradle
         run: ./gradlew clean
 
       - name: Build Release APK
-        run: ./gradlew assembleRelease -x lint --info
+        run: ./gradlew assembleRelease -x lint --stacktrace --info
         env:
           SIGNING_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Upload Signed Release APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: DualModeKeyBoard-signed-release
-          path: |
-            app/build/outputs/apk/release/*.apk
+          path: app/build/outputs/apk/release/*.apk
           retention-days: 90
