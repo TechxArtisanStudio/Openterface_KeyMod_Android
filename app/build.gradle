@@ -51,4 +51,5 @@ dependencies {
     androidTestImplementation libs.espresso.core
 
     implementation libs.usb.serial.for.android
+    implementation 'com.polidea.rxandroidble2:rxandroidble:1.19.0'
 }

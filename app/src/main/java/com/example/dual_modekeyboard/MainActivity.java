@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.hardware.usb.UsbDevice;
@@ -15,11 +16,12 @@ import android.os.Handler;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
@@ -30,9 +32,14 @@ import com.example.serial.UsbDeviceManager;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
+import com.polidea.rxandroidble2.RxBleClient;
+import com.polidea.rxandroidble2.scan.ScanSettings;
 
 import java.io.IOException;
 import java.util.List;
+
+import io.reactivex.disposables.Disposable;
+import android.Manifest;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -45,10 +52,13 @@ public class MainActivity extends AppCompatActivity {
     private UsbDeviceManager.OnDataReadListener onDataReadListener;
     private static final String ACTION_USB_PERMISSION = "com.example.ch32v208serial.USB_PERMISSION";
 
-    private Button keyBoard, mouse, keyBoardMouse, question, info;
-    private Drawable keyBoardDrawable, mouseDrawable, keyBoardMouseDrawable, questionDrawable, infoDrawable;
+    private Button bluetooth, keyBoard, mouse, keyBoardMouse, question, info;
+    private Drawable bluetoothDrawable, keyBoardDrawable, mouseDrawable, keyBoardMouseDrawable, questionDrawable, infoDrawable;
     private Button activeButton; // Track the currently active button
 
+    private RxBleClient rxBleClient;
+    private Disposable scanSubscription;
+    private static final int PERMISSION_REQUEST_CODE = 1;
 
     private final BroadcastReceiver usbReceiver = new BroadcastReceiver() {
         @Override
@@ -94,27 +104,8 @@ public class MainActivity extends AppCompatActivity {
         setActiveButton(keyBoardMouse, keyBoardMouseDrawable);
         showCompositeFragment();
 
-
-
-//        RightClickButton.setOnClickListener(new View.OnClickListener() {
-//           @Override
-//           public void onClick(View v) {
-//
-//           }
-//       });
-//
-//        leftClickButton.setOnClickListener(v -> {
-//            // Handle left click action
-//            String sendKBData = String.format("57AB00050501010000000E");
-////            sendKBData += CompositeFragment.makeChecksum(sendKBData);
-//            byte[] sendKBDataBytes = CompositeFragment.hexStringToByteArray(sendKBData);
-//            try {
-//                port.write(sendKBDataBytes, 20);
-//            } catch (IOException e) {
-//                throw new RuntimeException(e);
-//            }
-//            CustomKeyboardView.releaseAllData();
-//        });
+        // init RxBleClient
+        rxBleClient = RxBleClient.create(this);
     }
 
     private void initializeUIComponents() {
@@ -129,12 +120,14 @@ public class MainActivity extends AppCompatActivity {
 
         textView = findViewById(R.id.textView);
 
+        bluetooth = findViewById(R.id.bluetooth);
         keyBoard = findViewById(R.id.keyBoard);
         mouse = findViewById(R.id.mouse);
         keyBoardMouse = findViewById(R.id.keyBoardMouse);
         question = findViewById(R.id.question);
         info = findViewById(R.id.info);
 
+        if (bluetooth != null) bluetoothDrawable = bluetooth.getCompoundDrawables()[1];
         if (keyBoard != null) keyBoardDrawable = keyBoard.getCompoundDrawables()[1];
         if (mouse != null) mouseDrawable = mouse.getCompoundDrawables()[1];
         if (keyBoardMouse != null) keyBoardMouseDrawable = keyBoardMouse.getCompoundDrawables()[1];
@@ -144,7 +137,54 @@ public class MainActivity extends AppCompatActivity {
         setupButtonListeners();
     }
 
+    private void startScan() {
+        // Configure the scanning Settings
+        ScanSettings scanSettings = new ScanSettings.Builder().build();
+
+        // Start scanning and subscribe to the results
+        scanSubscription = rxBleClient.scanBleDevices(scanSettings)
+                .subscribe(
+                        (scanResult) -> {
+                            String deviceName = scanResult.getBleDevice().getName();
+                            Log.d("ScanResult", "find device: " + (deviceName != null ? deviceName : "unknown device"));
+                        },
+                        (Throwable throwable) -> {
+                            Log.e("ScanError", "scan error", throwable);
+                        }
+                );
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                BluetoothDialogFragment dialog = new BluetoothDialogFragment();
+                dialog.setRxBleClient(rxBleClient);
+                dialog.show(getSupportFragmentManager(), "BluetoothDialog");
+            } else {
+                Log.e("Permission", "location permission denied");
+            }
+        }
+    }
+
     private void setupButtonListeners() {
+        if (bluetooth != null) {
+            setOnClickListener(bluetooth, bluetoothDrawable, () -> {
+                // Check and request permissions
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED ||
+                        ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(this,
+                            new String[]{Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN},
+                            PERMISSION_REQUEST_CODE);
+                } else {
+                    BluetoothDialogFragment dialog = new BluetoothDialogFragment();
+                    dialog.setRxBleClient(rxBleClient);
+                    dialog.show(getSupportFragmentManager(), "BluetoothDialog");
+                }
+            });
+        }
+
         if (keyBoard != null) {
             setOnClickListener(keyBoard, keyBoardDrawable, this::showKeyboardFragment);
         }
@@ -241,6 +281,9 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         unregisterReceiver(usbReceiver);
+        if (scanSubscription != null && !scanSubscription.isDisposed()) {
+            scanSubscription.dispose();
+        }
     }
 
     private void startReading() {
@@ -280,7 +323,6 @@ public class MainActivity extends AppCompatActivity {
         UsbDevice device = driver.getDevice();
         UsbDeviceConnection connection = manager.openDevice(device);
         if (connection == null) {
-            Toast.makeText(this, "Failed to open USB device connection", Toast.LENGTH_LONG).show();
             return;
         }
 
