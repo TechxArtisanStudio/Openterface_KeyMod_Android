@@ -1,24 +1,21 @@
 package com.example.dual_modekeyboard;
 
-import static android.content.ContentValues.TAG;
-import static com.example.serial.UsbDeviceManager.port;
-
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.Color;
 import android.os.Handler;
-import android.text.Editable;
-import android.text.Spannable;
+import android.os.IBinder;
 import android.text.SpannableString;
-import android.text.style.ForegroundColorSpan;
-import android.text.style.RelativeSizeSpan;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 
@@ -34,21 +31,38 @@ import java.util.Arrays;
 import java.util.List;
 
 public class CustomKeyboardView extends LinearLayout {
-    private boolean isCaps = false;
-    private boolean isCapsLocked = false;
+    private static final String TAG = "CustomKeyboardView";
     private boolean isShiftLeftLocked = false;
     private boolean isCtrlLeftLocked = false;
     private boolean isAltLeftLocked = false;
     private boolean isWinLeftLocked = false;
+    private boolean isRunning = true;
     private boolean isSymbolMode = false;
     private List<List<Key>> lowerKeys;
-    private static UsbSerialPort port;
-
+    private UsbSerialPort port;
     private Handler repeatHandler = new Handler();
     private Runnable repeatRunnable;
     private boolean isRepeating = false;
 
-//    private static UsbDeviceManager usbDeviceManager;
+    private BluetoothService bluetoothService;
+    private boolean isServiceBound;
+
+    private final ServiceConnection serviceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            BluetoothService.BluetoothBinder binder = (BluetoothService.BluetoothBinder) service;
+            bluetoothService = binder.getService();
+            isServiceBound = true;
+            Log.d(TAG, "Bound to BluetoothService");
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            isServiceBound = false;
+            bluetoothService = null;
+            Log.d(TAG, "Unbound from BluetoothService");
+        }
+    };
 
     private static class Key {
         String label;
@@ -80,10 +94,15 @@ public class CustomKeyboardView extends LinearLayout {
     private void init(Context context) {
         setOrientation(VERTICAL);
         lowerKeys = parseKeyboard(context, R.xml.keyboard_lower);
-        System.out.println("Parsed keyboards: lowerKeys=" + lowerKeys.size());
+        Log.d(TAG, "Parsed keyboards: lowerKeys=" + lowerKeys.size());
+        bindService(context);
         updateKeyboard();
     }
 
+    private void bindService(Context context) {
+        Intent intent = new Intent(context, BluetoothService.class);
+        context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+    }
 
     private List<List<Key>> parseKeyboard(Context context, int resourceId) {
         List<List<Key>> rows = new ArrayList<>();
@@ -231,21 +250,17 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void updateKeyboard() {
-
         removeAllViews();
-        List<List<Key>> currentKeys;
-        currentKeys = lowerKeys;
+        List<List<Key>> currentKeys = lowerKeys;
 
         int screenHeight = getContext().getResources().getDisplayMetrics().heightPixels;
         int screenWidth = getContext().getResources().getDisplayMetrics().widthPixels;
         int keyboardHeight = screenHeight;
         int rowHeight = keyboardHeight / 8;
 
-        System.out.println("Screen Height: " + screenHeight + ", Screen Width: " + screenWidth + ", Row Height: " + rowHeight);
+        Log.d(TAG, "Screen Height: " + screenHeight + ", Screen Width: " + screenWidth + ", Row Height: " + rowHeight);
 
-        String[] functionalKeyCodes = {"46", "47", "48", "49", "4A",
-                "4B", "4C", "4D", "4E", "3B", "3C", "3D", "3E", "3F", "29", "3A",
-                "40", "41", "42", "43", "44", "45", "3D", "3F",};
+        String[] functionalKeyCodes = {"46", "47", "48", "49", "4A", "4B", "4C", "4D", "4E", "3B", "3C", "3D", "3E", "3F", "29", "3A", "40", "41", "42", "43", "44", "45", "3D", "3F"};
 
         for (List<Key> row : currentKeys) {
             LinearLayout rowLayout = new LinearLayout(getContext());
@@ -271,7 +286,7 @@ public class CustomKeyboardView extends LinearLayout {
                 for (String functionCode : functionalKeyCodes) {
                     if (key.codeStr.equals(functionCode)) {
                         isFunctionalKey = true;
-                        System.out.println("Matched functional key: label=" + key.label + ", code=0x" + Integer.toHexString(key.code));
+                        Log.d(TAG, "Matched functional key: label=" + key.label + ", code=0x" + Integer.toHexString(key.code));
                         break;
                     }
                 }
@@ -297,15 +312,15 @@ public class CustomKeyboardView extends LinearLayout {
                     textButton.setLayoutParams(params);
                     textButton.setBackgroundResource(R.drawable.key_background);
                     textButton.setGravity(Gravity.CENTER);
-                    textButton.setTextSize(12); // Set smaller base text size to make size difference visible
-                    textButton.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2)); // Adjust padding
+                    textButton.setTextSize(12);
+                    textButton.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
 
                     if (isFunctionalKey) {
                         textButton.setBackgroundResource(R.drawable.function_button_background);
                     } else if (key.code == 0xE1 && isShiftLeftLocked) {
                         textButton.setBackgroundResource(R.drawable.press_button_background);
                         textButton.setSelected(isSymbolMode);
-                    }  else if (key.code == 0xE0 && isCtrlLeftLocked) {
+                    } else if (key.code == 0xE0 && isCtrlLeftLocked) {
                         textButton.setBackgroundResource(R.drawable.press_button_background);
                     } else if (key.code == 0xE2 && isAltLeftLocked) {
                         textButton.setBackgroundResource(R.drawable.press_button_background);
@@ -317,17 +332,16 @@ public class CustomKeyboardView extends LinearLayout {
                         String displayLabel = key.label;
                         String symbolLabel = key.symbolLabel;
 
-                        // Check if the label contains a newline (e.g., "!\n1")
                         if (!isSymbolMode && displayLabel.contains("\n")) {
                             String[] parts = displayLabel.split("\n");
                             if (parts.length == 2) {
-                                symbolLabel = parts[0]; // e.g., "!"
-                                displayLabel = parts[1]; // e.g., "1"
+                                symbolLabel = parts[0];
+                                displayLabel = parts[1];
                             }
                             String combinedText = symbolLabel + "\n" + displayLabel;
                             SpannableString spannable = new SpannableString(combinedText);
                             textButton.setText(spannable);
-                            System.out.println("Applied Spannable: combinedText=" + combinedText + ", symbolLabel=" + symbolLabel + ", displayLabel=" + displayLabel);
+                            Log.d(TAG, "Applied Spannable: combinedText=" + combinedText + ", symbolLabel=" + symbolLabel + ", displayLabel=" + displayLabel);
                         } else {
                             textButton.setText(isSymbolMode && !symbolLabel.isEmpty() ? symbolLabel : displayLabel);
                             textButton.setTextColor(Color.BLACK);
@@ -373,13 +387,13 @@ public class CustomKeyboardView extends LinearLayout {
             data[i / 2] = (byte) ((Character.digit(ByteData.charAt(i), 16) << 4)
                     + Character.digit(ByteData.charAt(i + 1), 16));
         }
-        System.out.println("Data: " + Arrays.toString(data));
+        Log.d(TAG, "Data: " + Arrays.toString(data));
         return data;
     }
 
     public void setPort(UsbSerialPort port) {
         this.port = port;
-        System.out.println("Port set in CustomKeyboardView: " + (port != null ? "Valid" : "Null"));
+        Log.d(TAG, "Port set in CustomKeyboardView: " + (port != null ? "Valid" : "Null"));
     }
 
     public static String makeChecksum(String data) {
@@ -395,17 +409,28 @@ public class CustomKeyboardView extends LinearLayout {
         return String.format("%02X", mod);
     }
 
-    public static void releaseAllData(){
+    public void sendReleaseData() {
         String releaseSendMSData = "57AB00020800000000000000000C";
-        byte[] releaseSendKBDataBytes = hexStringToByteArray(releaseSendMSData);
-        try {
-            Thread.sleep(10);
-            port.write(releaseSendKBDataBytes, 20);
-            System.out.println("Successfully sent release data");
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+        if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+            try {
+                byte[] releaseSendKBDataBytes = hexStringToByteArray(releaseSendMSData);
+                Thread.sleep(50);
+                bluetoothService.sendData(releaseSendKBDataBytes);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            Log.d(TAG, "Sent Bluetooth release data");
+        } else if (port != null) {
+            try {
+                byte[] releaseSendKBDataBytes = hexStringToByteArray(releaseSendMSData);
+                Thread.sleep(10);
+                port.write(releaseSendKBDataBytes, 20);
+                Log.d(TAG, "Sent USB release data");
+            } catch (IOException | InterruptedException e) {
+                Log.e(TAG, "Error sending USB release data: " + e.getMessage());
+            }
+        } else {
+            Log.w(TAG, "No connection available for release data");
         }
     }
 
@@ -414,19 +439,13 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void handleKeyPress(Key key) {
-        System.out.println("Key pressed: label=" + key.label + ", code=" + key.code);
-        if (port == null) {
-            return;
-        }
+        Log.d(TAG, "Key pressed: label=" + key.label + ", code=" + key.code);
 
-        // Handle modifier key toggles (Shift, Ctrl, Alt, Win)
         boolean updateRequired = false;
         switch (key.code) {
             case 0xE1: // Shift Left
                 isSymbolMode = !isSymbolMode;
                 isShiftLeftLocked = !isShiftLeftLocked;
-                isCaps = false;
-                isCapsLocked = false;
                 updateRequired = true;
                 break;
             case 0xE0: // Ctrl Left
@@ -447,23 +466,31 @@ public class CustomKeyboardView extends LinearLayout {
             updateKeyboard();
         }
 
-        // Calculate combined modifier value
         int combinedValue = 0;
         combinedValue += isCtrlLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Ctrl")) : 0;
         combinedValue += isShiftLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift")) : 0;
         combinedValue += isAltLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Alt")) : 0;
         combinedValue += isWinLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Win")) : 0;
 
-        // Send key data
-        try {
-            String sendKBData = String.format("57AB000208%02X00%02X0000000000", combinedValue, key.code);
-            sendKBData += makeChecksum(sendKBData);
+        String sendKBData = String.format("57AB000208%02X00%02X0000000000", combinedValue, key.code);
+        sendKBData += makeChecksum(sendKBData);
+
+        if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
             byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
-            port.write(sendKBDataBytes, 20);
-            System.out.println("Successfully sent data for key code: 0x" + String.format("%02X", key.code));
-            releaseAllData();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+            bluetoothService.sendData(sendKBDataBytes);
+            Log.d(TAG, "Sent Bluetooth data: " + sendKBData);
+            sendReleaseData();
+        } else if (port != null) {
+            try {
+                byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
+                port.write(sendKBDataBytes, 20);
+                Log.d(TAG, "Sent USB data: " + sendKBData);
+                sendReleaseData();
+            } catch (IOException e) {
+                Log.e(TAG, "Error sending USB data: " + e.getMessage());
+            }
+        } else {
+            Log.w(TAG, "No connection available (Bluetooth or USB)");
         }
     }
 
@@ -494,5 +521,15 @@ public class CustomKeyboardView extends LinearLayout {
     private int dpToPx(int dp) {
         float density = getContext().getResources().getDisplayMetrics().density;
         return Math.round(dp * density);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        if (isServiceBound) {
+            getContext().unbindService(serviceConnection);
+            isServiceBound = false;
+            Log.d(TAG, "Unbound from BluetoothService");
+        }
     }
 }

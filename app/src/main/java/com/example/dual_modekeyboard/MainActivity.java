@@ -1,10 +1,11 @@
 package com.example.dual_modekeyboard;
 
-import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
@@ -13,6 +14,7 @@ import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -33,20 +35,18 @@ import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
 import com.polidea.rxandroidble2.RxBleClient;
-import com.polidea.rxandroidble2.scan.ScanSettings;
 
 import java.io.IOException;
 import java.util.List;
 
 import io.reactivex.disposables.Disposable;
 import android.Manifest;
-
+import com.polidea.rxandroidble2.scan.ScanSettings;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
     private TextView textView;
     private UsbSerialPort port;
-
     private boolean isReading = false;
     private Handler mSerialAsyncHandler;
     private UsbDeviceManager.OnDataReadListener onDataReadListener;
@@ -54,11 +54,32 @@ public class MainActivity extends AppCompatActivity {
 
     private Button bluetooth, keyBoard, mouse, keyBoardMouse, question, info;
     private Drawable bluetoothDrawable, keyBoardDrawable, mouseDrawable, keyBoardMouseDrawable, questionDrawable, infoDrawable;
-    private Button activeButton; // Track the currently active button
+    private Button activeButton;
 
     private RxBleClient rxBleClient;
     private Disposable scanSubscription;
     private static final int PERMISSION_REQUEST_CODE = 1;
+
+    private BluetoothService bluetoothService;
+    private boolean isServiceBound;
+
+    private final ServiceConnection serviceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            BluetoothService.BluetoothBinder binder = (BluetoothService.BluetoothBinder) service;
+            bluetoothService = binder.getService();
+            isServiceBound = true;
+            bluetoothService.setRxBleClient(rxBleClient);
+            Log.d(TAG, "Bound to BluetoothService");
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            isServiceBound = false;
+            bluetoothService = null;
+            Log.d(TAG, "Unbound from BluetoothService");
+        }
+    };
 
     private final BroadcastReceiver usbReceiver = new BroadcastReceiver() {
         @Override
@@ -78,20 +99,24 @@ public class MainActivity extends AppCompatActivity {
                         Toast.makeText(context, "USB device disconnected", Toast.LENGTH_SHORT).show();
                         textView.setText("USB device disconnected");
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        Log.e(TAG, "Error closing USB port: " + e.getMessage());
                     }
                 }
             }
         }
     };
 
-    @SuppressLint("MissingInflatedId")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         initializeUIComponents();
+
+        rxBleClient = RxBleClient.create(this);
+        Intent intent = new Intent(this, BluetoothService.class);
+        startService(intent);
+        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
 
         setupUsbSerial();
 
@@ -100,14 +125,11 @@ public class MainActivity extends AppCompatActivity {
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         registerReceiver(usbReceiver, filter);
 
-        // Set default fragment and button state
         setActiveButton(keyBoardMouse, keyBoardMouseDrawable);
         showCompositeFragment();
-
-        // init RxBleClient
-        rxBleClient = RxBleClient.create(this);
     }
 
+    // ... (initializeUIComponents, setupButtonListeners, setOnClickListener, setActiveButton, resetButtonColors remain unchanged) ...
     private void initializeUIComponents() {
         View decorView = getWindow().getDecorView();
         decorView.setSystemUiVisibility(
@@ -284,12 +306,16 @@ public class MainActivity extends AppCompatActivity {
         if (scanSubscription != null && !scanSubscription.isDisposed()) {
             scanSubscription.dispose();
         }
+        if (isServiceBound) {
+            unbindService(serviceConnection);
+            isServiceBound = false;
+        }
     }
 
     private void startReading() {
         new Thread(() -> {
             try {
-                while (true) {
+                while (isReading) {
                     byte[] buffer = new byte[1024];
                     int numBytesRead = port.read(buffer, 5);
                     if (numBytesRead > 0) {
@@ -305,7 +331,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.e(TAG, "Error reading USB data: " + e.getMessage());
             }
         }).start();
     }
@@ -323,6 +349,7 @@ public class MainActivity extends AppCompatActivity {
         UsbDevice device = driver.getDevice();
         UsbDeviceConnection connection = manager.openDevice(device);
         if (connection == null) {
+            Toast.makeText(this, "Failed to open USB device connection", Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -332,10 +359,11 @@ public class MainActivity extends AppCompatActivity {
             port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
             Toast.makeText(this, "Successful to open serial port", Toast.LENGTH_LONG).show();
             textView.setText("Successful to open serial port");
+            isReading = true;
             updateFragmentsWithPort(port);
             startReading();
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, "Failed to open serial port: " + e.getMessage());
             Toast.makeText(this, "Failed to open serial port", Toast.LENGTH_LONG).show();
         }
     }
