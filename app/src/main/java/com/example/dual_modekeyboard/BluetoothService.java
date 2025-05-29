@@ -13,12 +13,15 @@ import androidx.annotation.Nullable;
 import com.polidea.rxandroidble2.RxBleClient;
 import com.polidea.rxandroidble2.RxBleConnection;
 import com.polidea.rxandroidble2.RxBleDevice;
+import com.polidea.rxandroidble2.exceptions.BleDisconnectedException;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import io.reactivex.Observable;
 import io.reactivex.disposables.CompositeDisposable;
@@ -40,7 +43,7 @@ public class BluetoothService extends Service {
     private Disposable reconnectDisposable;
 
     public class BluetoothBinder extends Binder {
-        BluetoothService getService() {
+        public BluetoothService getService() {
             return BluetoothService.this;
         }
     }
@@ -62,6 +65,14 @@ public class BluetoothService extends Service {
         }
 
         String deviceAddress = device.getMacAddress();
+
+        // Check if already connected to this device
+        if (isConnected() && connectedDevice != null &&
+                connectedDevice.getMacAddress().equals(deviceAddress)) {
+            Log.d(TAG, "Already connected to device: " + sanitizeDeviceName(device.getName()) + " (" + deviceAddress + ")");
+            return;
+        }
+
         synchronized (connectingDevices) {
             if (connectingDevices.contains(deviceAddress)) {
                 Log.d(TAG, "Already connecting to device: " + sanitizeDeviceName(device.getName()) + " (" + deviceAddress + ")");
@@ -73,7 +84,6 @@ public class BluetoothService extends Service {
         stopReconnect(); // Clear previous reconnect attempts
         connectedDevice = device;
 
-        // Use autoConnect=false and handle reconnection via retry logic
         Disposable connectionDisposable = device.establishConnection(false)
                 .doOnDispose(() -> {
                     synchronized (connectingDevices) {
@@ -88,7 +98,6 @@ public class BluetoothService extends Service {
                             }
                             activeConnection = connection;
                             Log.d(TAG, "Connected to " + sanitizeDeviceName(device.getName()) + " (" + deviceAddress + ")");
-                            // Connection established, no need for separate monitoring
                         },
                         throwable -> {
                             synchronized (connectingDevices) {
@@ -96,6 +105,21 @@ public class BluetoothService extends Service {
                             }
                             Log.e(TAG, "Connection error for device " + sanitizeDeviceName(device.getName()) + " (" + deviceAddress + "): " + throwable.toString());
                             activeConnection = null;
+                            // Check if the error is a BleDisconnectedException with status 255
+                            if (throwable instanceof BleDisconnectedException) {
+                                String errorMessage = throwable.toString();
+                                // Parse status from message (e.g., "with status 255")
+                                Pattern pattern = Pattern.compile("with status (\\d+)");
+                                Matcher matcher = pattern.matcher(errorMessage);
+                                if (matcher.find()) {
+                                    int status = Integer.parseInt(matcher.group(1));
+                                    if (status == 255) {
+                                        Log.w(TAG, "Skipping reconnect due to GATT_OUT_OF_RANGE error (status 255)");
+                                        return;
+                                    }
+                                }
+                            }
+                            // Schedule reconnect for other cases
                             scheduleReconnect(device);
                         }
                 );

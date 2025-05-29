@@ -1,7 +1,6 @@
 package com.example.dual_modekeyboard;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.content.ComponentName;
 import android.content.Context;
@@ -55,7 +54,6 @@ public class BluetoothDialogFragment extends DialogFragment {
     private ListView devicesListView;
     private Button closeButton;
     private Button scanButton;
-    private Button sendButton;
     private CustomDeviceAdapter devicesAdapter;
     private ArrayList<DeviceItem> devicesList;
     private RxBleClient rxBleClient;
@@ -74,9 +72,27 @@ public class BluetoothDialogFragment extends DialogFragment {
             bluetoothService = binder.getService();
             isServiceBound = true;
             bluetoothService.setRxBleClient(rxBleClient);
-            if (bluetoothAdapter.isEnabled() && !pairedDevices.isEmpty()) {
-                RxBleDevice device = pairedDevices.get(0);
-                bluetoothService.connectToDevice(device);
+            // Check for connected device and update list
+            if (bluetoothAdapter.isEnabled() && isServiceBound) {
+                RxBleDevice connectedDevice = bluetoothService.getConnectedDevice();
+                if (connectedDevice != null) {
+                    // Ensure connected device is in pairedDevices
+                    boolean exists = false;
+                    for (RxBleDevice device : pairedDevices) {
+                        if (device.getMacAddress().equals(connectedDevice.getMacAddress()) &&
+                                sanitizeDeviceName(device.getName()).equals(sanitizeDeviceName(connectedDevice.getName()))) {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    if (!exists) {
+                        pairedDevices.add(connectedDevice);
+                        savePairedDevice(connectedDevice);
+                    }
+                    updateDeviceList();
+                } else if (!pairedDevices.isEmpty()) {
+                    bluetoothService.connectToDevice(pairedDevices.get(0));
+                }
             }
         }
 
@@ -172,6 +188,10 @@ public class BluetoothDialogFragment extends DialogFragment {
         initializeUIComponents(view);
         initializeBluetooth();
         bindService();
+        // Refresh device list to show connected device
+        if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+            updateDeviceList();
+        }
         return view;
     }
 
@@ -203,7 +223,6 @@ public class BluetoothDialogFragment extends DialogFragment {
         devicesListView = view.findViewById(R.id.devices_list);
         closeButton = view.findViewById(R.id.close_button);
         scanButton = view.findViewById(R.id.scan_button);
-        sendButton = view.findViewById(R.id.send_button);
 
         devicesList = new ArrayList<>();
         pairedDevices = pairedDevices != null ? pairedDevices : new ArrayList<>();
@@ -230,11 +249,32 @@ public class BluetoothDialogFragment extends DialogFragment {
                 String deviceName = sanitizeDeviceName(selectedBleDevice.getName());
                 if (deviceName.matches("(?i)openterface KM.*")) {
                     if (isServiceBound) {
-                        bluetoothService.connectToDevice(selectedBleDevice);
-                        if (!pairedDevices.contains(selectedBleDevice)) {
-                            pairedDevices.add(selectedBleDevice);
-                            savePairedDevice(selectedBleDevice);
-                            updateDeviceList();
+                        // Check if the device is already connected
+                        if (bluetoothService.isConnected() &&
+                                bluetoothService.getConnectedDevice() != null &&
+                                bluetoothService.getConnectedDevice().getMacAddress().equals(selectedBleDevice.getMacAddress())) {
+                            showToast("Device is already connected");
+                            return;
+                        }
+                        // Verify name and MAC address match a paired device
+                        boolean isPaired = false;
+                        for (RxBleDevice device : pairedDevices) {
+                            if (device.getMacAddress().equals(selectedBleDevice.getMacAddress()) &&
+                                    sanitizeDeviceName(device.getName()).equals(deviceName)) {
+                                isPaired = true;
+                                break;
+                            }
+                        }
+                        if (isPaired || item.type == DeviceItem.TYPE_DEVICE) {
+                            bluetoothService.connectToDevice(selectedBleDevice);
+                            // Add to pairedDevices if not already present
+                            if (!isPaired) {
+                                pairedDevices.add(selectedBleDevice);
+                                savePairedDevice(selectedBleDevice);
+                                updateDeviceList();
+                            }
+                        } else {
+                            showToast("Device name or MAC address does not match paired device");
                         }
                     }
                 } else {
@@ -256,14 +296,6 @@ public class BluetoothDialogFragment extends DialogFragment {
                 showToast("Please enable Bluetooth first");
             }
         });
-
-        if (sendButton != null) {
-            sendButton.setOnClickListener(v -> {
-                if (isServiceBound) {
-//                    bluetoothService.sendData("57AB0005050100FD00000A");
-                }
-            });
-        }
     }
 
     private void initializeBluetooth() {
@@ -316,6 +348,10 @@ public class BluetoothDialogFragment extends DialogFragment {
         if (!bluetoothAdapter.isEnabled()) {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BLUETOOTH);
+        } else if (isServiceBound && bluetoothService.isConnected()) {
+            // Skip scan if already connected
+            showToast("Already connected to a device");
+            updateDeviceList();
         } else if (!isScanning && isServiceBound && !pairedDevices.isEmpty()) {
             bluetoothService.connectToDevice(pairedDevices.get(0));
         } else if (!isScanning) {
@@ -449,24 +485,55 @@ public class BluetoothDialogFragment extends DialogFragment {
         SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         Set<String> pairedDeviceSet = new HashSet<>(prefs.getStringSet(KEY_PAIRED_DEVICES, new HashSet<>()));
         String deviceEntry = device.getMacAddress() + ";" + sanitizeDeviceName(device.getName());
+
+        // Remove any existing entry with the same MAC address to avoid duplicates
+        pairedDeviceSet.removeIf(entry -> entry.startsWith(device.getMacAddress() + ";"));
         pairedDeviceSet.add(deviceEntry);
-        prefs.edit().putStringSet(KEY_PAIRED_DEVICES, pairedDeviceSet).commit();
+
+        prefs.edit().putStringSet(KEY_PAIRED_DEVICES, pairedDeviceSet).apply();
+        Log.d(TAG, "Saved paired device: " + deviceEntry);
     }
 
     private void loadPairedDevices() {
         pairedDevices = new ArrayList<>();
         SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         Set<String> pairedDeviceSet = prefs.getStringSet(KEY_PAIRED_DEVICES, new HashSet<>());
+        Set<String> uniqueMacAddresses = new HashSet<>();
+
         for (String deviceEntry : pairedDeviceSet) {
             String[] parts = deviceEntry.split(";", 2);
-            if (parts.length == 0) continue;
+            if (parts.length < 2) continue; // Skip invalid entries
             String macAddress = parts[0];
+            String storedName = parts[1];
+
+            if (!uniqueMacAddresses.add(macAddress)) {
+                Log.w(TAG, "Duplicate MAC address found in SharedPreferences: " + macAddress);
+                continue;
+            }
+
             try {
                 RxBleDevice device = rxBleClient.getBleDevice(macAddress);
-                pairedDevices.add(device);
+                // Only add if the current device name matches the stored name
+                if (sanitizeDeviceName(device.getName()).equals(storedName)) {
+                    pairedDevices.add(device);
+                    Log.d(TAG, "Loaded paired device: " + macAddress + ", name: " + storedName);
+                } else {
+                    Log.w(TAG, "Device name mismatch for MAC " + macAddress + ": expected " + storedName + ", got " + sanitizeDeviceName(device.getName()));
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Error loading paired device: " + macAddress + ", error: " + e.getMessage());
             }
+        }
+
+        // Update SharedPreferences to remove invalid entries
+        if (pairedDeviceSet.size() != pairedDevices.size()) {
+            Set<String> cleanedDeviceSet = new HashSet<>();
+            for (RxBleDevice device : pairedDevices) {
+                String deviceEntry = device.getMacAddress() + ";" + sanitizeDeviceName(device.getName());
+                cleanedDeviceSet.add(deviceEntry);
+            }
+            prefs.edit().putStringSet(KEY_PAIRED_DEVICES, cleanedDeviceSet).apply();
+            Log.d(TAG, "Cleaned up invalid entries in SharedPreferences");
         }
     }
 

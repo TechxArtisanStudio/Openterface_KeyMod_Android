@@ -414,7 +414,7 @@ public class CustomKeyboardView extends LinearLayout {
         if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
             try {
                 byte[] releaseSendKBDataBytes = hexStringToByteArray(releaseSendMSData);
-                Thread.sleep(50);
+                Thread.sleep(10);
                 bluetoothService.sendData(releaseSendKBDataBytes);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
@@ -503,7 +503,7 @@ public class CustomKeyboardView extends LinearLayout {
             public void run() {
                 if (isRepeating) {
                     handleKeyPress(key);
-                    repeatHandler.postDelayed(this, 50);
+                    repeatHandler.postDelayed(this, 10);
                 }
             }
         };
