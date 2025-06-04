@@ -42,6 +42,8 @@ import java.util.List;
 import io.reactivex.disposables.Disposable;
 import android.Manifest;
 import com.polidea.rxandroidble2.scan.ScanSettings;
+import android.app.PendingIntent;
+
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
@@ -106,6 +108,26 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    private final BroadcastReceiver usbPermissionReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (ACTION_USB_PERMISSION.equals(action)) {
+                synchronized (this) {
+                    UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                    if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                        if (device != null) {
+                            setupUsbSerial(); // Reinitialize after the permission is granted
+                        }
+                    } else {
+                        Toast.makeText(context, "USB permission denied", Toast.LENGTH_SHORT).show();
+                        textView.setText("USB permission denied");
+                    }
+                }
+            }
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -118,18 +140,43 @@ public class MainActivity extends AppCompatActivity {
         startService(intent);
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
 
-        setupUsbSerial();
-
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
-        filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-        registerReceiver(usbReceiver, filter);
-
         setActiveButton(keyBoardMouse, keyBoardMouseDrawable);
         showCompositeFragment();
     }
 
-    // ... (initializeUIComponents, setupButtonListeners, setOnClickListener, setActiveButton, resetButtonColors remain unchanged) ...
+    @Override
+    protected void onResume() {
+        super.onResume();
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        filter.addAction(ACTION_USB_PERMISSION);
+        registerReceiver(usbReceiver, filter);
+        registerReceiver(usbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION));
+        setupUsbSerial(); // Try to initialize the USB device
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        unregisterReceiver(usbReceiver);
+        unregisterReceiver(usbPermissionReceiver);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (scanSubscription != null && !scanSubscription.isDisposed()) {
+            scanSubscription.dispose();
+        }
+        if (isServiceBound) {
+            unbindService(serviceConnection);
+            isServiceBound = false;
+        }
+        Intent intent = new Intent(this, BluetoothService.class);
+        stopService(intent); // stop servic
+    }
+
     private void initializeUIComponents() {
         View decorView = getWindow().getDecorView();
         decorView.setSystemUiVisibility(
@@ -160,10 +207,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startScan() {
-        // Configure the scanning Settings
         ScanSettings scanSettings = new ScanSettings.Builder().build();
-
-        // Start scanning and subscribe to the results
         scanSubscription = rxBleClient.scanBleDevices(scanSettings)
                 .subscribe(
                         (scanResult) -> {
@@ -193,7 +237,6 @@ public class MainActivity extends AppCompatActivity {
     private void setupButtonListeners() {
         if (bluetooth != null) {
             setOnClickListener(bluetooth, bluetoothDrawable, () -> {
-                // Check and request permissions
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED ||
                         ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
                     ActivityCompat.requestPermissions(this,
@@ -237,8 +280,8 @@ public class MainActivity extends AppCompatActivity {
     private void setOnClickListener(Button button, Drawable drawable, Runnable onClickAction) {
         if (button == null || drawable == null) return;
         button.setOnClickListener(v -> {
-            resetButtonColors(); // Reset colors of keyBoard, mouse, and keyBoardMouse
-            setActiveButton(button, drawable); // Set the clicked button as active
+            resetButtonColors();
+            setActiveButton(button, drawable);
             onClickAction.run();
         });
     }
@@ -248,12 +291,11 @@ public class MainActivity extends AppCompatActivity {
         int activeColor = getResources().getColor(android.R.color.holo_blue_light);
         button.setTextColor(activeColor);
         drawable.setColorFilter(activeColor, PorterDuff.Mode.SRC_IN);
-        activeButton = button; // Update the active button
+        activeButton = button;
     }
 
     private void resetButtonColors() {
-        // Reset only keyBoard, mouse, and keyBoardMouse to their initial colors
-        int defaultColor = getResources().getColor(android.R.color.black); // Assuming white as default text color
+        int defaultColor = getResources().getColor(android.R.color.black);
         resetButton(keyBoard, keyBoardDrawable, defaultColor);
         resetButton(mouse, mouseDrawable, defaultColor);
         resetButton(keyBoardMouse, keyBoardMouseDrawable, defaultColor);
@@ -262,7 +304,7 @@ public class MainActivity extends AppCompatActivity {
     private void resetButton(Button button, Drawable drawable, int defaultColor) {
         if (button != null && drawable != null) {
             button.setTextColor(defaultColor);
-            drawable.clearColorFilter(); // Reset drawable to original color
+            drawable.clearColorFilter();
         }
     }
 
@@ -296,19 +338,6 @@ public class MainActivity extends AppCompatActivity {
             if (keyboardView != null) {
                 keyboardView.setPort(newPort);
             }
-        }
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        unregisterReceiver(usbReceiver);
-        if (scanSubscription != null && !scanSubscription.isDisposed()) {
-            scanSubscription.dispose();
-        }
-        if (isServiceBound) {
-            unbindService(serviceConnection);
-            isServiceBound = false;
         }
     }
 
@@ -347,6 +376,15 @@ public class MainActivity extends AppCompatActivity {
 
         UsbSerialDriver driver = availableDrivers.get(0);
         UsbDevice device = driver.getDevice();
+
+        // check USB permission
+        if (!manager.hasPermission(device)) {
+            Intent permissionIntent = new Intent(ACTION_USB_PERMISSION);
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, permissionIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            manager.requestPermission(device, pendingIntent);
+            return;
+        }
+
         UsbDeviceConnection connection = manager.openDevice(device);
         if (connection == null) {
             Toast.makeText(this, "Failed to open USB device connection", Toast.LENGTH_LONG).show();
