@@ -175,6 +175,7 @@
         <item>Full KeyBoard</item>
     </string-array>
 
+    <string name="usbConnect">UsbConnect</string>
     <string name="bluetooth">Bluetooth</string>
     <string name="KeyBoard">KeyBoard</string>
     <string name="Mouse">Mouse</string>

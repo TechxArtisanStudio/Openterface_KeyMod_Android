@@ -65,6 +65,13 @@ public class BluetoothDialogFragment extends DialogFragment {
     private BluetoothService bluetoothService;
     private boolean isServiceBound;
 
+    // Callback interface to notify MainActivity of connection state changes
+    public interface BluetoothConnectionListener {
+        void onBluetoothConnectionChanged(boolean isConnected);
+    }
+
+    private BluetoothConnectionListener connectionListener;
+
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
@@ -72,6 +79,12 @@ public class BluetoothDialogFragment extends DialogFragment {
             bluetoothService = binder.getService();
             isServiceBound = true;
             bluetoothService.setRxBleClient(rxBleClient);
+            boolean isConnected = bluetoothService.isConnected();
+            ((MainActivity) requireActivity()).isBluetoothConnected = isConnected;
+            // Notify MainActivity of initial connection state
+            if (connectionListener != null) {
+                connectionListener.onBluetoothConnectionChanged(isConnected);
+            }
             // Check for connected device and update list
             if (bluetoothAdapter.isEnabled() && isServiceBound) {
                 RxBleDevice connectedDevice = bluetoothService.getConnectedDevice();
@@ -100,6 +113,11 @@ public class BluetoothDialogFragment extends DialogFragment {
         public void onServiceDisconnected(ComponentName name) {
             isServiceBound = false;
             bluetoothService = null;
+            ((MainActivity) requireActivity()).isBluetoothConnected = false;
+            // Notify MainActivity of disconnection
+            if (connectionListener != null) {
+                connectionListener.onBluetoothConnectionChanged(false);
+            }
         }
     };
 
@@ -140,6 +158,7 @@ public class BluetoothDialogFragment extends DialogFragment {
                 textView.setTypeface(null, android.graphics.Typeface.BOLD);
                 convertView.setEnabled(false);
                 convertView.setOnClickListener(null);
+//                convert comienza a partir de aquíconvertView.setOnClickListener(null);
             } else {
                 if (convertView == null || convertView.getTag() == null || !convertView.getTag().equals("DEVICE")) {
                     convertView = LayoutInflater.from(getContext()).inflate(android.R.layout.simple_list_item_1, parent, false);
@@ -180,6 +199,11 @@ public class BluetoothDialogFragment extends DialogFragment {
         this.rxBleClient = client;
     }
 
+    // Set the connection listener
+    public void setConnectionListener(BluetoothConnectionListener listener) {
+        this.connectionListener = listener;
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -188,6 +212,9 @@ public class BluetoothDialogFragment extends DialogFragment {
         initializeUIComponents(view);
         initializeBluetooth();
         bindService();
+        if (!isServiceBound) {
+            bindService(); // Retry binding if not already bound
+        }
         // Refresh device list to show connected device
         if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
             updateDeviceList();
@@ -272,6 +299,10 @@ public class BluetoothDialogFragment extends DialogFragment {
                                 pairedDevices.add(selectedBleDevice);
                                 savePairedDevice(selectedBleDevice);
                                 updateDeviceList();
+                            }
+                            // Notify MainActivity of connection
+                            if (connectionListener != null) {
+                                connectionListener.onBluetoothConnectionChanged(true);
                             }
                         } else {
                             showToast("Device name or MAC address does not match paired device");
@@ -376,6 +407,10 @@ public class BluetoothDialogFragment extends DialogFragment {
             devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Scanned BLE Devices", null));
             mainHandler.post(() -> devicesAdapter.notifyDataSetChanged());
             showToast("Bluetooth disabled");
+            // Notify MainActivity of disconnection
+            if (connectionListener != null) {
+                connectionListener.onBluetoothConnectionChanged(false);
+            }
         }
     }
 

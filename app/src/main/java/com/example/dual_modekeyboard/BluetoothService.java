@@ -149,7 +149,7 @@ public class BluetoothService extends Service {
     }
 
     @SuppressLint("CheckResult")
-    public void sendData(byte[] keyBoardData) {
+    public void     sendData(byte[] keyBoardData) {
         if (activeConnection == null) {
             Log.w(TAG, "Cannot send data: No active connection");
             if (connectedDevice != null) {
@@ -201,5 +201,14 @@ public class BluetoothService extends Service {
         connectedDevice = null;
         stopReconnect();
         Log.d(TAG, "BluetoothService destroyed");
+    }
+
+    public void disconnect() {
+        if (activeConnection != null) {
+            connectionDisposables.clear();
+            activeConnection = null;
+            connectedDevice = null;
+            Log.d(TAG, "Bluetooth disconnected");
+        }
     }
 }

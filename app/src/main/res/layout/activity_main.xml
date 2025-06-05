@@ -9,7 +9,8 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:paddingTop="3dp">
 
         <TextView
             android:id="@+id/textView"
@@ -18,6 +19,19 @@
             android:layout_weight="3"
             android:text="this is textView"
             android:gravity="center"/>
+
+        <android.widget.Button
+            android:id="@+id/usbConnect"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:background="@android:color/transparent"
+            android:drawableTop="@drawable/usb_plug"
+            android:scaleType="fitCenter"
+            android:text="@string/usbConnect"
+            android:textSize="12sp"
+            android:textColor="@color/black"
+            android:theme="@style/FontStyle"/>
 
         <android.widget.Button
             android:id="@+id/bluetooth"
