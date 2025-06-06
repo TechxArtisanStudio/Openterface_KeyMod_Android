@@ -182,4 +182,6 @@
     <string name="CompositeMode">Composite Mode</string>
     <string name="Instructions">Instructions</string>
     <string name="About">About</string>
+
+    <string name="ShortCut">ShortCut</string>
 </resources>

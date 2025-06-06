@@ -19,6 +19,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -52,7 +53,7 @@ public class BluetoothDialogFragment extends DialogFragment {
     private BluetoothAdapter bluetoothAdapter;
     private Switch bluetoothSwitch;
     private ListView devicesListView;
-    private Button closeButton;
+    private ImageButton closeButton;
     private Button scanButton;
     private CustomDeviceAdapter devicesAdapter;
     private ArrayList<DeviceItem> devicesList;
@@ -466,7 +467,6 @@ public class BluetoothDialogFragment extends DialogFragment {
                                     devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device));
                                     mainHandler.post(() -> {
                                         devicesAdapter.notifyDataSetChanged();
-                                        showToast("Found openterface KM: " + deviceName);
                                     });
 
                                     stopScan();
@@ -482,7 +482,6 @@ public class BluetoothDialogFragment extends DialogFragment {
                             }
                     );
         }
-        showToast("Scanning for openterface KM devices...");
     }
 
     private void stopScan() {
@@ -494,7 +493,6 @@ public class BluetoothDialogFragment extends DialogFragment {
                 isScanning = false;
                 mainHandler.post(() -> {
                     scanButton.setEnabled(true);
-                    showToast("Scan stopped");
                 });
             }
         }

@@ -8,17 +8,9 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_weight="1.1"
         android:orientation="horizontal"
         android:paddingTop="3dp">
-
-        <TextView
-            android:id="@+id/textView"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="3"
-            android:text="this is textView"
-            android:gravity="center"/>
 
         <android.widget.Button
             android:id="@+id/usbConnect"
@@ -107,6 +99,19 @@
             android:drawableTop="@drawable/info_lg"
             android:scaleType="fitCenter"
             android:text="@string/About"
+            android:textSize="12sp"
+            android:textColor="@color/black"
+            android:theme="@style/FontStyle"/>
+
+        <android.widget.Button
+            android:id="@+id/shortcut"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:background="@android:color/transparent"
+            android:drawableTop="@drawable/three_dots"
+            android:scaleType="fitCenter"
+            android:text="@string/ShortCut"
             android:textSize="12sp"
             android:textColor="@color/black"
             android:theme="@style/FontStyle"/>

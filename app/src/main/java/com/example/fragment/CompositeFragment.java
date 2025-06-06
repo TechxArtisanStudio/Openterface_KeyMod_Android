@@ -231,7 +231,7 @@ public class CompositeFragment extends Fragment {
                 } else {
                     Log.w(TAG, "No connection available for left click");
                 }
-                releaseAllMSData();
+//                releaseAllMSData();
             } catch (IOException e) {
                 Log.e(TAG, "Error sending left click data: " + e.getMessage());
             }
@@ -252,7 +252,7 @@ public class CompositeFragment extends Fragment {
                 } else {
                     Log.w(TAG, "No connection available for right click");
                 }
-                releaseAllMSData();
+//                releaseAllMSData();
             } catch (IOException e) {
                 Log.e(TAG, "Error sending right click data: " + e.getMessage());
             }
@@ -273,7 +273,7 @@ public class CompositeFragment extends Fragment {
                 } else {
                     Log.w(TAG, "No connection available for slide down");
                 }
-                releaseAllMSData();
+//                releaseAllMSData();
             } catch (IOException e) {
                 Log.e(TAG, "Error sending slide down data: " + e.getMessage());
             }
@@ -294,7 +294,7 @@ public class CompositeFragment extends Fragment {
                 } else {
                     Log.w(TAG, "No connection available for slide up");
                 }
-                releaseAllMSData();
+//                releaseAllMSData();
             } catch (IOException e) {
                 Log.e(TAG, "Error sending slide up data: " + e.getMessage());
             }

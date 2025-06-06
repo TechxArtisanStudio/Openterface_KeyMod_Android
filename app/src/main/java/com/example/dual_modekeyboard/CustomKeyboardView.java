@@ -479,13 +479,13 @@ public class CustomKeyboardView extends LinearLayout {
             byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
             bluetoothService.sendData(sendKBDataBytes);
             Log.d(TAG, "Sent Bluetooth data: " + sendKBData);
-            sendReleaseData();
+//            sendReleaseData();
         } else if (port != null) {
             try {
                 byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
                 port.write(sendKBDataBytes, 20);
                 Log.d(TAG, "Sent USB data: " + sendKBData);
-                sendReleaseData();
+//                sendReleaseData();
             } catch (IOException e) {
                 Log.e(TAG, "Error sending USB data: " + e.getMessage());
             }

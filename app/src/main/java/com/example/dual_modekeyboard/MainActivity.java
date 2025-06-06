@@ -17,6 +17,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -31,6 +32,7 @@ import androidx.fragment.app.FragmentTransaction;
 
 import com.example.fragment.CompositeFragment;
 import com.example.fragment.KeyboardFragment;
+import com.example.fragment.ShortcutFragment;
 import com.example.serial.UsbDeviceManager;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
@@ -48,15 +50,14 @@ import android.app.PendingIntent;
 public class MainActivity extends AppCompatActivity implements BluetoothDialogFragment.BluetoothConnectionListener {
 
     private static final String TAG = "MainActivity";
-    private TextView textView;
     private UsbSerialPort port;
     private boolean isReading = false;
     private Handler mSerialAsyncHandler;
     private UsbDeviceManager.OnDataReadListener onDataReadListener;
     private static final String ACTION_USB_PERMISSION = "com.example.ch32v208serial.USB_PERMISSION";
 
-    private Button usbConnect, bluetooth, keyBoard, mouse, keyBoardMouse, question, info;
-    private Drawable usbConnectDrawable, bluetoothDrawable, keyBoardDrawable, mouseDrawable, keyBoardMouseDrawable, questionDrawable, infoDrawable;
+    private Button usbConnect, bluetooth, keyBoard, mouse, keyBoardMouse, question, info, shortcut;
+    private Drawable usbConnectDrawable, bluetoothDrawable, keyBoardDrawable, mouseDrawable, keyBoardMouseDrawable, questionDrawable, infoDrawable, shortcutDrawable;
     private Button activeButton;
 
     private RxBleClient rxBleClient;
@@ -106,7 +107,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                         usbConnect.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.usb_plug_disconnect, 0, 0);
                         usbConnect.setTextColor(getResources().getColor(android.R.color.holo_red_light));
                         usbConnectDrawable.setColorFilter(getResources().getColor(android.R.color.holo_red_light), PorterDuff.Mode.SRC_IN);
-                        textView.setText("USB device disconnected");
                     } catch (IOException e) {
                         Log.e(TAG, "Error closing USB port: " + e.getMessage());
                     }
@@ -128,7 +128,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                         }
                     } else {
                         Toast.makeText(context, "USB permission denied", Toast.LENGTH_SHORT).show();
-                        textView.setText("USB permission denied");
                     }
                 }
             }
@@ -139,7 +138,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         initializeUIComponents();
 
         rxBleClient = RxBleClient.create(this);
@@ -158,8 +157,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         filter.addAction(ACTION_USB_PERMISSION);
-        registerReceiver(usbReceiver, filter);
-        registerReceiver(usbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION));
+        registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        registerReceiver(usbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION), Context.RECEIVER_NOT_EXPORTED);
         setupUsbSerial(); // Try to initialize the USB device
     }
 
@@ -194,8 +193,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                         | View.SYSTEM_UI_FLAG_FULLSCREEN
                         | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
 
-        textView = findViewById(R.id.textView);
-
         usbConnect = findViewById(R.id.usbConnect);
         bluetooth = findViewById(R.id.bluetooth);
         keyBoard = findViewById(R.id.keyBoard);
@@ -203,6 +200,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         keyBoardMouse = findViewById(R.id.keyBoardMouse);
         question = findViewById(R.id.question);
         info = findViewById(R.id.info);
+        shortcut = findViewById(R.id.shortcut);
 
         if (usbConnect != null) usbConnectDrawable = usbConnect.getCompoundDrawables()[1];
         if (bluetooth != null) bluetoothDrawable = bluetooth.getCompoundDrawables()[1];
@@ -211,6 +209,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (keyBoardMouse != null) keyBoardMouseDrawable = keyBoardMouse.getCompoundDrawables()[1];
         if (question != null) questionDrawable = question.getCompoundDrawables()[1];
         if (info != null) infoDrawable = info.getCompoundDrawables()[1];
+        if (shortcut != null) shortcutDrawable = shortcut.getCompoundDrawables()[1];
 
         setupButtonListeners();
     }
@@ -255,12 +254,9 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                     bluetoothService.disconnect();
                     isBluetoothConnected = false;
                     Toast.makeText(this, "Bluetooth disconnected", Toast.LENGTH_SHORT).show();
-                    textView.setText("Bluetooth disconnected");
-                    Log.d(TAG, "USB connect button clicked1111");
                 }
                 // Setup USB
                 setupUsbSerial();
-                Log.d(TAG, "USB connect button clicked2222");
             });
         }
 
@@ -277,14 +273,10 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                         updateFragmentsWithPort(null);
                         isUsbConnected = false;
                         Toast.makeText(this, "USB disconnected", Toast.LENGTH_SHORT).show();
-                        textView.setText("USB disconnected");
-                        Log.d(TAG, "isUsbConnected && port button clicked1111");
                     } catch (IOException e) {
                         Log.e(TAG, "Error closing USB port: " + e.getMessage());
                     }
                 }
-
-                Log.d(TAG, "isUsbConnected && port button clicked2222");
 
                 // Start and bind to BluetoothService
                 Intent intent = new Intent(this, BluetoothService.class);
@@ -332,6 +324,10 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 // Toast.makeText(this, "Info button clicked", Toast.LENGTH_SHORT).show();
             });
         }
+
+        if (shortcut != null) {
+            setOnClickListener(shortcut, shortcutDrawable, this::showShortCutFragment);
+        }
     }
 
     private void setOnClickListener(Button button, Drawable drawable, Runnable onClickAction) {
@@ -356,6 +352,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         resetButton(keyBoard, keyBoardDrawable, defaultColor);
         resetButton(mouse, mouseDrawable, defaultColor);
         resetButton(keyBoardMouse, keyBoardMouseDrawable, defaultColor);
+        resetButton(shortcut, shortcutDrawable, defaultColor);
     }
 
     private void resetButton(Button button, Drawable drawable, int defaultColor) {
@@ -387,6 +384,13 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction transaction = fragmentManager.beginTransaction();
         transaction.replace(R.id.fragment_container, CompositeFragment.newInstance(port));
+        transaction.commit();
+    }
+
+    private void showShortCutFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, ShortcutFragment.newInstance());
         transaction.commit();
     }
 
@@ -441,7 +445,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             usbConnect.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.usb_plug_disconnect, 0, 0);
             usbConnect.setTextColor(getResources().getColor(android.R.color.holo_red_light));
             usbConnectDrawable.setColorFilter(getResources().getColor(android.R.color.holo_red_light), PorterDuff.Mode.SRC_IN);
-            textView.setText("No USB serial devices found");
             isUsbConnected = false;
             return;
         }
@@ -469,7 +472,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             port.open(manager.openDevice(device));
             port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
             Toast.makeText(this, "Successful to open serial port", Toast.LENGTH_LONG).show();
-            textView.setText("Successful to open serial port");
 
             Drawable usbConnectDrawableTint = ContextCompat.getDrawable(this, R.drawable.usb_plug);
             if (usbConnectDrawableTint != null) {
@@ -496,10 +498,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         Log.d(TAG, "Bluetooth connection state updated: " + isConnected);
         if (isConnected) {
             Toast.makeText(this, "Bluetooth connected", Toast.LENGTH_SHORT).show();
-            textView.setText("Bluetooth connected");
         } else {
             Toast.makeText(this, "Bluetooth disconnected", Toast.LENGTH_SHORT).show();
-            textView.setText("Bluetooth disconnected");
         }
     }
 }
