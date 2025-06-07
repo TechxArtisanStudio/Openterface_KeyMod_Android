@@ -157,8 +157,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         filter.addAction(ACTION_USB_PERMISSION);
-        registerReceiver(usbReceiver, filter);
-        registerReceiver(usbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION));
+        registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        registerReceiver(usbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION), Context.RECEIVER_NOT_EXPORTED);
         setupUsbSerial(); // Try to initialize the USB device
     }
 
