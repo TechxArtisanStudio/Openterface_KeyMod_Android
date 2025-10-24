@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="@dimen/sidebar_width"
+    android:layout_height="match_parent"
+    android:background="@color/sidebar_background"
+    android:orientation="vertical"
+    android:padding="@dimen/sidebar_padding"
+    android:elevation="8dp">
+
+    <!-- Menu Header -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/mode_selection"
+        android:textSize="@dimen/sidebar_title_size"
+        android:textStyle="bold"
+        android:paddingTop="@dimen/spacing_medium"
+        android:paddingBottom="@dimen/spacing_large"
+        android:textColor="@color/text_primary"
+        android:fontFamily="sans-serif-medium"/>
+
+    <!-- Mode Selection using RadioGroup -->
+    <RadioGroup
+        android:id="@+id/modeRadioGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Keyboard Mode -->
+        <RadioButton
+            android:id="@+id/radioKeyboard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/keyboard_mode"
+            android:textSize="@dimen/sidebar_item_text_size"
+            android:textColor="@color/sidebar_item_text"
+            android:padding="@dimen/sidebar_item_padding"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp"
+            android:checked="true"
+            android:background="@drawable/radio_button_background"
+            android:fontFamily="sans-serif"
+            android:drawablePadding="@dimen/spacing_small"/>
+
+        <!-- Mouse Mode -->
+        <RadioButton
+            android:id="@+id/radioMouse"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/mouse_mode"
+            android:textSize="@dimen/sidebar_item_text_size"
+            android:textColor="@color/sidebar_item_text"
+            android:padding="@dimen/sidebar_item_padding"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp"
+            android:background="@drawable/radio_button_background"
+            android:fontFamily="sans-serif"
+            android:drawablePadding="@dimen/spacing_small"/>
+
+        <!-- Composite Mode -->
+        <RadioButton
+            android:id="@+id/radioComposite"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/composite_mode"
+            android:textSize="@dimen/sidebar_item_text_size"
+            android:textColor="@color/sidebar_item_text"
+            android:padding="@dimen/sidebar_item_padding"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp"
+            android:background="@drawable/radio_button_background"
+            android:fontFamily="sans-serif"
+            android:drawablePadding="@dimen/spacing_small"/>
+
+    </RadioGroup>
+
+    <!-- Spacer -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"/>
+
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/divider"
+        android:layout_marginTop="@dimen/spacing_medium"
+        android:layout_marginBottom="@dimen/spacing_medium"/>
+
+    <!-- Info Text -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/mode_info"
+        android:textSize="12sp"
+        android:textColor="@color/text_secondary"
+        android:lineSpacingMultiplier="1.2"
+        android:paddingBottom="@dimen/spacing_medium"
+        android:fontFamily="sans-serif"/>
+
+</LinearLayout>

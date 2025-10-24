@@ -1,11 +1,11 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Base.Theme.DualmodeKeyboard" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Base.Theme.KeyMod" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
     </style>
 
-    <style name="Theme.DualmodeKeyboard" parent="Base.Theme.DualmodeKeyboard" />
+    <style name="Theme.KeyMod" parent="Base.Theme.KeyMod" />
 
     <style name="ButtonTheme" parent="Theme.AppCompat.Light">
         <item name="android:background">@drawable/key_background</item>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Spacing -->
+    <dimen name="spacing_tiny">4dp</dimen>
+    <dimen name="spacing_small">8dp</dimen>
+    <dimen name="spacing_medium">16dp</dimen>
+    <dimen name="spacing_large">24dp</dimen>
+    <dimen name="spacing_xlarge">32dp</dimen>
+    
+    <!-- Header -->
+    <dimen name="header_height">56dp</dimen>
+    <dimen name="header_padding">8dp</dimen>
+    <dimen name="header_elevation">4dp</dimen>
+    <dimen name="header_icon_size">40dp</dimen>
+    <dimen name="header_title_size">18sp</dimen>
+    
+    <!-- Buttons -->
+    <dimen name="button_icon_padding">12dp</dimen>
+    <dimen name="button_corner_radius">8dp</dimen>
+    <dimen name="button_elevation">2dp</dimen>
+    
+    <!-- Sidebar -->
+    <dimen name="sidebar_width">280dp</dimen>
+    <dimen name="sidebar_padding">16dp</dimen>
+    <dimen name="sidebar_item_padding">16dp</dimen>
+    <dimen name="sidebar_item_margin">8dp</dimen>
+    <dimen name="sidebar_item_radius">12dp</dimen>
+    <dimen name="sidebar_title_size">18sp</dimen>
+    <dimen name="sidebar_item_text_size">16sp</dimen>
+    
+    <!-- Fragment -->
+    <dimen name="fragment_padding">8dp</dimen>
+    <dimen name="fragment_margin">8dp</dimen>
+    
+    <!-- Touchpad -->
+    <dimen name="touchpad_corner_radius">12dp</dimen>
+    <dimen name="touchpad_elevation">2dp</dimen>
+    
+    <!-- Card -->
+    <dimen name="card_corner_radius">12dp</dimen>
+    <dimen name="card_elevation">3dp</dimen>
+</resources>

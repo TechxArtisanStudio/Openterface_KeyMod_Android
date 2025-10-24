@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">DualMode KeyBoard</string>
+    <string name="app_name">KeyMod</string>
     <string name="PrtSc">PrtSc</string>
     <string name="ScrLk">ScrLk</string>
     <string name="Pause">Pause</string>
@@ -184,4 +184,34 @@
     <string name="About">About</string>
 
     <string name="ShortCut">ShortCut</string>
+    
+    <!-- Connection Dialog Strings -->
+    <string name="connection_title">Device Connection</string>
+    <string name="connection_type">Connection Type</string>
+    <string name="connection_status">Connection Status</string>
+    <string name="usb_connection">USB Connection</string>
+    <string name="bluetooth_connection">Bluetooth Connection</string>
+    <string name="not_connected">Not Connected</string>
+    <string name="connected">Connected</string>
+    <string name="connecting">Connecting...</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_connecting">Connecting...</string>
+    <string name="auto_connect_on_startup">Auto-connect on startup</string>
+    <string name="last_connected_none">No previous connection</string>
+    <string name="last_connected_usb">Last connected: USB</string>
+    <string name="last_connected_bluetooth">Last connected: %s</string>
+    <string name="close">Close</string>
+    <string name="connection">Connection</string>
+    <string name="menu">Menu</string>
+    
+    <!-- Mode Selection Strings -->
+    <string name="mode_keyboard">Keyboard Mode</string>
+    <string name="mode_mouse">Mouse Mode</string>
+    <string name="mode_composite">Keyboard + Mouse Mode</string>
+    <string name="mode_selection">Mode Selection</string>
+    <string name="keyboard_mode">Keyboard Only</string>
+    <string name="mouse_mode">Mouse Only</string>
+    <string name="composite_mode">Keyboard + Mouse</string>
+    <string name="mode_info">Select your preferred input mode</string>
 </resources>

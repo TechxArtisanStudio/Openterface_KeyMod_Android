@@ -1,4 +1,4 @@
-package com.example.dual_modekeyboard;
+package com.openterface.keymod;
 
 import android.content.Context;
 
@@ -21,6 +21,6 @@ public class ExampleInstrumentedTest {
     public void useAppContext() {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertEquals("com.example.dual_modekeyboard", appContext.getPackageName());
+        assertEquals("com.openterface.keymod", appContext.getPackageName());
     }
 }

@@ -13,8 +13,42 @@
     <color name="gray_400">#FFBDBDBD</color>
     <color name="gray_600">#FF757575</color>
     <color name="ic_openterface_background">#FFFFFF</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
     <color name="holo_red_light">#ffff4444</color>
-
-
     <color name="green">#0F9D58</color>
+
+    <!-- App Theme Colors -->
+    <color name="primary">#1E88E5</color>
+    <color name="primary_dark">#1565C0</color>
+    <color name="primary_light">#BBDEFB</color>
+    <color name="accent">#FF9800</color>
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="divider">#BDBDBD</color>
+    
+    <!-- Background Colors -->
+    <color name="background_light">#FAFAFA</color>
+    <color name="background_white">#FFFFFF</color>
+    <color name="card_background">#FFFFFF</color>
+    
+    <!-- Header Colors -->
+    <color name="header_background">#FFFFFF</color>
+    <color name="header_shadow">#10000000</color>
+    
+    <!-- Touchpad Colors -->
+    <color name="touchpad_background">#F5F5F5</color>
+    <color name="touchpad_border">#E0E0E0</color>
+    
+    <!-- Button Colors -->
+    <color name="button_text">#424242</color>
+    <color name="button_background">#FAFAFA</color>
+    
+    <!-- Connection Status Colors -->
+    <color name="status_connected">#4CAF50</color>
+    <color name="status_disconnected">#9E9E9E</color>
+    
+    <!-- Sidebar Colors -->
+    <color name="sidebar_background">#FFFFFF</color>
+    <color name="sidebar_item_selected">#E3F2FD</color>
+    <color name="sidebar_item_text">#424242</color>
 </resources>

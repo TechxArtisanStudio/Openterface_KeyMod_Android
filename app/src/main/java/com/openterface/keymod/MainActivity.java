@@ -1,0 +1,721 @@
+package com.openterface.keymod;
+
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
+import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbDeviceConnection;
+import android.hardware.usb.UsbManager;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
+import android.util.Log;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.RadioGroup;
+import android.widget.RadioButton;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.core.graphics.drawable.DrawableCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
+
+import com.openterface.fragment.CompositeFragment;
+import com.openterface.fragment.KeyboardFragment;
+import com.openterface.fragment.MouseFragment;
+import com.openterface.fragment.ShortcutFragment;
+import com.openterface.serial.UsbDeviceManager;
+import com.hoho.android.usbserial.driver.UsbSerialDriver;
+import com.hoho.android.usbserial.driver.UsbSerialPort;
+import com.hoho.android.usbserial.driver.UsbSerialProber;
+import com.polidea.rxandroidble2.RxBleClient;
+import com.polidea.rxandroidble2.RxBleDevice;
+
+import java.io.IOException;
+import java.util.List;
+
+import io.reactivex.disposables.Disposable;
+import android.Manifest;
+import com.polidea.rxandroidble2.scan.ScanSettings;
+import android.app.PendingIntent;
+
+public class MainActivity extends AppCompatActivity implements BluetoothDialogFragment.BluetoothConnectionListener {
+
+    private static final String TAG = "MainActivity";
+    private UsbSerialPort port;
+    private boolean isReading = false;
+    private Handler mSerialAsyncHandler;
+    private UsbDeviceManager.OnDataReadListener onDataReadListener;
+    private static final String ACTION_USB_PERMISSION = "com.openterface.ch32v208serial.USB_PERMISSION";
+
+    // New UI components for Phase 1
+    private ImageButton connectionButton;
+    private ImageButton menuButton;
+    private DrawerLayout drawerLayout;
+    private RadioGroup modeRadioGroup;
+    
+    // Old button bar components (now hidden but kept for backward compatibility)
+    private Button usbConnect, bluetooth, keyBoard, mouse, keyBoardMouse, question, info, shortcut;
+    private Drawable usbConnectDrawable, bluetoothDrawable, keyBoardDrawable, mouseDrawable, keyBoardMouseDrawable, questionDrawable, infoDrawable, shortcutDrawable;
+    private Button activeButton;
+
+    private RxBleClient rxBleClient;
+    private Disposable scanSubscription;
+    private static final int PERMISSION_REQUEST_CODE = 1;
+
+    private BluetoothService bluetoothService;
+    private boolean isServiceBound;
+
+    // Connection Manager
+    private ConnectionManager connectionManager;
+    
+    // Bluetooth Auto Connect Manager
+    private BluetoothAutoConnectManager autoConnectManager;
+    
+    private boolean isUsbConnected = false; // Track USB connection state
+    public boolean isBluetoothConnected = false; // Track Bluetooth connection state
+
+    private final ServiceConnection serviceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            BluetoothService.BluetoothBinder binder = (BluetoothService.BluetoothBinder) service;
+            bluetoothService = binder.getService();
+            isServiceBound = true;
+            bluetoothService.setRxBleClient(rxBleClient);
+            Log.d(TAG, "Bound to BluetoothService");
+            
+            // Initialize auto-connect manager after service is bound
+            initializeAutoConnect();
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            isServiceBound = false;
+            bluetoothService = null;
+            Log.d(TAG, "Unbound from BluetoothService");
+        }
+    };
+
+    private final BroadcastReceiver usbReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
+                UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                if (device != null) {
+                    // Use ConnectionManager for USB setup
+                    if (connectionManager != null) {
+                        connectionManager.connectUsb();
+                    }
+                }
+            } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
+                if (connectionManager != null && 
+                    connectionManager.getCurrentConnectionType() == ConnectionManager.ConnectionType.USB) {
+                    connectionManager.disconnect();
+                    Toast.makeText(context, "USB device disconnected", Toast.LENGTH_SHORT).show();
+                }
+            }
+        }
+    };
+
+    private final BroadcastReceiver usbPermissionReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (ACTION_USB_PERMISSION.equals(action)) {
+                synchronized (this) {
+                    UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                    if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                        if (device != null && connectionManager != null) {
+                            // Reinitialize after the permission is granted
+                            connectionManager.connectUsb();
+                        }
+                    } else {
+                        Toast.makeText(context, "USB permission denied", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+        }
+    };
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        
+        // Initialize Connection Manager
+        connectionManager = new ConnectionManager(this);
+        setupConnectionStateListener();
+        
+        initializeUIComponents();
+
+        rxBleClient = RxBleClient.create(this);
+        Intent intent = new Intent(this, BluetoothService.class);
+        startService(intent);
+        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+
+        // Start with Composite mode
+        showCompositeFragment();
+        
+        // Note: Bluetooth auto-connect will be initialized after service is bound
+        // USB auto-connect is still handled by ConnectionManager
+        new Handler().postDelayed(() -> {
+            // Only auto-connect USB here, Bluetooth will be handled by autoConnectManager
+            String lastType = getSharedPreferences("ConnectionPrefs", MODE_PRIVATE)
+                    .getString("last_connection_type", "");
+            if ("USB".equals(lastType)) {
+                connectionManager.autoConnect();
+            }
+        }, 500);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        filter.addAction(ACTION_USB_PERMISSION);
+        registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        registerReceiver(usbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION), Context.RECEIVER_NOT_EXPORTED);
+        // Don't auto-setup USB here, ConnectionManager handles it
+        
+        // Re-apply immersive mode
+        setImmersiveMode();
+    }
+    
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            setImmersiveMode();
+        }
+    }
+    
+    private void setImmersiveMode() {
+        View decorView = getWindow().getDecorView();
+        decorView.setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        unregisterReceiver(usbReceiver);
+        unregisterReceiver(usbPermissionReceiver);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (scanSubscription != null && !scanSubscription.isDisposed()) {
+            scanSubscription.dispose();
+        }
+        
+        // Stop auto-connect manager
+        if (autoConnectManager != null) {
+            autoConnectManager.stopAutoConnect();
+        }
+        
+        if (isServiceBound) {
+            unbindService(serviceConnection);
+            isServiceBound = false;
+        }
+        Intent intent = new Intent(this, BluetoothService.class);
+        stopService(intent); // stop service
+    }
+
+    private void initializeUIComponents() {
+        // Set immersive mode
+        setImmersiveMode();
+
+        // Initialize new header buttons
+        connectionButton = findViewById(R.id.connection_button);
+        menuButton = findViewById(R.id.menu_button);
+        
+        // Initialize drawer layout and radio group
+        drawerLayout = findViewById(R.id.drawer_layout);
+        modeRadioGroup = findViewById(R.id.modeRadioGroup);
+        
+        // Set up mode selection listener
+        if (modeRadioGroup != null) {
+            modeRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
+                if (checkedId == R.id.radioKeyboard) {
+                    showKeyboardFragment();
+                } else if (checkedId == R.id.radioMouse) {
+                    showMouseFragment();
+                } else if (checkedId == R.id.radioComposite) {
+                    showCompositeFragment();
+                }
+                // Close the drawer after selection
+                if (drawerLayout != null) {
+                    drawerLayout.closeDrawers();
+                }
+            });
+        }
+        
+        // Initialize old buttons (kept for backward compatibility, but hidden - may be null)
+        // These are in hidden layout, won't be found
+        keyBoard = findViewById(R.id.keyBoard);
+        mouse = findViewById(R.id.mouse);
+        keyBoardMouse = findViewById(R.id.keyBoardMouse);
+        question = findViewById(R.id.question);
+        info = findViewById(R.id.info);
+        shortcut = findViewById(R.id.shortcut);
+
+        if (keyBoard != null) keyBoardDrawable = keyBoard.getCompoundDrawables()[1];
+        if (mouse != null) mouseDrawable = mouse.getCompoundDrawables()[1];
+        if (keyBoardMouse != null) keyBoardMouseDrawable = keyBoardMouse.getCompoundDrawables()[1];
+        if (shortcut != null) shortcutDrawable = shortcut.getCompoundDrawables()[1];
+
+        setupButtonListeners();
+    }
+    
+    private void setupConnectionStateListener() {
+        connectionManager.setConnectionStateListener(new ConnectionManager.ConnectionStateListener() {
+            @Override
+            public void onConnectionStateChanged(ConnectionManager.ConnectionType type, ConnectionManager.ConnectionState state) {
+                runOnUiThread(() -> {
+                    updateConnectionButton(type, state);
+                    
+                    // Update fragments with new port if USB connected
+                    if (type == ConnectionManager.ConnectionType.USB && 
+                        state == ConnectionManager.ConnectionState.CONNECTED) {
+                        port = connectionManager.getUsbPort();
+                        isUsbConnected = true;
+                        isBluetoothConnected = false;
+                        updateFragmentsWithPort(port);
+                        startReading();
+                    } else if (type == ConnectionManager.ConnectionType.BLUETOOTH && 
+                               state == ConnectionManager.ConnectionState.CONNECTED) {
+                        isUsbConnected = false;
+                        isBluetoothConnected = true;
+                        if (port != null) {
+                            try {
+                                port.close();
+                            } catch (IOException e) {
+                                Log.e(TAG, "Error closing port: " + e.getMessage());
+                            }
+                            port = null;
+                            updateFragmentsWithPort(null);
+                        }
+                    } else if (state == ConnectionManager.ConnectionState.DISCONNECTED) {
+                        isUsbConnected = false;
+                        isBluetoothConnected = false;
+                        if (port != null) {
+                            try {
+                                port.close();
+                            } catch (IOException e) {
+                                Log.e(TAG, "Error closing port: " + e.getMessage());
+                            }
+                            port = null;
+                            updateFragmentsWithPort(null);
+                        }
+                    }
+                });
+            }
+
+            @Override
+            public void onConnectionError(String error) {
+                runOnUiThread(() -> {
+                    Toast.makeText(MainActivity.this, error, Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+    }
+    
+    private void initializeAutoConnect() {
+        if (bluetoothService == null || rxBleClient == null) {
+            Log.w(TAG, "Cannot initialize auto-connect: service or client not ready");
+            return;
+        }
+        
+        autoConnectManager = new BluetoothAutoConnectManager(this, rxBleClient, bluetoothService);
+        autoConnectManager.setAutoConnectListener(new BluetoothAutoConnectManager.AutoConnectListener() {
+            @Override
+            public void onAutoConnectStarted() {
+                Log.d(TAG, "Auto-connect started");
+                runOnUiThread(() -> {
+                    Toast.makeText(MainActivity.this, "Auto-connecting to Bluetooth...", Toast.LENGTH_SHORT).show();
+                });
+            }
+
+            @Override
+            public void onAutoConnectSuccess(RxBleDevice device) {
+                Log.d(TAG, "Auto-connect successful: " + device.getName());
+                runOnUiThread(() -> {
+                    isBluetoothConnected = true;
+                    if (connectionManager != null) {
+                        connectionManager.connectBluetooth(device);
+                    }
+                    
+                    // Dismiss any open dialogs (Connection dialog or Bluetooth dialog)
+                    dismissAllDialogs();
+                    
+                    Toast.makeText(MainActivity.this, "Auto-connected to " + device.getName(), Toast.LENGTH_SHORT).show();
+                });
+            }
+
+            @Override
+            public void onAutoConnectFailed(String reason) {
+                Log.e(TAG, "Auto-connect failed: " + reason);
+                runOnUiThread(() -> {
+                    // Don't show error toast for normal failures (user might not care)
+                    Log.d(TAG, "Bluetooth auto-connect failed silently: " + reason);
+                });
+            }
+
+            @Override
+            public void onAutoConnectRetrying(int retryCount) {
+                Log.d(TAG, "Auto-connect retrying: attempt " + retryCount);
+                runOnUiThread(() -> {
+                    Toast.makeText(MainActivity.this, "Retrying Bluetooth connection (" + retryCount + "/3)...", Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+        
+        // Start auto-connect with a slight delay to ensure everything is ready
+        new Handler().postDelayed(() -> {
+            if (autoConnectManager != null) {
+                autoConnectManager.startAutoConnect();
+            }
+        }, 1000); // 1 second delay
+    }
+    
+    private void updateConnectionButton(ConnectionManager.ConnectionType type, ConnectionManager.ConnectionState state) {
+        if (connectionButton == null) return;
+        
+        int iconRes = R.drawable.ic_connection_disconnected;
+        
+        switch (state) {
+            case CONNECTED:
+                iconRes = R.drawable.ic_connection_connected;
+                break;
+            case CONNECTING:
+                iconRes = R.drawable.ic_connection_connecting;
+                break;
+            case DISCONNECTED:
+                iconRes = R.drawable.ic_connection_disconnected;
+                break;
+        }
+        
+        connectionButton.setImageResource(iconRes);
+    }
+
+    private void startScan() {
+        ScanSettings scanSettings = new ScanSettings.Builder().build();
+        scanSubscription = rxBleClient.scanBleDevices(scanSettings)
+                .subscribe(
+                        (scanResult) -> {
+                            String deviceName = scanResult.getBleDevice().getName();
+                            Log.d("ScanResult", "find device: " + (deviceName != null ? deviceName : "unknown device"));
+                        },
+                        (Throwable throwable) -> {
+                            Log.e("ScanError", "scan error", throwable);
+                        }
+                );
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                BluetoothDialogFragment dialog = new BluetoothDialogFragment();
+                dialog.setRxBleClient(rxBleClient);
+                dialog.setConnectionListener(this); // Set the listener
+                dialog.show(getSupportFragmentManager(), "BluetoothDialog");
+            } else {
+                Log.e("Permission", "location permission denied");
+            }
+        }
+    }
+
+    private void setupButtonListeners() {
+        // Connection button handler
+        if (connectionButton != null) {
+            connectionButton.setOnClickListener(v -> {
+                ConnectionDialogFragment dialog = ConnectionDialogFragment.newInstance();
+                dialog.setConnectionManager(connectionManager);
+                dialog.setRxBleClient(rxBleClient);
+                dialog.setConnectionDialogListener((type, state) -> {
+                    // Connection state changes are handled by the listener
+                    updateConnectionButton(type, state);
+                });
+                dialog.show(getSupportFragmentManager(), "ConnectionDialog");
+            });
+        }
+        
+        // Menu button handler - toggle drawer
+        if (menuButton != null) {
+            menuButton.setOnClickListener(v -> {
+                if (drawerLayout != null) {
+                    if (drawerLayout.isDrawerOpen(android.view.Gravity.END)) {
+                        drawerLayout.closeDrawer(android.view.Gravity.END);
+                    } else {
+                        drawerLayout.openDrawer(android.view.Gravity.END);
+                    }
+                }
+            });
+        }
+
+        if (keyBoard != null) {
+            setOnClickListener(keyBoard, keyBoardDrawable, this::showKeyboardFragment);
+        }
+
+        if (keyBoardMouse != null) {
+            setOnClickListener(keyBoardMouse, keyBoardMouseDrawable, this::showCompositeFragment);
+        }
+
+        if (mouse != null) {
+            setOnClickListener(mouse, mouseDrawable, () -> {
+                // Toast.makeText(this, "Mouse button clicked", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (question != null) {
+            question.setOnClickListener(v -> {
+                // Toast.makeText(this, "Question button clicked", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (info != null) {
+            info.setOnClickListener(v -> {
+                // Toast.makeText(this, "Info button clicked", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (shortcut != null) {
+            setOnClickListener(shortcut, shortcutDrawable, this::showShortCutFragment);
+        }
+    }
+
+    private void setOnClickListener(Button button, Drawable drawable, Runnable onClickAction) {
+        if (button == null || drawable == null) return;
+        button.setOnClickListener(v -> {
+            resetButtonColors();
+            setActiveButton(button, drawable);
+            onClickAction.run();
+        });
+    }
+
+    private void setActiveButton(Button button, Drawable drawable) {
+        if (button == null || drawable == null) return;
+        int activeColor = getResources().getColor(android.R.color.holo_blue_light);
+        button.setTextColor(activeColor);
+        drawable.setColorFilter(activeColor, PorterDuff.Mode.SRC_IN);
+        activeButton = button;
+    }
+
+    private void resetButtonColors() {
+        int defaultColor = getResources().getColor(android.R.color.black);
+        resetButton(keyBoard, keyBoardDrawable, defaultColor);
+        resetButton(mouse, mouseDrawable, defaultColor);
+        resetButton(keyBoardMouse, keyBoardMouseDrawable, defaultColor);
+        resetButton(shortcut, shortcutDrawable, defaultColor);
+    }
+
+    private void resetButton(Button button, Drawable drawable, int defaultColor) {
+        if (button != null && drawable != null) {
+            button.setTextColor(defaultColor);
+            drawable.clearColorFilter();
+        }
+    }
+
+    // Note: resetConnectionButtons() removed as USB/Bluetooth buttons are now in the connection dialog
+    
+    private void dismissAllDialogs() {
+        try {
+            FragmentManager fragmentManager = getSupportFragmentManager();
+            
+            // Dismiss BluetoothDialogFragment if open
+            Fragment bluetoothDialog = fragmentManager.findFragmentByTag("BluetoothDialog");
+            if (bluetoothDialog instanceof BluetoothDialogFragment) {
+                ((BluetoothDialogFragment) bluetoothDialog).dismiss();
+                Log.d(TAG, "Dismissed BluetoothDialogFragment");
+            }
+            
+            // Dismiss ConnectionDialogFragment if open
+            Fragment connectionDialog = fragmentManager.findFragmentByTag("ConnectionDialog");
+            if (connectionDialog instanceof ConnectionDialogFragment) {
+                ((ConnectionDialogFragment) connectionDialog).dismiss();
+                Log.d(TAG, "Dismissed ConnectionDialogFragment");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error dismissing dialogs: " + e.getMessage());
+        }
+    }
+
+    private void showKeyboardFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, KeyboardFragment.newInstance(port));
+        transaction.commit();
+    }
+
+    private void showCompositeFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, CompositeFragment.newInstance(port));
+        transaction.commit();
+    }
+
+    private void showMouseFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, MouseFragment.newInstance(port));
+        transaction.commit();
+    }
+
+    private void showShortCutFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, ShortcutFragment.newInstance());
+        transaction.commit();
+    }
+
+    private void updateFragmentsWithPort(UsbSerialPort newPort) {
+        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+        if (currentFragment instanceof KeyboardFragment) {
+            ((KeyboardFragment) currentFragment).port = newPort;
+            CustomKeyboardView keyboardView = currentFragment.getView() != null ?
+                    currentFragment.getView().findViewById(R.id.keyboard_view) : null;
+            if (keyboardView != null) {
+                keyboardView.setPort(newPort);
+            }
+        } else if (currentFragment instanceof CompositeFragment) {
+            ((CompositeFragment) currentFragment).port = newPort;
+            CustomKeyboardView keyboardView = currentFragment.getView() != null ?
+                    currentFragment.getView().findViewById(R.id.keyboard_view) : null;
+            if (keyboardView != null) {
+                keyboardView.setPort(newPort);
+            }
+        } else if (currentFragment instanceof MouseFragment) {
+            ((MouseFragment) currentFragment).setPort(newPort);
+        }
+    }
+
+    private void startReading() {
+        new Thread(() -> {
+            try {
+                while (isReading) {
+                    byte[] buffer = new byte[1024];
+                    int numBytesRead = port.read(buffer, 5);
+                    if (numBytesRead > 0) {
+                        StringBuilder allReadData = new StringBuilder();
+                        for (int i = 0; i < numBytesRead; i++) {
+                            allReadData.append(String.format("%02X ", buffer[i]));
+                        }
+                        Log.d(TAG, "Read data: " + allReadData.toString().trim());
+
+                        if (onDataReadListener != null) {
+                            onDataReadListener.onDataRead();
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "Error reading USB data: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    private void setupUsbSerial() {
+        UsbManager manager = (UsbManager) getSystemService(Context.USB_SERVICE);
+        List<UsbSerialDriver> availableDrivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager);
+        if (availableDrivers.isEmpty()) {
+            Toast.makeText(this, "No USB serial devices found", Toast.LENGTH_LONG).show();
+            usbConnect.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.usb_plug_disconnect, 0, 0);
+            usbConnect.setTextColor(getResources().getColor(android.R.color.holo_red_light));
+            usbConnectDrawable.setColorFilter(getResources().getColor(android.R.color.holo_red_light), PorterDuff.Mode.SRC_IN);
+            isUsbConnected = false;
+            return;
+        }
+
+        UsbSerialDriver driver = availableDrivers.get(0);
+        UsbDevice device = driver.getDevice();
+
+        // check USB permission
+        if (!manager.hasPermission(device)) {
+            Intent permissionIntent = new Intent(ACTION_USB_PERMISSION);
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, permissionIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            manager.requestPermission(device, pendingIntent);
+            return;
+        }
+
+        UsbDeviceConnection connection = manager.openDevice(device);
+        if (connection == null) {
+            Toast.makeText(this, "Failed to open USB device connection", Toast.LENGTH_LONG).show();
+            isUsbConnected = false;
+            return;
+        }
+
+        port = driver.getPorts().get(0);
+        try {
+            port.open(manager.openDevice(device));
+            port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
+            Toast.makeText(this, "Successful to open serial port", Toast.LENGTH_LONG).show();
+
+            Drawable usbConnectDrawableTint = ContextCompat.getDrawable(this, R.drawable.usb_plug);
+            if (usbConnectDrawableTint != null) {
+                DrawableCompat.setTint(usbConnectDrawableTint, ContextCompat.getColor(this, android.R.color.holo_blue_light));
+                usbConnect.setCompoundDrawablesWithIntrinsicBounds(null, usbConnectDrawableTint, null, null);
+            }
+
+            usbConnect.setTextColor(getResources().getColor(android.R.color.holo_blue_light));
+            usbConnectDrawable.setColorFilter(getResources().getColor(android.R.color.holo_blue_light), PorterDuff.Mode.SRC_IN);
+            isReading = true;
+            isUsbConnected = true;
+            updateFragmentsWithPort(port);
+            startReading();
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to open serial port: " + e.getMessage());
+            Toast.makeText(this, "Failed to open serial port", Toast.LENGTH_LONG).show();
+            isUsbConnected = false;
+        }
+    }
+
+    @Override
+    public void onBluetoothConnectionChanged(boolean isConnected) {
+        isBluetoothConnected = isConnected;
+        Log.d(TAG, "Bluetooth connection state updated: " + isConnected);
+        
+        // Update ConnectionManager if Bluetooth is connected
+        if (isConnected && bluetoothService != null && connectionManager != null) {
+            com.polidea.rxandroidble2.RxBleDevice connectedDevice = bluetoothService.getConnectedDevice();
+            if (connectedDevice != null) {
+                connectionManager.connectBluetooth(connectedDevice);
+                Log.d(TAG, "Updated ConnectionManager with BLE device");
+            }
+        } else if (!isConnected && connectionManager != null && 
+                   connectionManager.getCurrentConnectionType() == ConnectionManager.ConnectionType.BLUETOOTH) {
+            connectionManager.disconnect();
+            Log.d(TAG, "Disconnected Bluetooth in ConnectionManager");
+        }
+        
+        if (isConnected) {
+            Toast.makeText(this, "Bluetooth connected", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "Bluetooth disconnected", Toast.LENGTH_SHORT).show();
+        }
+    }
+}

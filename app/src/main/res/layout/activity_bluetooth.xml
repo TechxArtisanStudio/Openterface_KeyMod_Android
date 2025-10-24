@@ -30,8 +30,10 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Scan for Devices"
-        android:layout_below="@id/bluetooth_switch"
-        android:layout_centerHorizontal="true" />
+        android:layout_marginTop="16dp"
+        app:layout_constraintTop_toBottomOf="@id/bluetooth_switch"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <Switch
         android:id="@+id/bluetooth_switch"
@@ -83,8 +85,8 @@
         android:layout_height="wrap_content"
         android:src="@drawable/x_circle"
         android:background="@android:color/transparent"
-        tools:ignore="MissingConstraints">
-
-    </ImageButton>
+        android:layout_margin="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

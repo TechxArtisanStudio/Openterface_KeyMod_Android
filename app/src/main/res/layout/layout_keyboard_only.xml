@@ -5,7 +5,7 @@
     android:orientation="vertical"
     android:padding="2dp">
 
-    <com.example.dual_modekeyboard.CustomKeyboardView
+    <com.openterface.keymod.CustomKeyboardView
         android:id="@+id/keyboard_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"

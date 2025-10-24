@@ -3,12 +3,12 @@ plugins {
 }
 
 android {
-    namespace 'com.example.dual_modekeyboard'
+    namespace 'com.openterface.keymod'
     compileSdk 35
 
     defaultConfig {
-        archivesBaseName = "DualModeKeyboard"
-        applicationId "com.example.dual_modekeyboard"
+        archivesBaseName = "KeyMod"
+        applicationId "com.openterface.keymod"
         minSdk 26
         targetSdk 35
         versionCode 1
@@ -20,9 +20,9 @@ android {
     signingConfigs {
         release {
             storeFile file("keystore.jks")
-            storePassword System.getenv("SIGNING_STORE_PASSWORD")
-            keyAlias System.getenv("SIGNING_KEY_ALIAS")
-            keyPassword System.getenv("SIGNING_KEY_PASSWORD")
+            storePassword "password"
+            keyAlias "keymod"
+            keyPassword "password"
         }
     }
 
