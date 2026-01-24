@@ -48,7 +48,7 @@ jobs:
           ./gradlew assembleRelease -x lint --stacktrace --info --warning-mode all \
             -PRELEASE_STORE_FILE=keystore.jks \
             -PRELEASE_STORE_PASSWORD="${{ secrets.KEY_STORE_PASSWORD }}" \
-            -PRELEASE_KEY_ALIAS="keymod" \
+            -PRELEASE_KEY_ALIAS="${{ secrets.SIGNING_KEY }}" \
             -PRELEASE_KEY_PASSWORD="${{ secrets.KEY_PASSWORD }}"
 
       - name: Upload Signed Release APK
