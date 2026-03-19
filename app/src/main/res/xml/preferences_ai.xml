@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- AI Configuration Section -->
+    <PreferenceCategory
+        android:title="AI Configuration"
+        app:iconSpaceReserved="false">
+
+        <EditTextPreference
+            android:key="ai_endpoint"
+            android:title="AI Endpoint"
+            android:summary="API endpoint URL"
+            android:defaultValue="https://api.openai.com/v1"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="ai_model"
+            android:title="Model"
+            android:summary="AI model for text refinement"
+            android:defaultValue="gpt-4-turbo-preview"
+            android:entries="@array/ai_model_names"
+            android:entryValues="@array/ai_model_values"
+            app:iconSpaceReserved="false" />
+
+        <EditTextPreference
+            android:key="ai_api_key"
+            android:title="API Key"
+            android:summary="OpenAI API key for AI features"
+            android:defaultValue=""
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <!-- Text Refinement Section -->
+    <PreferenceCategory
+        android:title="Text Refinement"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="ai_refinement"
+            android:title="Enable refinement"
+            android:summary="AI improves transcribed text"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="ai_style"
+            android:title="Style"
+            android:summary="Refinement style"
+            android:defaultValue="professional"
+            android:entries="@array/ai_style_names"
+            android:entryValues="@array/ai_style_values"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

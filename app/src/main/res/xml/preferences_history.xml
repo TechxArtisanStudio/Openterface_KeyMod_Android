@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- History Management Section -->
+    <PreferenceCategory
+        android:title="History Management"
+        app:iconSpaceReserved="false">
+
+        <SeekBarPreference
+            android:key="max_history"
+            android:title="Max history items"
+            android:summary="Maximum number of items to store"
+            android:defaultValue="50"
+            android:max="500"
+            app:showSeekBarValue="true"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="auto_delete_days"
+            android:title="Auto-delete after"
+            android:summary="Automatically delete old history"
+            android:defaultValue="0"
+            android:entries="@array/auto_delete_names"
+            android:entryValues="@array/auto_delete_values"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <!-- Actions Section -->
+    <PreferenceCategory
+        android:title="Actions"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="clear_history"
+            android:title="Clear all history"
+            android:summary="Delete all AI request history"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="export_history"
+            android:title="Export history"
+            android:summary="Save history to JSON file"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

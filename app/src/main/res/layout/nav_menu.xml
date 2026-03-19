@@ -81,6 +81,23 @@
         android:layout_height="0dp"
         android:layout_weight="1"/>
 
+    <!-- Settings Button -->
+    <Button
+        android:id="@+id/settings_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Settings"
+        android:textSize="14sp"
+        android:textColor="@color/text_primary"
+        android:padding="@dimen/sidebar_item_padding"
+        android:layout_marginTop="@dimen/spacing_medium"
+        android:layout_marginBottom="@dimen/spacing_medium"
+        android:background="?attr/selectableItemBackground"
+        android:gravity="start|center_vertical"
+        android:drawableStart="@drawable/ic_settings"
+        android:drawablePadding="@dimen/spacing_small"
+        style="?android:attr/borderlessButtonStyle" />
+
     <!-- Divider -->
     <View
         android:layout_width="match_parent"

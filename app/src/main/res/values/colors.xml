@@ -1,54 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="DODGERBLUE">#ff1e90ff</color>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
+    <!-- Base Colors -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="light_blue_400">#FF29B6F6</color>
-    <color name="light_blue_600">#FF039BE5</color>
-    <color name="gray_400">#FFBDBDBD</color>
-    <color name="gray_600">#FF757575</color>
-    <color name="ic_openterface_background">#FFFFFF</color>
-    <color name="ic_launcher_background">#FFFFFF</color>
-    <color name="holo_red_light">#ffff4444</color>
-    <color name="green">#0F9D58</color>
+    <color name="background_light">#FFF5F5F5</color>
+    <color name="text_primary">#FF212121</color>
+    <color name="text_secondary">#FF757575</color>
+    <color name="header_background">#FFFFFFFF</color>
+    <color name="footer_background">#FFFFFFFF</color>
 
-    <!-- App Theme Colors -->
-    <color name="primary">#1E88E5</color>
-    <color name="primary_dark">#1565C0</color>
-    <color name="primary_light">#BBDEFB</color>
-    <color name="accent">#FF9800</color>
-    <color name="text_primary">#212121</color>
-    <color name="text_secondary">#757575</color>
-    <color name="divider">#BDBDBD</color>
-    
-    <!-- Background Colors -->
-    <color name="background_light">#FAFAFA</color>
-    <color name="background_white">#FFFFFF</color>
-    <color name="card_background">#FFFFFF</color>
-    
-    <!-- Header Colors -->
-    <color name="header_background">#FFFFFF</color>
-    <color name="header_shadow">#10000000</color>
-    
-    <!-- Touchpad Colors -->
-    <color name="touchpad_background">#F5F5F5</color>
-    <color name="touchpad_border">#E0E0E0</color>
-    
-    <!-- Button Colors -->
-    <color name="button_text">#424242</color>
-    <color name="button_background">#FAFAFA</color>
-    
+    <!-- Mode Card Colors -->
+    <color name="color_keyboard_mouse">#FF2196F3</color>
+    <color name="color_gamepad">#FF9C27B0</color>
+    <color name="color_numpad">#FF4CAF50</color>
+    <color name="color_shortcuts">#FFFF9800</color>
+    <color name="color_macros">#FFF44336</color>
+    <color name="color_voice">#FF00BCD4</color>
+
     <!-- Connection Status Colors -->
-    <color name="status_connected">#4CAF50</color>
-    <color name="status_disconnected">#9E9E9E</color>
+    <color name="connected">#FF4CAF50</color>
+    <color name="connecting">#FFFF9800</color>
+    <color name="disconnected">#FF757575</color>
+
+    <!-- Legacy Colors (for existing drawables) -->
+    <color name="DODGERBLUE">#FF1E90FF</color>
+    <color name="gray_600">#FF757575</color>
+    <color name="gray_400">#FFBDBDBD</color>
     
-    <!-- Sidebar Colors -->
-    <color name="sidebar_background">#FFFFFF</color>
-    <color name="sidebar_item_selected">#E3F2FD</color>
-    <color name="sidebar_item_text">#424242</color>
+    <!-- Additional Colors (for existing layouts) -->
+    <color name="sidebar_item_selected">#FF1976D2</color>
+    <color name="primary">#FF1976D2</color>
+    <color name="card_background">#FFFFFFFF</color>
+    <color name="divider">#FFBDBDBD</color>
+    <color name="holo_red_light">#FFFF4444</color>
+    <color name="button_text">#FF212121</color>
+    <color name="touchpad_background">#FFE0E0E0</color>
+    <color name="sidebar_background">#FFFFFFFF</color>
+    <color name="sidebar_item_text">#FF212121</color>
+    <color name="ic_launcher_background">#FF1976D2</color>
 </resources>

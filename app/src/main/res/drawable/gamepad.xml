@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    
+    <!-- Gamepad body -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M4,8h16c1.1,0 2,0.9 2,2v4c0,1.1 -0.9,2 -2,2H4c-1.1,0 -2,-0.9 -2,-2v-4c0,-1.1 0.9,-2 2,-2z"/>
+    
+    <!-- D-Pad (left) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M7,10h2v2h2v2H9v2H7v-2H5v-2h2V10z"/>
+    
+    <!-- Buttons (right) - A, B, X, Y positions -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M15,10.5m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M17,12.5m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M13,12.5m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M15,14.5m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0"/>
+    
+</vector>

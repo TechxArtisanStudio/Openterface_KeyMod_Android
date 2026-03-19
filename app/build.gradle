@@ -52,4 +52,10 @@ dependencies {
 
     implementation libs.usb.serial.for.android
     implementation 'com.polidea.rxandroidble2:rxandroidble:1.19.0'
+    
+    // AndroidX Preferences
+    implementation 'androidx.preference:preference:1.2.1'
+    
+    // Gson for JSON serialization
+    implementation 'com.google.code.gson:gson:2.10.1'
 }

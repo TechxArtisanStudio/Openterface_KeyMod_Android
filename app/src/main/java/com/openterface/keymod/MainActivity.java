@@ -35,9 +35,13 @@ import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.openterface.fragment.CompositeFragment;
+import com.openterface.fragment.GamepadFragment;
 import com.openterface.fragment.KeyboardFragment;
+import com.openterface.fragment.MacrosFragment;
 import com.openterface.fragment.MouseFragment;
 import com.openterface.fragment.ShortcutFragment;
+import com.openterface.fragment.ShortcutHubFragment;
+import com.openterface.fragment.VoiceInputFragment;
 import com.openterface.serial.UsbDeviceManager;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
@@ -168,9 +172,20 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         Intent intent = new Intent(this, BluetoothService.class);
         startService(intent);
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+        
+        // Set BluetoothService in ConnectionManager once bound
+        if (connectionManager != null) {
+            connectionManager.setBluetoothService(bluetoothService);
+        }
 
-        // Start with Composite mode
-        showCompositeFragment();
+        // Handle launch mode from LaunchPanelActivity
+        String launchMode = getIntent().getStringExtra("launch_mode");
+        if (launchMode != null) {
+            handleLaunchMode(launchMode);
+        } else {
+            // Default to Composite mode
+            showCompositeFragment();
+        }
         
         // Note: Bluetooth auto-connect will be initialized after service is bound
         // USB auto-connect is still handled by ConnectionManager
@@ -478,6 +493,15 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 }
             });
         }
+        
+        // Settings button handler (in nav menu)
+        View settingsButton = findViewById(R.id.settings_button);
+        if (settingsButton != null) {
+            settingsButton.setOnClickListener(v -> {
+                Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
+                startActivity(intent);
+            });
+        }
 
         if (keyBoard != null) {
             setOnClickListener(keyBoard, keyBoardDrawable, this::showKeyboardFragment);
@@ -592,6 +616,65 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         FragmentTransaction transaction = fragmentManager.beginTransaction();
         transaction.replace(R.id.fragment_container, ShortcutFragment.newInstance());
         transaction.commit();
+    }
+
+    private void showMacrosFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, new MacrosFragment());
+        transaction.commit();
+    }
+
+    private void showShortcutHubFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, new ShortcutHubFragment());
+        transaction.commit();
+    }
+
+    private void showVoiceInputFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, new VoiceInputFragment());
+        transaction.commit();
+    }
+
+    private void showGamepadFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, new GamepadFragment());
+        transaction.commit();
+    }
+
+    /**
+     * Handle launch mode from LaunchPanelActivity
+     */
+    private void handleLaunchMode(String mode) {
+        switch (mode) {
+            case LaunchPanelActivity.MODE_KEYBOARD_MOUSE:
+                showCompositeFragment();
+                break;
+            case LaunchPanelActivity.MODE_GAMEPAD:
+                showGamepadFragment();
+                break;
+            case LaunchPanelActivity.MODE_NUMPAD:
+                Toast.makeText(this, "Numpad mode coming soon!", Toast.LENGTH_SHORT).show();
+                showCompositeFragment();
+                break;
+            case LaunchPanelActivity.MODE_SHORTCUTS:
+                showShortcutHubFragment();
+                break;
+            case LaunchPanelActivity.MODE_MACROS:
+                showMacrosFragment();
+                break;
+            case LaunchPanelActivity.MODE_VOICE:
+                Toast.makeText(this, "Voice mode coming soon!", Toast.LENGTH_SHORT).show();
+                showCompositeFragment();
+                break;
+            default:
+                showCompositeFragment();
+                break;
+        }
     }
 
     private void updateFragmentsWithPort(UsbSerialPort newPort) {
@@ -717,5 +800,12 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         } else {
             Toast.makeText(this, "Bluetooth disconnected", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /**
+     * Get ConnectionManager instance for fragments
+     */
+    public ConnectionManager getConnectionManager() {
+        return connectionManager;
     }
 }

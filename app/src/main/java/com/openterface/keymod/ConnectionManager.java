@@ -53,6 +53,7 @@ public class ConnectionManager {
     private ConnectionState currentConnectionState = ConnectionState.DISCONNECTED;
     private UsbSerialPort usbPort;
     private RxBleDevice bleDevice;
+    private BluetoothService bluetoothService;
     private ConnectionStateListener stateListener;
     private final Handler timeoutHandler = new Handler(Looper.getMainLooper());
 
@@ -286,5 +287,80 @@ public class ConnectionManager {
             .remove(KEY_LAST_BLE_DEVICE_MAC)
             .remove(KEY_LAST_BLE_DEVICE_NAME)
             .apply();
+    }
+
+    /**
+     * Set BluetoothService for BLE HID sending
+     */
+    public void setBluetoothService(BluetoothService service) {
+        this.bluetoothService = service;
+        Log.d(TAG, "BluetoothService set for HID sending");
+    }
+
+    /**
+     * Send HID keyboard event
+     * @param modifiers Modifier keys (Ctrl, Shift, Alt, etc.)
+     * @param keyCode HID key code
+     */
+    public void sendKeyEvent(int modifiers, int keyCode) {
+        if (!isConnected()) {
+            Log.w(TAG, "Cannot send key event: not connected");
+            return;
+        }
+        HIDSender.sendKeyEvent(usbPort, bluetoothService, modifiers, keyCode);
+    }
+
+    /**
+     * Send HID key release
+     */
+    public void sendKeyRelease() {
+        if (!isConnected()) {
+            Log.w(TAG, "Cannot send key release: not connected");
+            return;
+        }
+        HIDSender.sendKeyRelease(usbPort, null);
+    }
+
+    /**
+     * Send HID mouse movement
+     * @param deltaX X movement (-128 to 127)
+     * @param deltaY Y movement (-128 to 127)
+     * @param buttons Mouse buttons (bitmask)
+     */
+    public void sendMouseMovement(int deltaX, int deltaY, int buttons) {
+        if (!isConnected()) {
+            Log.w(TAG, "Cannot send mouse movement: not connected");
+            return;
+        }
+        HIDSender.sendMouseMovement(usbPort, bluetoothService, deltaX, deltaY, buttons);
+    }
+
+    /**
+     * Send HID mouse click
+     * @param button Button (1=left, 2=right, 4=middle)
+     * @param press True for press, false for release
+     */
+    public void sendMouseClick(int button, boolean press) {
+        if (!isConnected()) {
+            Log.w(TAG, "Cannot send mouse click: not connected");
+            return;
+        }
+        HIDSender.sendMouseClick(usbPort, bluetoothService, button, press);
+    }
+
+    /**
+     * Send HID gamepad event
+     * @param buttons Gamepad buttons bitmask
+     * @param leftX Left stick X (-128 to 127)
+     * @param leftY Left stick Y (-128 to 127)
+     * @param rightX Right stick X (-128 to 127)
+     * @param rightY Right stick Y (-128 to 127)
+     */
+    public void sendGamepadEvent(int buttons, int leftX, int leftY, int rightX, int rightY) {
+        if (!isConnected()) {
+            Log.w(TAG, "Cannot send gamepad event: not connected");
+            return;
+        }
+        HIDSender.sendGamepadEvent(usbPort, bluetoothService, buttons, leftX, leftY, rightX, rightY);
     }
 }

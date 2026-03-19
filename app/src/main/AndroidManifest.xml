@@ -11,6 +11,12 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    
+    <!-- Storage permissions for profile import/export -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="32" />
 
     <application
         android:allowBackup="true"
@@ -22,15 +28,32 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.KeyMod"
         tools:targetApi="34">
+        
+        <!-- Launch Panel Activity (Entry Point) -->
         <activity
-            android:name="com.openterface.keymod.MainActivity"
+            android:name="com.openterface.keymod.LaunchPanelActivity"
             android:exported="true"
-            android:screenOrientation="landscape">
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.KeyMod">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        
+        <!-- Main Activity -->
+        <activity
+            android:name="com.openterface.keymod.MainActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.KeyMod" />
+        
+        <!-- Settings Activity -->
+        <activity
+            android:name="com.openterface.keymod.SettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.KeyMod" />
 
         <service
             android:name="com.openterface.keymod.BluetoothService"
