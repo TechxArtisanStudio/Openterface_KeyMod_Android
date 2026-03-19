@@ -38,4 +38,7 @@
     <color name="sidebar_background">#FFFFFFFF</color>
     <color name="sidebar_item_text">#FF212121</color>
     <color name="ic_launcher_background">#FF1976D2</color>
+    
+    <!-- Settings Colors -->
+    <color name="primary_light">#FFBBDEFB</color>
 </resources>

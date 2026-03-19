@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Language Arrays -->
+    <string-array name="language_names">
+        <item>English</item>
+        <item>中文</item>
+        <item>Español</item>
+        <item>Français</item>
+        <item>Deutsch</item>
+        <item>日本語</item>
+    </string-array>
+
+    <string-array name="language_codes">
+        <item>en</item>
+        <item>zh</item>
+        <item>es</item>
+        <item>fr</item>
+        <item>de</item>
+        <item>ja</item>
+    </string-array>
+
+    <!-- Voice Language Arrays -->
+    <string-array name="voice_language_names">
+        <item>Auto-detect</item>
+        <item>English</item>
+        <item>中文</item>
+        <item>Español</item>
+        <item>Français</item>
+        <item>Deutsch</item>
+        <item>Italiano</item>
+        <item>日本語</item>
+        <item>한국어</item>
+        <item>Português</item>
+        <item>Русский</item>
+        <item>العربية</item>
+        <item>हिन्दी</item>
+    </string-array>
+
+    <string-array name="voice_language_codes">
+        <item>auto</item>
+        <item>en</item>
+        <item>zh</item>
+        <item>es</item>
+        <item>fr</item>
+        <item>de</item>
+        <item>it</item>
+        <item>ja</item>
+        <item>ko</item>
+        <item>pt</item>
+        <item>ru</item>
+        <item>ar</item>
+        <item>hi</item>
+    </string-array>
+
+    <!-- AI Model Arrays -->
+    <string-array name="ai_model_names">
+        <item>GPT-4 Turbo (Fast)</item>
+        <item>GPT-4 (High Quality)</item>
+        <item>GPT-3.5 Turbo (Fast, Cheap)</item>
+    </string-array>
+
+    <string-array name="ai_model_values">
+        <item>gpt-4-turbo-preview</item>
+        <item>gpt-4</item>
+        <item>gpt-3.5-turbo</item>
+    </string-array>
+
+    <!-- AI Style Arrays -->
+    <string-array name="ai_style_names">
+        <item>Casual</item>
+        <item>Professional</item>
+        <item>Technical</item>
+        <item>Creative</item>
+        <item>Minimal</item>
+    </string-array>
+
+    <string-array name="ai_style_values">
+        <item>casual</item>
+        <item>professional</item>
+        <item>technical</item>
+        <item>creative</item>
+        <item>minimal</item>
+    </string-array>
+
+    <!-- Auto-delete Arrays -->
+    <string-array name="auto_delete_names">
+        <item>Never</item>
+        <item>7 days</item>
+        <item>30 days</item>
+        <item>90 days</item>
+    </string-array>
+
+    <string-array name="auto_delete_values">
+        <item>0</item>
+        <item>7</item>
+        <item>30</item>
+        <item>90</item>
+    </string-array>
+</resources>
