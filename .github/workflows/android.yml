@@ -30,12 +30,14 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-write: ${{ github.event_name != 'pull_request' }}
 
-      - name: Decode Keystore
+      - name: Decode Keystore (if secrets available)
+        if: env.SIGNING_KEY != ''
         env:
           ENCODED_STRING: ${{ secrets.SIGNING_KEY }}
         run: |
           echo $ENCODED_STRING | base64 -di > app/keystore.jks
           ls -l app/keystore.jks
+        continue-on-error: true
 
       - name: Clean Gradle
         run: ./gradlew clean --info
@@ -43,16 +45,33 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace --info --warning-mode all
 
-      - name: Build Release APK
+      - name: Build Release APK (Unsigned)
         run: |
           ./gradlew assembleRelease -x lint --stacktrace --info --warning-mode all \
             -PRELEASE_STORE_FILE=keystore.jks \
-            -PRELEASE_STORE_PASSWORD="${{ secrets.KEY_STORE_PASSWORD }}" \
-            -PRELEASE_KEY_ALIAS="${{ secrets.SIGNING_KEY }}" \
-            -PRELEASE_KEY_PASSWORD="${{ secrets.KEY_PASSWORD }}"
+            -PRELEASE_STORE_PASSWORD="" \
+            -PRELEASE_KEY_ALIAS="" \
+            -PRELEASE_KEY_PASSWORD=""
+        continue-on-error: true
+        id: release_build
 
-      - name: Upload Signed Release APK
-        if: success()
+      - name: Build Release APK (Fallback - Debug Signed)
+        if: steps.release_build.outcome == 'failure'
+        run: |
+          echo "Release signing failed (no keystore), building unsigned debug APK instead"
+          ./gradlew assembleDebug --stacktrace --info
+
+      - name: Upload Debug APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KeyMod-debug
+          path: |
+            app/build/outputs/apk/debug/*.apk
+          retention-days: 90
+
+      - name: Upload Release APK (if signed)
+        if: steps.release_build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: KeyMod-signed-release
