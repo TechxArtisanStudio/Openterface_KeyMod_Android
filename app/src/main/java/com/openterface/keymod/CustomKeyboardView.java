@@ -90,13 +90,40 @@ public class CustomKeyboardView extends LinearLayout {
         super(context, attrs);
         init(context);
     }
+    
+    @Override
+    protected void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        
+        // Reload keyboard layout when orientation changes
+        boolean isLandscape = newConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        int keyboardResId = isLandscape ? R.xml.keyboard_lower_landscape : R.xml.keyboard_lower_portrait;
+        
+        Log.d(TAG, "Orientation changed: landscape=" + isLandscape + ", reloading keyboard");
+        lowerKeys = parseKeyboard(getContext(), keyboardResId);
+        removeAllViews();
+        updateKeyboard();
+    }
 
     private void init(Context context) {
         setOrientation(VERTICAL);
-        lowerKeys = parseKeyboard(context, R.xml.keyboard_lower);
-        Log.d(TAG, "Parsed keyboards: lowerKeys=" + lowerKeys.size());
+        
+        // Load keyboard layout based on orientation (matching iOS behavior)
+        int keyboardResId = isLandscape(context) ? R.xml.keyboard_lower_landscape : R.xml.keyboard_lower_portrait;
+        lowerKeys = parseKeyboard(context, keyboardResId);
+        
+        Log.d(TAG, "Parsed keyboard (landscape=" + isLandscape(context) + "): lowerKeys=" + lowerKeys.size());
         bindService(context);
         updateKeyboard();
+    }
+    
+    /**
+     * Check if device is in landscape orientation
+     * Matches iOS OrientationManager.isLandscape behavior
+     */
+    private boolean isLandscape(Context context) {
+        return context.getResources().getConfiguration().orientation 
+            == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
     }
 
     private void bindService(Context context) {
