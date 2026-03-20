@@ -280,18 +280,13 @@ public class CustomKeyboardView extends LinearLayout {
         removeAllViews();
         List<List<Key>> currentKeys = lowerKeys;
 
-        int screenHeight = getContext().getResources().getDisplayMetrics().heightPixels;
-        int screenWidth = getContext().getResources().getDisplayMetrics().widthPixels;
-        int keyboardHeight = screenHeight;
-        int rowHeight = keyboardHeight / 8;
-
-        Log.d(TAG, "Screen Height: " + screenHeight + ", Screen Width: " + screenWidth + ", Row Height: " + rowHeight);
-
         String[] functionalKeyCodes = {"46", "47", "48", "49", "4A", "4B", "4C", "4D", "4E", "3B", "3C", "3D", "3E", "3F", "29", "3A", "40", "41", "42", "43", "44", "45", "3D", "3F"};
 
         for (List<Key> row : currentKeys) {
             LinearLayout rowLayout = new LinearLayout(getContext());
-            rowLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, rowHeight));
+            // Use weight=1 so each row shares the available height equally,
+            // regardless of the keyboard container's actual pixel height.
+            rowLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1.0f));
             rowLayout.setOrientation(HORIZONTAL);
 
             float totalWeight = 0;

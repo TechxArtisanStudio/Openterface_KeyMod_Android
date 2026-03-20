@@ -1,85 +1,273 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="@dimen/sidebar_width"
     android:layout_height="match_parent"
     android:background="@color/sidebar_background"
     android:orientation="vertical"
-    android:padding="@dimen/sidebar_padding"
     android:elevation="8dp">
 
-    <!-- Menu Header -->
-    <TextView
+    <!-- Sidebar Header (menu button + title, mirrors iOS) -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/mode_selection"
-        android:textSize="@dimen/sidebar_title_size"
-        android:textStyle="bold"
-        android:paddingTop="@dimen/spacing_medium"
-        android:paddingBottom="@dimen/spacing_large"
-        android:textColor="@color/text_primary"
-        android:fontFamily="sans-serif-medium"/>
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp">
 
-    <!-- Mode Selection using RadioGroup -->
-    <RadioGroup
-        android:id="@+id/modeRadioGroup"
+        <ImageButton
+            android:id="@+id/sidebar_close_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_menu"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="@color/text_primary"
+            android:contentDescription="Close menu" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="KeyMod"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginStart="8dp" />
+
+    </LinearLayout>
+
+    <!-- Navigation Items -->
+    <LinearLayout
+        android:id="@+id/nav_keyboard_mouse"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp"
+        android:background="@drawable/nav_item_background_selector"
+        android:clickable="true"
+        android:focusable="true">
 
-        <!-- Keyboard Mode -->
-        <RadioButton
-            android:id="@+id/radioKeyboard"
-            android:layout_width="match_parent"
+        <ImageView
+            android:id="@+id/nav_icon_keyboard_mouse"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/keyboard_mouse"
+            android:tint="@color/card_selected_bg" />
+
+        <TextView
+            android:id="@+id/nav_text_keyboard_mouse"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/keyboard_mode"
-            android:textSize="@dimen/sidebar_item_text_size"
-            android:textColor="@color/sidebar_item_text"
-            android:padding="@dimen/sidebar_item_padding"
-            android:layout_marginTop="2dp"
-            android:layout_marginBottom="2dp"
-            android:checked="true"
-            android:background="@drawable/radio_button_background"
-            android:fontFamily="sans-serif"
-            android:drawablePadding="@dimen/spacing_small"/>
+            android:text="Keyboard &amp; Mouse"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:layout_marginStart="12dp" />
 
-        <!-- Mouse Mode -->
-        <RadioButton
-            android:id="@+id/radioMouse"
-            android:layout_width="match_parent"
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/nav_gamepad"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp"
+        android:background="@drawable/nav_item_background_selector"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/nav_icon_gamepad"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/gamepad"
+            android:tint="@color/card_selected_bg" />
+
+        <TextView
+            android:id="@+id/nav_text_gamepad"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/mouse_mode"
-            android:textSize="@dimen/sidebar_item_text_size"
-            android:textColor="@color/sidebar_item_text"
-            android:padding="@dimen/sidebar_item_padding"
-            android:layout_marginTop="2dp"
-            android:layout_marginBottom="2dp"
-            android:background="@drawable/radio_button_background"
-            android:fontFamily="sans-serif"
-            android:drawablePadding="@dimen/spacing_small"/>
+            android:text="Gamepad"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:layout_marginStart="12dp" />
 
-        <!-- Composite Mode -->
-        <RadioButton
-            android:id="@+id/radioComposite"
-            android:layout_width="match_parent"
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/nav_numpad"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp"
+        android:background="@drawable/nav_item_background_selector"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/nav_icon_numpad"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/numpad"
+            android:tint="@color/card_selected_bg" />
+
+        <TextView
+            android:id="@+id/nav_text_numpad"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/composite_mode"
-            android:textSize="@dimen/sidebar_item_text_size"
-            android:textColor="@color/sidebar_item_text"
-            android:padding="@dimen/sidebar_item_padding"
-            android:layout_marginTop="2dp"
-            android:layout_marginBottom="2dp"
-            android:background="@drawable/radio_button_background"
-            android:fontFamily="sans-serif"
-            android:drawablePadding="@dimen/spacing_small"/>
+            android:text="Numpad"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:layout_marginStart="12dp" />
 
-    </RadioGroup>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/nav_shortcuts"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp"
+        android:background="@drawable/nav_item_background_selector"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/nav_icon_shortcuts"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/three_dots"
+            android:tint="@color/card_selected_bg" />
+
+        <TextView
+            android:id="@+id/nav_text_shortcuts"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Shortcuts"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:layout_marginStart="12dp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/nav_macros"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp"
+        android:background="@drawable/nav_item_background_selector"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/nav_icon_macros"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/macros"
+            android:tint="@color/card_selected_bg" />
+
+        <TextView
+            android:id="@+id/nav_text_macros"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Macros"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:layout_marginStart="12dp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/nav_voice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp"
+        android:background="@drawable/nav_item_background_selector"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/nav_icon_voice"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/voice"
+            android:tint="@color/card_selected_bg" />
+
+        <TextView
+            android:id="@+id/nav_text_voice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Voice Input"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:layout_marginStart="12dp" />
+
+    </LinearLayout>
 
     <!-- Spacer -->
     <View
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_weight="1" />
+
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/divider"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Choose Mode Button (returns to LaunchPanel) -->
+    <Button
+        android:id="@+id/choose_mode_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Choose Mode"
+        android:textSize="14sp"
+        android:textColor="@color/card_selected_bg"
+        android:padding="@dimen/sidebar_item_padding"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="4dp"
+        android:background="?attr/selectableItemBackground"
+        android:gravity="start|center_vertical"
+        android:drawablePadding="@dimen/spacing_small"
+        style="?android:attr/borderlessButtonStyle" />
 
     <!-- Settings Button -->
     <Button
@@ -90,31 +278,14 @@
         android:textSize="14sp"
         android:textColor="@color/text_primary"
         android:padding="@dimen/sidebar_item_padding"
-        android:layout_marginTop="@dimen/spacing_medium"
-        android:layout_marginBottom="@dimen/spacing_medium"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="16dp"
         android:background="?attr/selectableItemBackground"
         android:gravity="start|center_vertical"
         android:drawableStart="@drawable/ic_settings"
         android:drawablePadding="@dimen/spacing_small"
         style="?android:attr/borderlessButtonStyle" />
 
-    <!-- Divider -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/divider"
-        android:layout_marginTop="@dimen/spacing_medium"
-        android:layout_marginBottom="@dimen/spacing_medium"/>
-
-    <!-- Info Text -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/mode_info"
-        android:textSize="12sp"
-        android:textColor="@color/text_secondary"
-        android:lineSpacingMultiplier="1.2"
-        android:paddingBottom="@dimen/spacing_medium"
-        android:fontFamily="sans-serif"/>
-
 </LinearLayout>
+

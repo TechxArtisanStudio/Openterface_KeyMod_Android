@@ -118,6 +118,33 @@ public class MouseFragment extends Fragment {
         }
     }
 
+    public void sendScrollData(int deltaX, int deltaY) {
+        new Thread(() -> {
+            try {
+                String scrollByte = deltaY == 0 ? "00"
+                        : deltaY > 0 ? String.format("%02X", Math.min(deltaY, 0x7F))
+                        : String.format("%02X", 0x100 + Math.max(deltaY, -0x7F));
+                String sendMSData =
+                        CH9329MSKBMap.getKeyCodeMap().get("prefix1") +
+                        CH9329MSKBMap.getKeyCodeMap().get("prefix2") +
+                        CH9329MSKBMap.getKeyCodeMap().get("address") +
+                        CH9329MSKBMap.CmdData().get("CmdMS_REL") +
+                        CH9329MSKBMap.DataLen().get("DataLenRelMS") +
+                        CH9329MSKBMap.MSRelData().get("FirstData") +
+                        "00" + "00" + "00" + scrollByte;
+                sendMSData += makeChecksum(sendMSData);
+                byte[] bytes = hexStringToByteArray(sendMSData);
+                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                    bluetoothService.sendData(bytes);
+                } else if (port != null) {
+                    port.write(bytes, 20);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error sending scroll data: " + e.getMessage());
+            }
+        }).start();
+    }
+
     public void sendHexRelData(float StartMoveMSX, float StartMoveMSY, float LastMoveMSX, float LastMoveMSY) {
         new Thread(() -> {
             try {
@@ -292,24 +319,79 @@ public class MouseFragment extends Fragment {
         if (touchPad != null) {
             touchPad.setOnTouchPadListener(new TouchPadView.OnTouchPadListener() {
                 @Override
-                public void onTouchMove(float startMoveMSX, float startMoveMSY, float lastMoveMSX, float lastMoveMSY) {
-                    Log.d(TAG, "TouchPad Move: " + startMoveMSX + ", " + startMoveMSY + ", " + lastMoveMSX + ", " + lastMoveMSY);
-                    sendHexRelData(startMoveMSX, startMoveMSY, lastMoveMSX, lastMoveMSY);
+                public void onTouchMove(float startX, float startY, float lastX, float lastY) {
+                    if (lastX == 0 && lastY == 0) {
+                        // 2-finger scroll sentinel from TouchPadView
+                        sendScrollData((int) startX, (int) startY);
+                    } else {
+                        sendHexRelData(startX, startY, lastX, lastY);
+                    }
                 }
 
                 @Override
                 public void onTouchClick() {
-                    Log.d(TAG, "TouchPad Click");
+                    Log.d(TAG, "TouchPad single tap -> left click");
+                    new Thread(() -> {
+                        try {
+                            String data = "57AB0005050101000000";
+                            data += makeChecksum(data);
+                            byte[] bytes = hexStringToByteArray(data);
+                            if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                                bluetoothService.sendData(bytes);
+                            } else if (port != null) {
+                                port.write(bytes, 20);
+                            }
+                            Thread.sleep(30);
+                            releaseAllMSData();
+                        } catch (IOException | InterruptedException e) {
+                            Log.e(TAG, "Error sending tap left click: " + e.getMessage());
+                        }
+                    }).start();
                 }
 
                 @Override
                 public void onTouchDoubleClick() {
-                    Log.d(TAG, "TouchPad Double Click");
+                    Log.d(TAG, "TouchPad double tap -> double click");
+                    new Thread(() -> {
+                        try {
+                            String data = "57AB0005050101000000";
+                            data += makeChecksum(data);
+                            byte[] bytes = hexStringToByteArray(data);
+                            for (int i = 0; i < 2; i++) {
+                                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                                    bluetoothService.sendData(bytes);
+                                } else if (port != null) {
+                                    port.write(bytes, 20);
+                                }
+                                Thread.sleep(30);
+                                releaseAllMSData();
+                                Thread.sleep(30);
+                            }
+                        } catch (IOException | InterruptedException e) {
+                            Log.e(TAG, "Error sending double click: " + e.getMessage());
+                        }
+                    }).start();
                 }
 
                 @Override
                 public void onTouchRightClick() {
-                    Log.d(TAG, "TouchPad Right Click");
+                    Log.d(TAG, "TouchPad 2-finger tap -> right click");
+                    new Thread(() -> {
+                        try {
+                            String data = "57AB0005050102000000";
+                            data += makeChecksum(data);
+                            byte[] bytes = hexStringToByteArray(data);
+                            if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                                bluetoothService.sendData(bytes);
+                            } else if (port != null) {
+                                port.write(bytes, 20);
+                            }
+                            Thread.sleep(30);
+                            releaseAllMSData();
+                        } catch (IOException | InterruptedException e) {
+                            Log.e(TAG, "Error sending right click: " + e.getMessage());
+                        }
+                    }).start();
                 }
             });
         }

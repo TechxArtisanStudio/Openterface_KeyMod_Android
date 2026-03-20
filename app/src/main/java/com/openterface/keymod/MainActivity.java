@@ -20,8 +20,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageButton;
-import android.widget.RadioGroup;
-import android.widget.RadioButton;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -70,7 +69,15 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private ImageButton connectionButton;
     private ImageButton menuButton;
     private DrawerLayout drawerLayout;
-    private RadioGroup modeRadioGroup;
+    private String currentNavMode = LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
+
+    // Sidebar nav item views
+    private LinearLayout navKeyboardMouse;
+    private LinearLayout navGamepad;
+    private LinearLayout navNumpad;
+    private LinearLayout navShortcuts;
+    private LinearLayout navMacros;
+    private LinearLayout navVoice;
     
     // Old button bar components (now hidden but kept for backward compatibility)
     private Button usbConnect, bluetooth, keyBoard, mouse, keyBoardMouse, question, info, shortcut;
@@ -184,6 +191,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             handleLaunchMode(launchMode);
         } else {
             // Default to Composite mode
+            currentNavMode = LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
             showCompositeFragment();
         }
         
@@ -268,26 +276,14 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         connectionButton = findViewById(R.id.connection_button);
         menuButton = findViewById(R.id.menu_button);
         
-        // Initialize drawer layout and radio group
+        // Initialize drawer layout and nav items
         drawerLayout = findViewById(R.id.drawer_layout);
-        modeRadioGroup = findViewById(R.id.modeRadioGroup);
-        
-        // Set up mode selection listener
-        if (modeRadioGroup != null) {
-            modeRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
-                if (checkedId == R.id.radioKeyboard) {
-                    showKeyboardFragment();
-                } else if (checkedId == R.id.radioMouse) {
-                    showMouseFragment();
-                } else if (checkedId == R.id.radioComposite) {
-                    showCompositeFragment();
-                }
-                // Close the drawer after selection
-                if (drawerLayout != null) {
-                    drawerLayout.closeDrawers();
-                }
-            });
-        }
+        navKeyboardMouse = findViewById(R.id.nav_keyboard_mouse);
+        navGamepad = findViewById(R.id.nav_gamepad);
+        navNumpad = findViewById(R.id.nav_numpad);
+        navShortcuts = findViewById(R.id.nav_shortcuts);
+        navMacros = findViewById(R.id.nav_macros);
+        navVoice = findViewById(R.id.nav_voice);
         
         // Initialize old buttons (kept for backward compatibility, but hidden - may be null)
         // These are in hidden layout, won't be found
@@ -485,15 +481,84 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (menuButton != null) {
             menuButton.setOnClickListener(v -> {
                 if (drawerLayout != null) {
-                    if (drawerLayout.isDrawerOpen(android.view.Gravity.END)) {
-                        drawerLayout.closeDrawer(android.view.Gravity.END);
+                    if (drawerLayout.isDrawerOpen(android.view.Gravity.START)) {
+                        drawerLayout.closeDrawer(android.view.Gravity.START);
                     } else {
-                        drawerLayout.openDrawer(android.view.Gravity.END);
+                        drawerLayout.openDrawer(android.view.Gravity.START);
                     }
                 }
             });
         }
-        
+
+        // Sidebar close button (mirrors iOS ellipsis button inside sidebar)
+        View sidebarCloseButton = findViewById(R.id.sidebar_close_button);
+        if (sidebarCloseButton != null) {
+            sidebarCloseButton.setOnClickListener(v -> {
+                if (drawerLayout != null) drawerLayout.closeDrawer(android.view.Gravity.START);
+            });
+        }
+
+        // Nav item click listeners
+        if (navKeyboardMouse != null) {
+            navKeyboardMouse.setOnClickListener(v -> {
+                currentNavMode = LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
+                updateNavSelection();
+                showCompositeFragment();
+                drawerLayout.closeDrawer(android.view.Gravity.START);
+            });
+        }
+        if (navGamepad != null) {
+            navGamepad.setOnClickListener(v -> {
+                currentNavMode = LaunchPanelActivity.MODE_GAMEPAD;
+                updateNavSelection();
+                showGamepadFragment();
+                drawerLayout.closeDrawer(android.view.Gravity.START);
+            });
+        }
+        if (navNumpad != null) {
+            navNumpad.setOnClickListener(v -> {
+                currentNavMode = LaunchPanelActivity.MODE_NUMPAD;
+                updateNavSelection();
+                Toast.makeText(this, "Numpad coming soon!", Toast.LENGTH_SHORT).show();
+                drawerLayout.closeDrawer(android.view.Gravity.START);
+            });
+        }
+        if (navShortcuts != null) {
+            navShortcuts.setOnClickListener(v -> {
+                currentNavMode = LaunchPanelActivity.MODE_SHORTCUTS;
+                updateNavSelection();
+                showShortcutHubFragment();
+                drawerLayout.closeDrawer(android.view.Gravity.START);
+            });
+        }
+        if (navMacros != null) {
+            navMacros.setOnClickListener(v -> {
+                currentNavMode = LaunchPanelActivity.MODE_MACROS;
+                updateNavSelection();
+                showMacrosFragment();
+                drawerLayout.closeDrawer(android.view.Gravity.START);
+            });
+        }
+        if (navVoice != null) {
+            navVoice.setOnClickListener(v -> {
+                currentNavMode = LaunchPanelActivity.MODE_VOICE;
+                updateNavSelection();
+                showVoiceInputFragment();
+                drawerLayout.closeDrawer(android.view.Gravity.START);
+            });
+        }
+
+        // Choose Mode button - returns to LaunchPanelActivity
+        View chooseModeButton = findViewById(R.id.choose_mode_button);
+        if (chooseModeButton != null) {
+            chooseModeButton.setOnClickListener(v -> {
+                drawerLayout.closeDrawer(android.view.Gravity.START);
+                Intent intent = new Intent(MainActivity.this, LaunchPanelActivity.class);
+                startActivity(intent);
+                finish();
+            });
+        }
+
         // Settings button handler (in nav menu)
         View settingsButton = findViewById(R.id.settings_button);
         if (settingsButton != null) {
@@ -590,6 +655,15 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         }
     }
 
+    private void updateNavSelection() {
+        if (navKeyboardMouse != null) navKeyboardMouse.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_KEYBOARD_MOUSE));
+        if (navGamepad != null) navGamepad.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_GAMEPAD));
+        if (navNumpad != null) navNumpad.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_NUMPAD));
+        if (navShortcuts != null) navShortcuts.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_SHORTCUTS));
+        if (navMacros != null) navMacros.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_MACROS));
+        if (navVoice != null) navVoice.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_VOICE));
+    }
+
     private void showKeyboardFragment() {
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction transaction = fragmentManager.beginTransaction();
@@ -650,6 +724,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
      * Handle launch mode from LaunchPanelActivity
      */
     private void handleLaunchMode(String mode) {
+        currentNavMode = mode;
+        updateNavSelection();
         switch (mode) {
             case LaunchPanelActivity.MODE_KEYBOARD_MOUSE:
                 showCompositeFragment();
@@ -668,8 +744,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 showMacrosFragment();
                 break;
             case LaunchPanelActivity.MODE_VOICE:
-                Toast.makeText(this, "Voice mode coming soon!", Toast.LENGTH_SHORT).show();
-                showCompositeFragment();
+                showVoiceInputFragment();
                 break;
             default:
                 showCompositeFragment();

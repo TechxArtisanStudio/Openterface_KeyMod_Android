@@ -12,6 +12,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -31,11 +32,16 @@ public class CompositeFragment extends Fragment {
     private static final String TAG = "CompositeFragment";
     private CustomKeyboardView keyboardView;
     private TouchPadView touchPad;
+    private LinearLayout touchpadSection;
+    private LinearLayout toggleHandle;
     public UsbSerialPort port;
     private Button leftClickButton, rightClickButton;
     private ImageButton slideUpButton, slideDownButton;
     private BluetoothService bluetoothService;
     private boolean isServiceBound;
+
+    private enum DisplayMode { BOTH, KEYBOARD, TOUCHPAD }
+    private DisplayMode displayMode = DisplayMode.BOTH;
 
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         @Override
@@ -202,6 +208,38 @@ public class CompositeFragment extends Fragment {
         }).start();
     }
 
+    /** Send a scroll-wheel packet. deltaY>0 scrolls up, deltaY<0 scrolls down (natural). */
+    public void sendScrollData(int deltaX, int deltaY) {
+        new Thread(() -> {
+            try {
+                // CH9329 relative mouse: byte[9] = scroll wheel
+                String scrollByte = deltaY == 0 ? "00"
+                        : deltaY > 0 ? String.format("%02X", Math.min(deltaY, 0x7F))
+                        : String.format("%02X", 0x100 + Math.max(deltaY, -0x7F));
+                String sendMSData =
+                        CH9329MSKBMap.getKeyCodeMap().get("prefix1") +
+                        CH9329MSKBMap.getKeyCodeMap().get("prefix2") +
+                        CH9329MSKBMap.getKeyCodeMap().get("address") +
+                        CH9329MSKBMap.CmdData().get("CmdMS_REL") +
+                        CH9329MSKBMap.DataLen().get("DataLenRelMS") +
+                        CH9329MSKBMap.MSRelData().get("FirstData") +
+                        "00" + // no button
+                        "00" + // x
+                        "00" + // y
+                        scrollByte;
+                sendMSData += makeChecksum(sendMSData);
+                byte[] bytes = hexStringToByteArray(sendMSData);
+                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                    bluetoothService.sendData(bytes);
+                } else if (port != null) {
+                    port.write(bytes, 20);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error sending scroll data: " + e.getMessage());
+            }
+        }).start();
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -302,6 +340,13 @@ public class CompositeFragment extends Fragment {
 
         keyboardView = view.findViewById(R.id.keyboard_view);
         touchPad = view.findViewById(R.id.touchPad);
+        touchpadSection = view.findViewById(R.id.touchpad_section);
+        toggleHandle = view.findViewById(R.id.toggle_handle);
+
+        if (toggleHandle != null) {
+            toggleHandle.setOnClickListener(v -> cycleDisplayMode());
+        }
+
         if (keyboardView != null && port != null) {
             keyboardView.setPort(port);
         }
@@ -309,29 +354,111 @@ public class CompositeFragment extends Fragment {
         if (touchPad != null) {
             touchPad.setOnTouchPadListener(new TouchPadView.OnTouchPadListener() {
                 @Override
-                public void onTouchMove(float startMoveMSX, float startMoveMSY, float lastMoveMSX, float lastMoveMSY) {
-                    Log.d(TAG, "TouchPad Move: " + startMoveMSX + ", " + startMoveMSY + ", " + lastMoveMSX + ", " + lastMoveMSY);
-                    sendHexRelData(startMoveMSX, startMoveMSY, lastMoveMSX, lastMoveMSY);
+                public void onTouchMove(float startX, float startY, float lastX, float lastY) {
+                    // 2-finger scroll is signalled with lastX==0 && lastY==0
+                    if (lastX == 0 && lastY == 0) {
+                        Log.d(TAG, "TouchPad 2-finger scroll: dx=" + startX + " dy=" + startY);
+                        sendScrollData((int) startX, (int) startY);
+                    } else {
+                        Log.d(TAG, "TouchPad Move: " + startX + ", " + startY + " -> " + lastX + ", " + lastY);
+                        sendHexRelData(startX, startY, lastX, lastY);
+                    }
                 }
 
                 @Override
                 public void onTouchClick() {
-                    Log.d(TAG, "TouchPad Click");
+                    Log.d(TAG, "TouchPad single tap -> left click");
+                    new Thread(() -> {
+                        try {
+                            String sendKBData = "57AB0005050101000000";
+                            sendKBData += makeChecksum(sendKBData);
+                            byte[] bytes = hexStringToByteArray(sendKBData);
+                            if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                                bluetoothService.sendData(bytes);
+                            } else if (port != null) {
+                                port.write(bytes, 20);
+                            }
+                            Thread.sleep(30);
+                            releaseAllMSData();
+                        } catch (IOException | InterruptedException e) {
+                            Log.e(TAG, "Error sending tap left click: " + e.getMessage());
+                        }
+                    }).start();
                 }
 
                 @Override
                 public void onTouchDoubleClick() {
-                    Log.d(TAG, "TouchPad Double Click");
+                    Log.d(TAG, "TouchPad double tap -> double click");
+                    new Thread(() -> {
+                        try {
+                            String clickData = "57AB0005050101000000";
+                            clickData += makeChecksum(clickData);
+                            byte[] bytes = hexStringToByteArray(clickData);
+                            for (int i = 0; i < 2; i++) {
+                                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                                    bluetoothService.sendData(bytes);
+                                } else if (port != null) {
+                                    port.write(bytes, 20);
+                                }
+                                Thread.sleep(30);
+                                releaseAllMSData();
+                                Thread.sleep(30);
+                            }
+                        } catch (IOException | InterruptedException e) {
+                            Log.e(TAG, "Error sending double click: " + e.getMessage());
+                        }
+                    }).start();
                 }
 
                 @Override
                 public void onTouchRightClick() {
-                    Log.d(TAG, "TouchPad Right Click");
+                    Log.d(TAG, "TouchPad 2-finger tap -> right click");
+                    new Thread(() -> {
+                        try {
+                            String sendKBData = "57AB0005050102000000";
+                            sendKBData += makeChecksum(sendKBData);
+                            byte[] bytes = hexStringToByteArray(sendKBData);
+                            if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                                bluetoothService.sendData(bytes);
+                            } else if (port != null) {
+                                port.write(bytes, 20);
+                            }
+                            Thread.sleep(30);
+                            releaseAllMSData();
+                        } catch (IOException | InterruptedException e) {
+                            Log.e(TAG, "Error sending right click: " + e.getMessage());
+                        }
+                    }).start();
+                }
+
+                @Override
+                public void onTouchLongPress() {
+                    Log.d(TAG, "TouchPad long press -> drag mode (no-op placeholder)");
                 }
             });
         }
 
         return view;
+    }
+
+    private void cycleDisplayMode() {
+        switch (displayMode) {
+            case BOTH:     displayMode = DisplayMode.KEYBOARD;  break;
+            case KEYBOARD: displayMode = DisplayMode.TOUCHPAD;  break;
+            case TOUCHPAD: displayMode = DisplayMode.BOTH;      break;
+        }
+        applyDisplayMode();
+    }
+
+    private void applyDisplayMode() {
+        if (touchpadSection != null) {
+            touchpadSection.setVisibility(
+                displayMode != DisplayMode.KEYBOARD ? View.VISIBLE : View.GONE);
+        }
+        if (keyboardView != null) {
+            keyboardView.setVisibility(
+                displayMode != DisplayMode.TOUCHPAD ? View.VISIBLE : View.GONE);
+        }
     }
 
     @Override

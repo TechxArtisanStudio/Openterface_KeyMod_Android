@@ -3,21 +3,21 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
+    android:orientation="horizontal"
     android:background="@color/background_light">
 
-    <!-- Touchpad Section (top, flexible height) -->
+    <!-- Mouse Section (30% width) -->
     <LinearLayout
-        android:id="@+id/touchpad_section"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="2"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="3"
         android:orientation="vertical">
 
-        <!-- Mouse Control Buttons Row -->
+        <!-- Mouse Control Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="0dp"
+            android:layout_weight="2"
             android:orientation="horizontal">
 
             <Button
@@ -72,40 +72,31 @@
 
         </LinearLayout>
 
-        <!-- TouchPad (fills remaining space in touchpad section) -->
+        <!-- TouchPad -->
         <com.openterface.keymod.TouchPadView
             android:id="@+id/touchPad"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_weight="8"
             android:background="@color/touchpad_background"/>
 
     </LinearLayout>
 
-    <!-- Toggle Handle (tap to cycle display modes: both / keyboard only / touchpad only) -->
+    <!-- Keyboard Section (70% width) -->
     <LinearLayout
-        android:id="@+id/toggle_handle"
-        android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:gravity="center"
-        android:background="@color/background_light"
-        android:clickable="true"
-        android:focusable="true">
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="7"
+        android:orientation="vertical">
 
-        <View
-            android:layout_width="40dp"
-            android:layout_height="4dp"
-            android:background="@drawable/toggle_handle_pill"/>
+        <com.openterface.keymod.CustomKeyboardView
+            android:id="@+id/keyboard_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center_horizontal"
+            android:keyBackground="@drawable/key_background"
+            android:theme="@style/ButtonTheme"/>
 
     </LinearLayout>
-
-    <!-- Keyboard Section (bottom, larger share so all rows fit) -->
-    <com.openterface.keymod.CustomKeyboardView
-        android:id="@+id/keyboard_view"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="3"
-        android:keyBackground="@drawable/key_background"
-        android:theme="@style/ButtonTheme"/>
 
 </LinearLayout>

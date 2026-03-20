@@ -1,16 +1,33 @@
-<!-- Connection status icon - Disconnected (Gray/Red) -->
+<!-- Connection status icon - Disconnected (gray with slash) -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
-    android:viewportHeight="24">
+    android:viewportHeight="24"
+    android:tint="#9E9E9E">
+    <!-- Antenna base/stem -->
     <path
-        android:fillColor="#F44336"
-        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM13,17h-2v-2h2v2zM13,13h-2L11,7h2v6z"/>
+        android:fillColor="#9E9E9E"
+        android:pathData="M12,14 L11,22 L13,22 Z"/>
+    <!-- Left inner wave -->
     <path
-        android:fillColor="#F44336"
-        android:pathData="M2,2l20,20"
-        android:strokeWidth="2"
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#9E9E9E"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M8.5,11 A5,5 0 0 0 12,16 A5,5 0 0 0 15.5,11"/>
+    <!-- Left outer wave -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#9E9E9E"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M5.5,8.5 A9,9 0 0 0 12,17 A9,9 0 0 0 18.5,8.5"/>
+    <!-- Diagonal slash -->
+    <path
+        android:fillColor="@android:color/transparent"
         android:strokeColor="#F44336"
-        android:strokeLineCap="round"/>
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M4,4 L20,20"/>
 </vector>

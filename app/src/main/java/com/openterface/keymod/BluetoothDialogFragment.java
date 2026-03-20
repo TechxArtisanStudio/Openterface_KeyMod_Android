@@ -95,7 +95,7 @@ public class BluetoothDialogFragment extends DialogFragment {
                     boolean exists = false;
                     for (RxBleDevice device : pairedDevices) {
                         if (device.getMacAddress().equals(connectedDevice.getMacAddress()) &&
-                                sanitizeDeviceName(device.getName()).equals(sanitizeDeviceName(connectedDevice.getName()))) {
+                                sanitizeDeviceName(device.getName()).equalsIgnoreCase(sanitizeDeviceName(connectedDevice.getName()))) {
                             exists = true;
                             break;
                         }
@@ -280,7 +280,7 @@ public class BluetoothDialogFragment extends DialogFragment {
                 
                 Log.d(TAG, LOG_PREFIX + "Device clicked: " + deviceName + " (" + deviceAddress + ")");
                 
-                if (deviceName.matches("(?i)openterface KM.*")) {
+                if (deviceName.matches("(?i)(openterface|kvm).*")) {
                     if (isServiceBound) {
                         // Check if the device is already connected
                         if (bluetoothService.isConnected() &&
@@ -294,7 +294,7 @@ public class BluetoothDialogFragment extends DialogFragment {
                         boolean isPaired = false;
                         for (RxBleDevice device : pairedDevices) {
                             if (device.getMacAddress().equals(selectedBleDevice.getMacAddress()) &&
-                                    sanitizeDeviceName(device.getName()).equals(deviceName)) {
+                                    sanitizeDeviceName(device.getName()).equalsIgnoreCase(deviceName)) {
                                 isPaired = true;
                                 break;
                             }
@@ -323,7 +323,7 @@ public class BluetoothDialogFragment extends DialogFragment {
                     }
                 } else {
                     Log.w(TAG, LOG_PREFIX + "Device does not match Openterface KM pattern: " + deviceName);
-                    showToast("Please select an openterface KM device");
+                    showToast("Please select an openterface or KVM device");
                 }
             }
         });
@@ -509,7 +509,7 @@ public class BluetoothDialogFragment extends DialogFragment {
 
                                 Log.d(TAG, LOG_PREFIX + "Found device: " + deviceName + " (" + deviceAddress + ")");
                                 
-                                if (!deviceName.matches("(?i)openterface KM.*")) {
+                                if (!deviceName.matches("(?i)(openterface|kvm).*")) {
                                     Log.d(TAG, LOG_PREFIX + "Device does NOT match Openterface KM pattern, skipping: " + deviceName);
                                     return;
                                 }
@@ -609,11 +609,11 @@ public class BluetoothDialogFragment extends DialogFragment {
             try {
                 RxBleDevice device = rxBleClient.getBleDevice(macAddress);
                 // Only add if the current device name matches the stored name
-                if (sanitizeDeviceName(device.getName()).equals(storedName)) {
+                if (sanitizeDeviceName(device.getName()).equalsIgnoreCase(storedName)) {
                     pairedDevices.add(device);
                     Log.d(TAG, LOG_PREFIX + "Loaded paired device: " + macAddress + ", name: " + storedName);
                 } else {
-                    Log.w(TAG, LOG_PREFIX + "Device name mismatch for MAC " + macAddress + ": expected " + storedName + ", got " + sanitizeDeviceName(device.getName()));
+                    Log.w(TAG, LOG_PREFIX + "Device name mismatch for MAC " + macAddress + ": expected " + storedName + ", got " + sanitizeDeviceName(device.getName()) + " (case-insensitive check failed)");
                 }
             } catch (Exception e) {
                 Log.e(TAG, LOG_PREFIX + "Error loading paired device: " + macAddress + ", error: " + e.getMessage());

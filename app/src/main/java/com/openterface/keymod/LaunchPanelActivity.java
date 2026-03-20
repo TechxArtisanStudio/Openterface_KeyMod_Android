@@ -4,13 +4,12 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
+import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
-
-import com.openterface.keymod.MainActivity;
 
 /**
  * Launch Panel - Mode selection screen as app entry point
@@ -31,7 +30,10 @@ public class LaunchPanelActivity extends AppCompatActivity {
     public static final String MODE_VOICE = "voice";
 
     private CheckBox rememberChoiceCheckBox;
+    private Button startButton;
+    private Button skipButton;
     private SharedPreferences prefs;
+    private String selectedMode = MODE_KEYBOARD_MOUSE;
 
     // Mode cards
     private CardView keyboardMouseCard;
@@ -50,11 +52,14 @@ public class LaunchPanelActivity extends AppCompatActivity {
 
         initializeViews();
         setupClickListeners();
+        updateCardSelections();
         checkLastMode();
     }
 
     private void initializeViews() {
         rememberChoiceCheckBox = findViewById(R.id.remember_choice_checkbox);
+        startButton = findViewById(R.id.start_button);
+        skipButton = findViewById(R.id.skip_button);
 
         // Mode cards
         keyboardMouseCard = findViewById(R.id.keyboard_mouse_card);
@@ -65,35 +70,51 @@ public class LaunchPanelActivity extends AppCompatActivity {
         voiceCard = findViewById(R.id.voice_card);
     }
 
+    private void updateCardSelections() {
+        keyboardMouseCard.setSelected(selectedMode.equals(MODE_KEYBOARD_MOUSE));
+        gamepadCard.setSelected(selectedMode.equals(MODE_GAMEPAD));
+        numpadCard.setSelected(selectedMode.equals(MODE_NUMPAD));
+        shortcutsCard.setSelected(selectedMode.equals(MODE_SHORTCUTS));
+        macrosCard.setSelected(selectedMode.equals(MODE_MACROS));
+        voiceCard.setSelected(selectedMode.equals(MODE_VOICE));
+    }
+
     private void setupClickListeners() {
         keyboardMouseCard.setOnClickListener(v -> {
-            launchMode(MODE_KEYBOARD_MOUSE);
+            selectedMode = MODE_KEYBOARD_MOUSE;
+            updateCardSelections();
         });
 
         gamepadCard.setOnClickListener(v -> {
-            // Gamepad not yet implemented - show toast
-            Toast.makeText(this, "Gamepad mode coming soon!", Toast.LENGTH_SHORT).show();
+            selectedMode = MODE_GAMEPAD;
+            updateCardSelections();
         });
 
         numpadCard.setOnClickListener(v -> {
-            // Numpad not yet implemented - show toast
-            Toast.makeText(this, "Numpad mode coming soon!", Toast.LENGTH_SHORT).show();
+            selectedMode = MODE_NUMPAD;
+            updateCardSelections();
         });
 
         shortcutsCard.setOnClickListener(v -> {
-            launchMode(MODE_SHORTCUTS);
+            selectedMode = MODE_SHORTCUTS;
+            updateCardSelections();
         });
 
         macrosCard.setOnClickListener(v -> {
-            launchMode(MODE_MACROS);
+            selectedMode = MODE_MACROS;
+            updateCardSelections();
         });
 
         voiceCard.setOnClickListener(v -> {
-            launchMode(MODE_VOICE);
+            selectedMode = MODE_VOICE;
+            updateCardSelections();
         });
 
-        voiceCard.setOnClickListener(v -> {
-            launchMode(MODE_VOICE);
+        startButton.setOnClickListener(v -> launchMode(selectedMode));
+
+        skipButton.setOnClickListener(v -> {
+            prefs.edit().putBoolean(REMEMBER_CHOICE_KEY, false).apply();
+            launchModeInternal(MODE_KEYBOARD_MOUSE);
         });
     }
 

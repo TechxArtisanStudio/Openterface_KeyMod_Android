@@ -1,10 +1,29 @@
-<!-- Connection status icon - Connected (Green) -->
+<!-- Connection status icon - Connected (green antenna with full waves) -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- Antenna base/stem -->
     <path
         android:fillColor="#4CAF50"
-        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM10,17l-5,-5 1.41,-1.41L10,14.17l7.59,-7.59L19,8l-9,9z"/>
+        android:pathData="M12,14 L11,22 L13,22 Z"/>
+    <!-- Inner wave -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#4CAF50"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M8.5,11 A5,5 0 0 0 12,16 A5,5 0 0 0 15.5,11"/>
+    <!-- Outer wave -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#4CAF50"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M5.5,8.5 A9,9 0 0 0 12,17 A9,9 0 0 0 18.5,8.5"/>
+    <!-- Center dot -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M12,13 m-1.5,0 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0"/>
 </vector>
