@@ -93,8 +93,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
         });
 
         voiceCard.setOnClickListener(v -> {
-            // Voice not yet implemented - show toast
-            Toast.makeText(this, "Voice mode coming soon!", Toast.LENGTH_SHORT).show();
+            launchMode(MODE_VOICE);
         });
     }
 
@@ -134,24 +133,8 @@ public class LaunchPanelActivity extends AppCompatActivity {
     }
 
     private void launchModeInternal(String mode) {
-        Intent intent;
-        
-        switch (mode) {
-            case MODE_KEYBOARD_MOUSE:
-                intent = new Intent(this, MainActivity.class);
-                intent.putExtra("launch_mode", MODE_KEYBOARD_MOUSE);
-                break;
-                
-            case MODE_SHORTCUTS:
-                intent = new Intent(this, MainActivity.class);
-                intent.putExtra("launch_mode", MODE_SHORTCUTS);
-                break;
-                
-            default:
-                intent = new Intent(this, MainActivity.class);
-                intent.putExtra("launch_mode", MODE_KEYBOARD_MOUSE);
-                break;
-        }
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.putExtra("launch_mode", mode);
         
         startActivity(intent);
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
@@ -167,11 +150,11 @@ public class LaunchPanelActivity extends AppCompatActivity {
             case MODE_NUMPAD:
                 return "Numpad";
             case MODE_SHORTCUTS:
-                return "Shortcuts";
+                return "Shortcut Hub";
             case MODE_MACROS:
                 return "Macros";
             case MODE_VOICE:
-                return "Voice";
+                return "Voice Input";
             default:
                 return "Keyboard & Mouse";
         }
