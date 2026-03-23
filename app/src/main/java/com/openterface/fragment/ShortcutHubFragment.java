@@ -13,6 +13,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.GridView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -21,6 +22,8 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
+import com.openterface.keymod.ConnectionManager;
+import com.openterface.keymod.MainActivity;
 import com.openterface.keymod.R;
 import com.openterface.keymod.ShortcutProfileManager;
 import com.openterface.keymod.ShortcutProfileManager.ShortcutProfile;
@@ -39,8 +42,10 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
 
     private ShortcutProfileManager profileManager;
     private Vibrator vibrator;
+    private ConnectionManager connectionManager;
 
-    // UI Components
+    // UI Components - Profile list panel
+    private LinearLayout panelProfilesList;
     private GridView profilesGridView;
     private TextView emptyTextView;
     private TextView activeProfileText;
@@ -48,9 +53,27 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
     private Button importButton;
     private Button exportButton;
 
+    // UI Components - Shortcuts detail panel
+    private LinearLayout panelShortcutsDetail;
+    private Button backButton;
+    private TextView detailProfileName;
+    private TextView detailProfileDescription;
+    private Button tabMy;
+    private LinearLayout tabsContainer;
+    private Button activateButton;
+    private GridView shortcutsGridView;
+    private TextView emptyMyShortcuts;
+
+    private static final String TAB_MY  = "my";
+    private String currentTab = TAB_MY;  // Default to favorites
+    private String currentCategoryId = null;  // Current category when in All tab
+
     private ProfilesAdapter adapter;
+    private ShortcutsAdapter shortcutsAdapter;
     private List<ShortcutProfile> profilesList;
+    private List<ShortcutProfileManager.Shortcut> myShortcutsList = new ArrayList<>();
     private ShortcutProfile activeProfile;
+    private ShortcutProfile selectedProfile;  // profile whose shortcuts are shown
 
     @Nullable
     @Override
@@ -62,6 +85,10 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         profileManager = new ShortcutProfileManager(requireContext());
         profileManager.setListener(this);
 
+        if (getActivity() instanceof MainActivity) {
+            connectionManager = ((MainActivity) getActivity()).getConnectionManager();
+        }
+
         initializeViews(view);
         loadProfiles();
         setupListeners();
@@ -70,6 +97,8 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
     }
 
     private void initializeViews(View view) {
+        // Profile list panel
+        panelProfilesList = view.findViewById(R.id.panel_profiles_list);
         profilesGridView = view.findViewById(R.id.profiles_gridview);
         emptyTextView = view.findViewById(R.id.empty_textview);
         activeProfileText = view.findViewById(R.id.active_profile_text);
@@ -77,9 +106,23 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         importButton = view.findViewById(R.id.import_button);
         exportButton = view.findViewById(R.id.export_button);
 
+        // Shortcuts detail panel
+        panelShortcutsDetail = view.findViewById(R.id.panel_shortcuts_detail);
+        backButton = view.findViewById(R.id.back_button);
+        detailProfileName = view.findViewById(R.id.detail_profile_name);
+        detailProfileDescription = view.findViewById(R.id.detail_profile_description);
+        tabMy = view.findViewById(R.id.tab_my);
+        tabsContainer = view.findViewById(R.id.tabs_container);
+        activateButton = view.findViewById(R.id.activate_button);
+        shortcutsGridView = view.findViewById(R.id.shortcuts_gridview);
+        emptyMyShortcuts = view.findViewById(R.id.empty_my_shortcuts);
+
         profilesList = new ArrayList<>();
         adapter = new ProfilesAdapter(requireContext(), profilesList);
         profilesGridView.setAdapter(adapter);
+
+        shortcutsAdapter = new ShortcutsAdapter(requireContext(), new ArrayList<>());
+        shortcutsGridView.setAdapter(shortcutsAdapter);
     }
 
     private void loadProfiles() {
@@ -110,10 +153,10 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
             }
         });
 
-        // Grid item click - activate profile
+        // Grid item click - show profile shortcuts
         profilesGridView.setOnItemClickListener((parent, view, position, id) -> {
             ShortcutProfile profile = profilesList.get(position);
-            activateProfile(profile);
+            showShortcutsDetail(profile);
         });
 
         // Grid item long click - show options
@@ -122,18 +165,266 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
             showProfileOptionsDialog(profile);
             return true;
         });
+
+        // Back button - return to profile list
+        backButton.setOnClickListener(v -> showProfileList());
+
+        // Activate button - set as active profile
+        activateButton.setOnClickListener(v -> {
+            if (selectedProfile != null) {
+                activateProfile(selectedProfile);
+            }
+        });
+
+        // Tab: ⭐ My
+        tabMy.setOnClickListener(v -> switchTab(TAB_MY, null));
+
+        // Shortcut tap - execute the shortcut
+        shortcutsGridView.setOnItemClickListener((parent, view, position, id) -> {
+            if (shortcutsAdapter.getCount() > 0) {
+                ShortcutProfileManager.Shortcut shortcut =
+                        (ShortcutProfileManager.Shortcut) shortcutsAdapter.getItem(position);
+                executeShortcut(shortcut);
+            }
+        });
+
+        // Shortcut long-press - add to / remove from My Favorites
+        shortcutsGridView.setOnItemLongClickListener((parent, view, position, id) -> {
+            if (shortcutsAdapter.getCount() > 0) {
+                ShortcutProfileManager.Shortcut shortcut =
+                        (ShortcutProfileManager.Shortcut) shortcutsAdapter.getItem(position);
+                if (currentCategoryId != null) {
+                    // Viewing category - add to favorites
+                    addToMyFavorites(shortcut);
+                } else if (TAB_MY.equals(currentTab)) {
+                    // Viewing favorites - remove from favorites
+                    confirmRemoveFromFavorites(shortcut);
+                }
+            }
+            return true;
+        });
+    }
+
+    private void showShortcutsDetail(ShortcutProfile profile) {
+        selectedProfile = profile;
+        currentTab = TAB_MY;  // Default to My Shortcuts
+        currentCategoryId = null;
+
+        detailProfileName.setText(profile.name);
+        detailProfileDescription.setText(profile.description);
+
+        // Load persisted My Shortcuts for this profile
+        myShortcutsList = profileManager.getMyShortcuts(profile.id);
+
+        // Update activate button label
+        boolean isActive = activeProfile != null && activeProfile.id.equals(profile.id);
+        activateButton.setText(isActive ? "✓ Active" : "Activate");
+        activateButton.setEnabled(!isActive);
+
+        // Build dynamic category tabs
+        rebuildCategoryTabs(profile);
+        updateTabUI();
+        refreshShortcutsGrid();
+
+        panelProfilesList.setVisibility(View.GONE);
+        panelShortcutsDetail.setVisibility(View.VISIBLE);
+    }
+
+    private void showProfileList() {
+        selectedProfile = null;
+        panelShortcutsDetail.setVisibility(View.GONE);
+        panelProfilesList.setVisibility(View.VISIBLE);
+    }
+
+    private void switchTab(String tab, String categoryId) {
+        currentTab = tab;
+        currentCategoryId = categoryId;
+        updateTabUI();
+        refreshShortcutsGrid();
+    }
+
+    private void switchToCategory(String categoryId) {
+        currentCategoryId = categoryId;
+        updateTabUI();
+        refreshShortcutsGrid();
+    }
+
+    private void updateTabUI() {
+        int primaryColor   = requireContext().getColor(R.color.primary);
+        int whiteColor     = requireContext().getColor(R.color.white);
+        int secondaryColor = requireContext().getColor(R.color.text_secondary);
+
+        // Update My Shortcuts tab
+        boolean mySelected = TAB_MY.equals(currentTab);
+        if (mySelected) {
+            tabMy.setBackgroundTintList(android.content.res.ColorStateList.valueOf(primaryColor));
+            tabMy.setTextColor(whiteColor);
+        } else {
+            tabMy.setBackgroundTintList(android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT));
+            tabMy.setTextColor(secondaryColor);
+        }
+
+        // Update category tabs (all children in tabsContainer)
+        for (int i = 0; i < tabsContainer.getChildCount(); i++) {
+            View child = tabsContainer.getChildAt(i);
+            if (child instanceof Button) {
+                Button btn = (Button) child;
+                String catId = (String) btn.getTag();
+                boolean selected = catId != null && catId.equals(currentCategoryId);
+                if (selected) {
+                    btn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(primaryColor));
+                    btn.setTextColor(whiteColor);
+                } else {
+                    btn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT));
+                    btn.setTextColor(secondaryColor);
+                }
+            }
+        }
+    }
+
+    private void rebuildCategoryTabs(ShortcutProfileManager.ShortcutProfile profile) {
+        // Clear all existing category tabs
+        tabsContainer.removeAllViews();
+
+        // Add buttons for each category
+        if (profile.categories != null && !profile.categories.isEmpty()) {
+            for (ShortcutProfileManager.ShortcutCategory cat : profile.categories) {
+                Button btn = new Button(requireContext());
+                btn.setText(cat.name);
+                btn.setTag(cat.id);  // Store category ID in tag
+                btn.setTextSize(12);
+                btn.setAllCaps(false);
+                btn.setMinWidth(0);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        dpToPx(36)
+                );
+                lp.setMarginEnd(dpToPx(8));
+                btn.setLayoutParams(lp);
+                btn.setPadding(dpToPx(16), 0, dpToPx(16), 0);
+                btn.setOnClickListener(v -> switchToCategory(cat.id));
+                tabsContainer.addView(btn);
+            }
+        }
+    }
+
+    private int dpToPx(int dp) {
+        return (int) (dp * requireContext().getResources().getDisplayMetrics().density);
+    }
+
+    private void refreshShortcutsGrid() {
+        if (selectedProfile == null) return;
+
+        List<ShortcutProfileManager.Shortcut> toShow = new ArrayList<>();
+        
+        // Priority 1: Show category shortcuts if a category is selected
+        if (currentCategoryId != null) {
+            for (ShortcutProfileManager.ShortcutCategory cat : selectedProfile.categories) {
+                if (cat.id.equals(currentCategoryId)) {
+                    toShow = new ArrayList<>(cat.shortcuts);
+                    break;
+                }
+            }
+        } 
+        // Priority 2: Show My Shortcuts favorites
+        else if (TAB_MY.equals(currentTab)) {
+            toShow = myShortcutsList;
+            if (toShow.isEmpty()) {
+                shortcutsGridView.setVisibility(View.GONE);
+                emptyMyShortcuts.setVisibility(View.VISIBLE);
+                return;
+            }
+        } 
+        // Priority 3: Show all flat shortcuts (for profiles without categories)
+        else if (selectedProfile.categories.isEmpty()) {
+            toShow = selectedProfile.shortcuts != null ? selectedProfile.shortcuts : new ArrayList<>();
+        }
+        
+        shortcutsGridView.setVisibility(View.VISIBLE);
+        emptyMyShortcuts.setVisibility(View.GONE);
+        shortcutsAdapter.setShortcuts(toShow);
+        shortcutsAdapter.notifyDataSetChanged();
+    }
+
+    private void addToMyFavorites(ShortcutProfileManager.Shortcut shortcut) {
+        if (selectedProfile == null) return;
+        for (ShortcutProfileManager.Shortcut s : myShortcutsList) {
+            if (s.id.equals(shortcut.id)) {
+                new AlertDialog.Builder(requireContext())
+                        .setTitle("Already in ⭐ My")
+                        .setMessage("'" + shortcut.name + "' is already in your favorites.")
+                        .setPositiveButton("OK", null)
+                        .show();
+                return;
+            }
+        }
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Add to ⭐ My Shortcuts")
+                .setMessage("Add '" + shortcut.name + "' (" + shortcut.label + ") to your favorites?")
+                .setPositiveButton("Add", (d, w) -> {
+                    myShortcutsList.add(shortcut);
+                    profileManager.updateMyShortcuts(selectedProfile.id, myShortcutsList);
+                    if (vibrator != null && vibrator.hasVibrator()) {
+                        vibrator.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE));
+                    }
+                    Toast.makeText(getContext(), "Added to ⭐ My: " + shortcut.name, Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void confirmRemoveFromFavorites(ShortcutProfileManager.Shortcut shortcut) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Remove Favorite")
+                .setMessage("Remove '" + shortcut.name + "' from My Shortcuts?")
+                .setPositiveButton("Remove", (d, w) -> {
+                    myShortcutsList.removeIf(s -> s.id.equals(shortcut.id));
+                    profileManager.updateMyShortcuts(selectedProfile.id, myShortcutsList);
+                    refreshShortcutsGrid();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void executeShortcut(ShortcutProfileManager.Shortcut shortcut) {
+        if (connectionManager == null) {
+            Toast.makeText(getContext(), "Not connected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        connectionManager.sendKeyEvent(shortcut.modifiers, shortcut.keyCode);
+        // Small delay then release key
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            if (connectionManager != null) {
+                connectionManager.sendKeyRelease();
+            }
+        }, 80);
+
+        // Haptic feedback
+        if (vibrator != null && vibrator.hasVibrator()) {
+            vibrator.vibrate(VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE));
+        }
+
+        Log.d(TAG, "Sent shortcut: " + shortcut.name + " (" + shortcut.label + ")"
+                + " modifiers=" + shortcut.modifiers + " key=" + shortcut.keyCode);
     }
 
     private void activateProfile(ShortcutProfile profile) {
         profileManager.setActiveProfile(profile.id);
         activeProfile = profile;
         updateActiveProfileDisplay();
-        
+
+        // Refresh activate button state if in detail view
+        if (selectedProfile != null && selectedProfile.id.equals(profile.id)) {
+            activateButton.setText("✓ Active");
+            activateButton.setEnabled(false);
+        }
+
         // Haptic feedback
         if (vibrator != null && vibrator.hasVibrator()) {
             vibrator.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE));
         }
-        
+
         Toast.makeText(getContext(), "Activated: " + profile.name, Toast.LENGTH_SHORT).show();
     }
 
@@ -449,6 +740,55 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
             nameText.setText(profile.name);
             descText.setText(profile.description);
             countText.setText(profile.getShortcutCount() + " shortcuts");
+
+            return convertView;
+        }
+    }
+
+    /**
+     * Shortcuts Grid Adapter
+     */
+    private static class ShortcutsAdapter extends android.widget.BaseAdapter {
+        private final Context context;
+        private List<ShortcutProfileManager.Shortcut> shortcuts;
+
+        public ShortcutsAdapter(Context context, List<ShortcutProfileManager.Shortcut> shortcuts) {
+            this.context = context;
+            this.shortcuts = shortcuts;
+        }
+
+        public void setShortcuts(List<ShortcutProfileManager.Shortcut> shortcuts) {
+            this.shortcuts = shortcuts;
+        }
+
+        @Override
+        public int getCount() {
+            return shortcuts.size();
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return shortcuts.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return shortcuts.get(position).id.hashCode();
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            if (convertView == null) {
+                convertView = LayoutInflater.from(context)
+                        .inflate(R.layout.grid_item_shortcut, parent, false);
+            }
+
+            ShortcutProfileManager.Shortcut shortcut = shortcuts.get(position);
+            TextView nameText = convertView.findViewById(R.id.shortcut_name);
+            TextView labelText = convertView.findViewById(R.id.shortcut_label);
+
+            nameText.setText(shortcut.name);
+            labelText.setText(shortcut.label);
 
             return convertView;
         }
