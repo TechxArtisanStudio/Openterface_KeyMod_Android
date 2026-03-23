@@ -34,7 +34,6 @@ import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.openterface.fragment.CompositeFragment;
-import com.openterface.fragment.GamepadFragment;
 import com.openterface.fragment.KeyboardFragment;
 import com.openterface.fragment.MacrosFragment;
 import com.openterface.fragment.MouseFragment;
@@ -73,7 +72,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
 
     // Sidebar nav item views
     private LinearLayout navKeyboardMouse;
-    private LinearLayout navGamepad;
     private LinearLayout navNumpad;
     private LinearLayout navShortcuts;
     private LinearLayout navMacros;
@@ -279,7 +277,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         // Initialize drawer layout and nav items
         drawerLayout = findViewById(R.id.drawer_layout);
         navKeyboardMouse = findViewById(R.id.nav_keyboard_mouse);
-        navGamepad = findViewById(R.id.nav_gamepad);
         navNumpad = findViewById(R.id.nav_numpad);
         navShortcuts = findViewById(R.id.nav_shortcuts);
         navMacros = findViewById(R.id.nav_macros);
@@ -507,14 +504,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 drawerLayout.closeDrawer(android.view.Gravity.START);
             });
         }
-        if (navGamepad != null) {
-            navGamepad.setOnClickListener(v -> {
-                currentNavMode = LaunchPanelActivity.MODE_GAMEPAD;
-                updateNavSelection();
-                showGamepadFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
-            });
-        }
         if (navNumpad != null) {
             navNumpad.setOnClickListener(v -> {
                 currentNavMode = LaunchPanelActivity.MODE_NUMPAD;
@@ -657,7 +646,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
 
     private void updateNavSelection() {
         if (navKeyboardMouse != null) navKeyboardMouse.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_KEYBOARD_MOUSE));
-        if (navGamepad != null) navGamepad.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_GAMEPAD));
         if (navNumpad != null) navNumpad.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_NUMPAD));
         if (navShortcuts != null) navShortcuts.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_SHORTCUTS));
         if (navMacros != null) navMacros.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_MACROS));
@@ -713,13 +701,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         transaction.commit();
     }
 
-    private void showGamepadFragment() {
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        FragmentTransaction transaction = fragmentManager.beginTransaction();
-        transaction.replace(R.id.fragment_container, new GamepadFragment());
-        transaction.commit();
-    }
-
     /**
      * Handle launch mode from LaunchPanelActivity
      */
@@ -729,9 +710,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         switch (mode) {
             case LaunchPanelActivity.MODE_KEYBOARD_MOUSE:
                 showCompositeFragment();
-                break;
-            case LaunchPanelActivity.MODE_GAMEPAD:
-                showGamepadFragment();
                 break;
             case LaunchPanelActivity.MODE_NUMPAD:
                 Toast.makeText(this, "Numpad mode coming soon!", Toast.LENGTH_SHORT).show();

@@ -41,6 +41,14 @@ public class GamepadView extends View {
     private ButtonPressListener buttonPressListener;
     private AnalogStickListener analogStickListener;
 
+    // Analog stick drag state
+    private String  activeStickId      = null;
+    private float   activeStickCenterX = 0;
+    private float   activeStickCenterY = 0;
+    private float   activeStickRadius  = 0;
+    private float   stickOffsetX       = 0;
+    private float   stickOffsetY       = 0;
+
     // Component bounds (for touch detection)
     private Map<String, RectF> componentBounds;
 
@@ -98,6 +106,8 @@ public class GamepadView extends View {
     }
 
     private void drawComponents(Canvas canvas) {
+        // Clear stale bounds from previous draw before re-registering all hit areas
+        componentBounds.clear();
         switch (currentLayout) {
             case XBOX:
                 drawXboxLayout(canvas);
@@ -241,10 +251,7 @@ public class GamepadView extends View {
         String id = "stick_" + label.toLowerCase();
         RectF bounds = new RectF(cx - radius, cy - radius, cx + radius, cy + radius);
         componentBounds.put(id, bounds);
-        
-        // Also add L3/R3 click bounds (the stick itself can be clicked)
-        String clickId = id + "_click";
-        componentBounds.put(clickId, bounds);
+        // L3/R3 click is detected via minimal-movement tap in onTouchEvent — no separate bounds needed
 
         // Outer circle (housing)
         Paint outerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -258,22 +265,29 @@ public class GamepadView extends View {
         ringPaint.setColor(Color.WHITE);
         canvas.drawCircle(cx, cy, radius, ringPaint);
         
-        // Inner circle (stick top) - offset based on position if we had it
+        // Inner circle (stick top) — offset toward where the user's thumb is
         Paint innerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        
+        float innerCx = cx;
+        float innerCy = cy;
+        if (id.equals(activeStickId)) {
+            innerCx += stickOffsetX;
+            innerCy += stickOffsetY;
+        }
+
         // Highlight if pressed (L3/R3 click)
-        if (clickId.equals(pressedComponentId)) {
+        if (id.equals(activeStickId) && (Math.abs(stickOffsetX) < activeStickRadius * 0.15f)
+                && (Math.abs(stickOffsetY) < activeStickRadius * 0.15f)) {
             innerPaint.setColor(Color.parseColor("#FF9800")); // Orange highlight
         } else {
             innerPaint.setColor(Color.parseColor("#666666"));
         }
-        
-        canvas.drawCircle(cx, cy, radius * 0.6f, innerPaint);
-        
+
+        canvas.drawCircle(innerCx, innerCy, radius * 0.6f, innerPaint);
+
         // Inner highlight
         Paint highlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         highlightPaint.setColor(Color.parseColor("#888888"));
-        canvas.drawCircle(cx, cy, radius * 0.3f, highlightPaint);
+        canvas.drawCircle(innerCx, innerCy, radius * 0.3f, highlightPaint);
         
         // Label (L or R)
         Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -331,7 +345,7 @@ public class GamepadView extends View {
     }
 
     private void drawShoulderButton(Canvas canvas, float cx, float cy, float width, float height, String label) {
-        String id = label.toLowerCase().replace("1", "");
+        String id = label.toLowerCase();
         RectF bounds = new RectF(cx - width/2, cy - height/2, cx + width/2, cy + height/2);
         componentBounds.put(id, bounds);
 
@@ -360,49 +374,93 @@ public class GamepadView extends View {
         float y = event.getY();
 
         switch (event.getAction()) {
-            case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_DOWN: {
                 String componentId = getComponentAt(x, y);
                 if (componentId != null) {
-                    if (isEditMode) {
+                    if (componentId.startsWith("stick_") && !isEditMode) {
+                        // Begin analog stick drag tracking
+                        activeStickId = componentId;
+                        RectF stickBounds = componentBounds.get(componentId);
+                        activeStickCenterX = stickBounds.centerX();
+                        activeStickCenterY = stickBounds.centerY();
+                        activeStickRadius  = stickBounds.width() / 2f;
+                        stickOffsetX = 0;
+                        stickOffsetY = 0;
+                        invalidate();
+                    } else if (isEditMode) {
                         draggedComponentId = componentId;
                     } else {
                         pressedComponentId = componentId;
-                        // Trigger button press
                         if (buttonPressListener != null) {
                             int keyCode = getKeyCodeForComponent(componentId);
                             buttonPressListener.onButtonPress(componentId, keyCode);
                         }
-                        invalidate(); // Redraw for visual feedback
+                        invalidate();
                     }
-                    return true;
                 }
-                break;
+                return true; // Always consume so we receive MOVE/UP
+            }
 
-            case MotionEvent.ACTION_MOVE:
-                if (draggedComponentId != null && isEditMode) {
-                    // Update position
-                    GamepadConfigManager.ComponentPosition pos = componentPositions.get(draggedComponentId);
+            case MotionEvent.ACTION_MOVE: {
+                if (activeStickId != null) {
+                    float dx   = x - activeStickCenterX;
+                    float dy   = y - activeStickCenterY;
+                    float dist = (float) Math.sqrt(dx * dx + dy * dy);
+                    if (dist > activeStickRadius) {
+                        dx = dx * activeStickRadius / dist;
+                        dy = dy * activeStickRadius / dist;
+                    }
+                    stickOffsetX = dx;
+                    stickOffsetY = dy;
+                    invalidate();
+                    if (analogStickListener != null) {
+                        String label = activeStickId.replace("stick_", "");
+                        analogStickListener.onAnalogStickMoved(
+                                label, dx / activeStickRadius, dy / activeStickRadius);
+                    }
+                } else if (draggedComponentId != null && isEditMode) {
+                    GamepadConfigManager.ComponentPosition pos =
+                            componentPositions.get(draggedComponentId);
                     if (pos != null) {
                         pos.x = x / getWidth();
                         pos.y = y / getHeight();
                         invalidate();
                     }
                 }
-                break;
+                return true;
+            }
 
             case MotionEvent.ACTION_UP:
-            case MotionEvent.ACTION_CANCEL:
+            case MotionEvent.ACTION_CANCEL: {
+                if (activeStickId != null) {
+                    // Minimal movement = treat as stick click (L3 / R3)
+                    float moved = (float) Math.sqrt(
+                            stickOffsetX * stickOffsetX + stickOffsetY * stickOffsetY);
+                    if (moved < activeStickRadius * 0.15f && buttonPressListener != null) {
+                        int keyCode = activeStickId.equals("stick_l") ? 1001 : 1002;
+                        buttonPressListener.onButtonPress(activeStickId + "_click", keyCode);
+                    }
+                    // Return stick to center and notify listener
+                    String label = activeStickId.replace("stick_", "");
+                    activeStickId = null;
+                    stickOffsetX  = 0;
+                    stickOffsetY  = 0;
+                    invalidate();
+                    if (analogStickListener != null) {
+                        analogStickListener.onAnalogStickMoved(label, 0, 0);
+                    }
+                }
                 if (draggedComponentId != null) {
                     draggedComponentId = null;
                 }
                 if (pressedComponentId != null) {
                     pressedComponentId = null;
-                    invalidate(); // Redraw to remove highlight
+                    invalidate();
                 }
-                break;
+                return true;
+            }
         }
-
-        return super.onTouchEvent(event);
+        return true;
     }
 
     private String getComponentAt(float x, float y) {
@@ -415,49 +473,52 @@ public class GamepadView extends View {
     }
 
     private int getKeyCodeForComponent(String componentId) {
-        // Map component IDs to Android key codes
-        // This is simplified - should use configManager.loadButtonMapping()
+        // Map component IDs to USB HID usage IDs (USB HID Keyboard/Keypad Usage Page)
         switch (componentId) {
-            // D-Pad - Arrow keys
-            case "dpad_up": return 19; // KEYCODE_DPAD_UP
-            case "dpad_down": return 20; // KEYCODE_DPAD_DOWN
-            case "dpad_left": return 21; // KEYCODE_DPAD_LEFT
-            case "dpad_right": return 22; // KEYCODE_DPAD_RIGHT
-            
-            // Xbox buttons (ABXY)
-            case "button_a": return 66; // Enter
-            case "button_b": return 4; // Back
-            case "button_x": return 67; // Delete
-            case "button_y": return 82; // Menu
-            
-            // PlayStation buttons (△○×□)
-            case "button_cross": return 66; // Enter (×)
-            case "button_circle": return 4; // Back (○)
-            case "button_square": return 67; // Delete (□)
-            case "button_triangle": return 82; // Menu (△)
-            
-            // NES buttons (A/B) - same IDs as Xbox
-            case "nes_a": return 66; // Enter
-            case "nes_b": return 4; // Back
-            
-            // Shoulder buttons (mapped to function keys)
-            case "lb": return 131; // F1
-            case "rb": return 132; // F2
-            case "lt": return 133; // F3
-            case "rt": return 134; // F4
-            case "l1": return 131; // F1
-            case "r1": return 132; // F2
-            case "l2": return 133; // F3
-            case "r2": return 134; // F4
-            
-            // Stick clicks (L3/R3 = mouse buttons)
-            case "stick_l_click": return 1001; // Special: Left mouse click
-            case "stick_r_click": return 1002; // Special: Right mouse click
-            
-            // Center buttons
-            case "back": return 135; // F5 (Xbox Back)
-            case "start": return 136; // F6 (Xbox Start)
-            case "select": return 135; // F5
+            // D-Pad - Arrow keys (HID: Up=0x52, Down=0x51, Left=0x50, Right=0x4F)
+            case "dpad_up":    return 82; // HID Up Arrow
+            case "dpad_down":  return 81; // HID Down Arrow
+            case "dpad_left":  return 80; // HID Left Arrow
+            case "dpad_right": return 79; // HID Right Arrow
+
+            // Xbox face buttons (A=Enter, B=Esc, X=Backspace, Y=Application)
+            case "button_a": return 40;  // HID Return/Enter
+            case "button_b": return 41;  // HID Escape
+            case "button_x": return 42;  // HID Backspace/Delete
+            case "button_y": return 101; // HID Application (Menu)
+
+            // PlayStation buttons (same mapping as Xbox equivalents)
+            // IDs from drawButton using UTF-8 symbol labels
+            case "button_×":        // fall-through
+            case "button_cross":    return 40;  // HID Return/Enter
+            case "button_○":        // fall-through
+            case "button_circle":   return 41;  // HID Escape
+            case "button_□":        // fall-through
+            case "button_square":   return 42;  // HID Backspace/Delete
+            case "button_△":        // fall-through
+            case "button_triangle": return 101; // HID Application (Menu)
+
+            // NES buttons (A/B same as Xbox)
+            case "button_a_nes": // fall-through (NES uses same button_a id)
+            case "nes_a": return 40;  // HID Return/Enter
+            case "nes_b": return 41;  // HID Escape
+
+            // Shoulder buttons → F1-F4 (HID: F1=0x3A=58 … F4=0x3D=61)
+            case "lb": case "l1": return 58; // HID F1
+            case "rb": case "r1": return 59; // HID F2
+            case "lt": case "l2": return 60; // HID F3
+            case "rt": case "r2": return 61; // HID F4
+
+            // Stick clicks (L3/R3 = mouse buttons, handled specially)
+            case "stick_l_click": return 1001;
+            case "stick_r_click": return 1002;
+
+            // Center buttons → F5/F6 (HID: F5=0x3E=62, F6=0x3F=63)
+            // Xbox "≡" drawButton generates id "button_≡"; "⊞" generates "button_⊞"
+            case "button_≡": case "back":   case "button_back":
+            case "button_select": case "select": return 62; // HID F5
+            case "button_⊞": case "start":  case "button_start": return 63; // HID F6
+
             default: return 0;
         }
     }

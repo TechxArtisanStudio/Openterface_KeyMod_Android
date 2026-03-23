@@ -13,7 +13,9 @@ import java.io.IOException;
 public class HIDSender {
 
     private static final String TAG = "HIDSender";
-    private static final byte[] HID_HEADER = {(byte) 0x57, (byte) 0xAB, 0x00, 0x02, 0x08};
+    // CH9329 UART protocol headers
+    private static final byte[] KBD_HEADER   = {(byte)0x57, (byte)0xAB, 0x00, 0x02, 0x08}; // keyboard CMD
+    private static final byte[] MOUSE_HEADER = {(byte)0x57, (byte)0xAB, 0x00, 0x04, 0x05}; // mouse CMD
 
     /**
      * Send keyboard event via USB or Bluetooth
@@ -98,42 +100,37 @@ public class HIDSender {
     }
 
     /**
-     * Build keyboard HID packet
+     * Build keyboard HID packet (CH9329: 5-byte header + 8-byte data + 1-byte checksum = 14 bytes)
+     * Format: 57 AB 00 02 08 | modifier | 00 | key1..key6 | checksum
      */
     private static byte[] buildKeyboardPacket(int modifiers, int keyCode) {
-        byte[] data = new byte[16];
-        System.arraycopy(HID_HEADER, 0, data, 0, 5);
-        data[5] = (byte) modifiers;
-        data[6] = 0; // Reserved
-        data[7] = (byte) keyCode;
-        data[8] = 0; // Key 2
-        data[9] = 0; // Key 3
-        data[10] = 0; // Key 4
-        data[11] = 0; // Key 5
-        data[12] = 0; // Key 6
-        data[13] = 0; // Reserved
-        data[14] = 0; // Reserved
-        data[15] = calculateChecksum(data);
+        byte[] data = new byte[14]; // 5 header + 8 data + 1 checksum
+        System.arraycopy(KBD_HEADER, 0, data, 0, 5);
+        data[5]  = (byte) modifiers;
+        data[6]  = 0;              // Reserved
+        data[7]  = (byte) keyCode; // Key slot 1
+        data[8]  = 0;              // Key slot 2
+        data[9]  = 0;              // Key slot 3
+        data[10] = 0;              // Key slot 4
+        data[11] = 0;              // Key slot 5
+        data[12] = 0;              // Key slot 6
+        data[13] = calculateChecksum(data);
         return data;
     }
 
     /**
-     * Build mouse HID packet
+     * Build relative mouse HID packet (CH9329: 5-byte header + 5-byte data + 1-byte checksum = 11 bytes)
+     * Format: 57 AB 00 04 05 | 01(relative) | buttons | deltaX | deltaY | wheel | checksum
      */
     private static byte[] buildMousePacket(int deltaX, int deltaY, int buttons) {
-        byte[] data = new byte[16];
-        System.arraycopy(HID_HEADER, 0, data, 0, 5);
-        data[5] = 0x01; // Mouse report ID
-        data[6] = (byte) buttons;
-        data[7] = (byte) deltaX;
-        data[8] = (byte) deltaY;
-        data[9] = 0; // Wheel X
-        data[10] = 0; // Wheel Y
-        data[11] = 0; // Reserved
-        data[12] = 0; // Reserved
-        data[13] = 0; // Reserved
-        data[14] = 0; // Reserved
-        data[15] = calculateChecksum(data);
+        byte[] data = new byte[11]; // 5 header + 5 data + 1 checksum
+        System.arraycopy(MOUSE_HEADER, 0, data, 0, 5);
+        data[5] = 0x01;            // Relative mode
+        data[6] = (byte) buttons;  // Button mask: bit0=left, bit1=right, bit2=middle
+        data[7] = (byte) deltaX;   // Signed X delta
+        data[8] = (byte) deltaY;   // Signed Y delta
+        data[9] = 0;               // Scroll wheel
+        data[10] = calculateChecksum(data);
         return data;
     }
 

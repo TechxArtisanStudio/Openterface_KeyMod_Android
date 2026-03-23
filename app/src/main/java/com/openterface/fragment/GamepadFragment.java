@@ -287,7 +287,7 @@ public class GamepadFragment extends Fragment {
         
         // W key (Up)
         if (wantW && !wPressed) {
-            connectionManager.sendKeyEvent(0, 87); // W key
+            connectionManager.sendKeyEvent(0, 26); // HID W key
             wPressed = true;
             Log.d(TAG, "WASD: W pressed");
         } else if (!wantW && wPressed) {
@@ -298,7 +298,7 @@ public class GamepadFragment extends Fragment {
         
         // A key (Left)
         if (wantA && !aPressed) {
-            connectionManager.sendKeyEvent(0, 65); // A key
+            connectionManager.sendKeyEvent(0, 4); // HID A key
             aPressed = true;
             Log.d(TAG, "WASD: A pressed");
         } else if (!wantA && aPressed) {
@@ -309,7 +309,7 @@ public class GamepadFragment extends Fragment {
         
         // S key (Down)
         if (wantS && !sPressed) {
-            connectionManager.sendKeyEvent(0, 83); // S key
+            connectionManager.sendKeyEvent(0, 22); // HID S key
             sPressed = true;
             Log.d(TAG, "WASD: S pressed");
         } else if (!wantS && sPressed) {
@@ -320,7 +320,7 @@ public class GamepadFragment extends Fragment {
         
         // D key (Right)
         if (wantD && !dPressed) {
-            connectionManager.sendKeyEvent(0, 68); // D key
+            connectionManager.sendKeyEvent(0, 7); // HID D key
             dPressed = true;
             Log.d(TAG, "WASD: D pressed");
         } else if (!wantD && dPressed) {
