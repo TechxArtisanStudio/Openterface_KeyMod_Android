@@ -37,6 +37,7 @@ import com.openterface.fragment.CompositeFragment;
 import com.openterface.fragment.KeyboardFragment;
 import com.openterface.fragment.MacrosFragment;
 import com.openterface.fragment.MouseFragment;
+import com.openterface.fragment.NumpadFragment;
 import com.openterface.fragment.ShortcutFragment;
 import com.openterface.fragment.ShortcutHubFragment;
 import com.openterface.fragment.VoiceInputFragment;
@@ -508,7 +509,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             navNumpad.setOnClickListener(v -> {
                 currentNavMode = LaunchPanelActivity.MODE_NUMPAD;
                 updateNavSelection();
-                Toast.makeText(this, "Numpad coming soon!", Toast.LENGTH_SHORT).show();
+                showNumpadFragment();
                 drawerLayout.closeDrawer(android.view.Gravity.START);
             });
         }
@@ -694,6 +695,13 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         transaction.commit();
     }
 
+    private void showNumpadFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, NumpadFragment.newInstance(port));
+        transaction.commit();
+    }
+
     private void showVoiceInputFragment() {
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction transaction = fragmentManager.beginTransaction();
@@ -712,8 +720,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 showCompositeFragment();
                 break;
             case LaunchPanelActivity.MODE_NUMPAD:
-                Toast.makeText(this, "Numpad mode coming soon!", Toast.LENGTH_SHORT).show();
-                showCompositeFragment();
+                showNumpadFragment();
                 break;
             case LaunchPanelActivity.MODE_SHORTCUTS:
                 showShortcutHubFragment();
@@ -748,6 +755,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             }
         } else if (currentFragment instanceof MouseFragment) {
             ((MouseFragment) currentFragment).setPort(newPort);
+        } else if (currentFragment instanceof NumpadFragment) {
+            ((NumpadFragment) currentFragment).port = newPort;
         }
     }
 

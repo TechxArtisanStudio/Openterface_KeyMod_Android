@@ -262,6 +262,18 @@ public class CH9329MSKBMap {
         keyCodeMap.put("NUMPAD_MULTIPLY", "55");
         keyCodeMap.put("NUMPAD_SUBTRACT", "56");
         keyCodeMap.put("NUMPAD_ADD", "57");
+        keyCodeMap.put("NUMPAD_ENTER", "58");
+        keyCodeMap.put("NUMPAD_1", "59");
+        keyCodeMap.put("NUMPAD_2", "5A");
+        keyCodeMap.put("NUMPAD_3", "5B");
+        keyCodeMap.put("NUMPAD_4", "5C");
+        keyCodeMap.put("NUMPAD_5", "5D");
+        keyCodeMap.put("NUMPAD_6", "5E");
+        keyCodeMap.put("NUMPAD_7", "5F");
+        keyCodeMap.put("NUMPAD_8", "60");
+        keyCodeMap.put("NUMPAD_9", "61");
+        keyCodeMap.put("NUMPAD_0", "62");
+        keyCodeMap.put("NUMPAD_DOT", "63");
 
         //release keyboard data
         keyCodeMap.put("release", "57AB00020800000000000000000C");
