@@ -99,6 +99,12 @@ public class BluetoothService extends Service {
                             }
                             activeConnection = connection;
                             Log.d(TAG, LOG_PREFIX + "Connected to " + sanitizeDeviceName(device.getName()) + " (" + deviceAddress + ")");
+                            // Persist this device so auto-connect can use it on next launch
+                            getSharedPreferences("ConnectionPrefs", MODE_PRIVATE)
+                                    .edit()
+                                    .putString("last_ble_device_mac", deviceAddress)
+                                    .putString("last_ble_device_name", sanitizeDeviceName(device.getName()))
+                                    .apply();
                         },
                         throwable -> {
                             synchronized (connectingDevices) {
