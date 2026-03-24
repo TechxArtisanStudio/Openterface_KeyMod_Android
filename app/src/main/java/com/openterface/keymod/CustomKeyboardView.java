@@ -379,17 +379,26 @@ public class CustomKeyboardView extends LinearLayout {
 
                 button.setOnClickListener(v -> handleKeyPress(key));
 
+                // Add touch listener to handle key release on all buttons
+                button.setOnTouchListener((v, event) -> {
+                    if (event.getAction() == MotionEvent.ACTION_UP) {
+                        if (key.isRepeatable) {
+                            stopRepeatingDelete();
+                        } else {
+                            // Send key release after short delay for regular keys
+                            repeatHandler.postDelayed(() -> {
+                                sendReleaseData();
+                                Log.d(TAG, "Sent key release for: " + key.label);
+                            }, 30);
+                        }
+                    }
+                    return false;
+                });
+
                 if (key.isRepeatable) {
                     button.setOnLongClickListener(v -> {
                         startRepeatingDelete(key);
                         return true;
-                    });
-
-                    button.setOnTouchListener((v, event) -> {
-                        if (event.getAction() == MotionEvent.ACTION_UP) {
-                            stopRepeatingDelete();
-                        }
-                        return false;
                     });
                 }
                 rowLayout.addView(button);
@@ -432,28 +441,28 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     public void sendReleaseData() {
-        String releaseSendMSData = "57AB00020800000000000000000C";
-        if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-            try {
-                byte[] releaseSendKBDataBytes = hexStringToByteArray(releaseSendMSData);
-                Thread.sleep(10);
-                bluetoothService.sendData(releaseSendKBDataBytes);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+        new Thread(() -> {
+            String releaseSendMSData = "57AB00020800000000000000000C";
+            if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                try {
+                    byte[] releaseSendKBDataBytes = hexStringToByteArray(releaseSendMSData);
+                    Thread.sleep(10);
+                    bluetoothService.sendData(releaseSendKBDataBytes);
+                    Log.d(TAG, "Sent Bluetooth release data");
+                } catch (InterruptedException e) {
+                    Log.e(TAG, "Error sending Bluetooth release data: " + e.getMessage());
+                }
+            } else if (port != null) {
+                try {
+                    byte[] releaseSendKBDataBytes = hexStringToByteArray(releaseSendMSData);
+                    Thread.sleep(10);
+                    port.write(releaseSendKBDataBytes, 20);
+                    Log.d(TAG, "Sent USB release data");
+                } catch (IOException | InterruptedException e) {
+                    Log.e(TAG, "Error sending USB release data: " + e.getMessage());
+                }
             }
-            Log.d(TAG, "Sent Bluetooth release data");
-        } else if (port != null) {
-            try {
-                byte[] releaseSendKBDataBytes = hexStringToByteArray(releaseSendMSData);
-                Thread.sleep(10);
-                port.write(releaseSendKBDataBytes, 20);
-                Log.d(TAG, "Sent USB release data");
-            } catch (IOException | InterruptedException e) {
-                Log.e(TAG, "Error sending USB release data: " + e.getMessage());
-            }
-        } else {
-            Log.w(TAG, "No connection available for release data");
-        }
+        }).start();
     }
 
     private int parseHex(String hex) {

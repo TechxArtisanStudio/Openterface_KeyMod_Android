@@ -18,7 +18,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp"
-            android:background="@color/white"
+            android:background="@color/header_background"
             android:elevation="4dp">
 
             <TextView
@@ -51,7 +51,7 @@
             android:padding="12dp"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:background="@color/white"
+            android:background="@color/header_background"
             android:layout_marginTop="8dp" />
 
         <!-- Action Buttons -->
@@ -130,7 +130,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:padding="12dp"
-            android:background="@color/white"
+            android:background="@color/header_background"
             android:elevation="4dp"
             android:gravity="center_vertical">
 
@@ -190,7 +190,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:background="@color/white"
+            android:background="@color/header_background"
             android:layout_marginTop="1dp"
             android:gravity="center_vertical">
 

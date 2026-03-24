@@ -107,6 +107,11 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             isServiceBound = true;
             bluetoothService.setRxBleClient(rxBleClient);
             Log.d(TAG, "Bound to BluetoothService");
+
+            // Keep ConnectionManager in sync with the newly bound service.
+            if (connectionManager != null) {
+                connectionManager.setBluetoothService(bluetoothService);
+            }
             
             // Initialize auto-connect manager after service is bound
             initializeAutoConnect();
@@ -117,6 +122,10 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             isServiceBound = false;
             bluetoothService = null;
             Log.d(TAG, "Unbound from BluetoothService");
+
+            if (connectionManager != null) {
+                connectionManager.setBluetoothService(null);
+            }
         }
     };
 
@@ -170,6 +179,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         
         // Initialize Connection Manager
         connectionManager = new ConnectionManager(this);
+        connectionManager.setMainActivity(this); // Pass MainActivity reference
         setupConnectionStateListener();
         
         initializeUIComponents();
@@ -389,8 +399,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             public void onAutoConnectFailed(String reason) {
                 Log.e(TAG, "Auto-connect failed: " + reason);
                 runOnUiThread(() -> {
-                    // Don't show error toast for normal failures (user might not care)
-                    Log.d(TAG, "Bluetooth auto-connect failed silently: " + reason);
+                    Toast.makeText(MainActivity.this, "Auto-connect failed: " + reason, Toast.LENGTH_SHORT).show();
                 });
             }
 
@@ -843,6 +852,17 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     public void onBluetoothConnectionChanged(boolean isConnected) {
         isBluetoothConnected = isConnected;
         Log.d(TAG, "Bluetooth connection state updated: " + isConnected);
+
+        if (connectionManager != null) {
+            connectionManager.setBluetoothService(bluetoothService);
+            connectionManager.syncBluetoothConnectionState(isConnected);
+        }
+
+        // Ensure top connection icon reflects actual BLE callback state immediately.
+        updateConnectionButton(
+                isConnected ? ConnectionManager.ConnectionType.BLUETOOTH : ConnectionManager.ConnectionType.NONE,
+                isConnected ? ConnectionManager.ConnectionState.CONNECTED : ConnectionManager.ConnectionState.DISCONNECTED
+        );
         
         // Update ConnectionManager if Bluetooth is connected
         if (isConnected && bluetoothService != null && connectionManager != null) {
@@ -850,6 +870,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             if (connectedDevice != null) {
                 connectionManager.connectBluetooth(connectedDevice);
                 Log.d(TAG, "Updated ConnectionManager with BLE device");
+            } else {
+                Log.d(TAG, "Bluetooth connected but connectedDevice is null; state synced from callback");
             }
         } else if (!isConnected && connectionManager != null && 
                    connectionManager.getCurrentConnectionType() == ConnectionManager.ConnectionType.BLUETOOTH) {
@@ -869,5 +891,9 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
      */
     public ConnectionManager getConnectionManager() {
         return connectionManager;
+    }
+
+    public BluetoothService getBluetoothService() {
+        return bluetoothService;
     }
 }

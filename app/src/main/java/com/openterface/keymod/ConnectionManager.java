@@ -54,6 +54,8 @@ public class ConnectionManager {
     private UsbSerialPort usbPort;
     private RxBleDevice bleDevice;
     private BluetoothService bluetoothService;
+    private MainActivity mainActivity; // Reference to activity for retrieving services
+    private final MacrosManager macrosManager;
     private ConnectionStateListener stateListener;
     private final Handler timeoutHandler = new Handler(Looper.getMainLooper());
 
@@ -65,6 +67,7 @@ public class ConnectionManager {
     public ConnectionManager(Context context) {
         this.context = context.getApplicationContext();
         this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        this.macrosManager = MacrosManager.getInstance(this.context);
     }
 
     public void setConnectionStateListener(ConnectionStateListener listener) {
@@ -88,7 +91,40 @@ public class ConnectionManager {
     }
 
     public boolean isConnected() {
-        return currentConnectionState == ConnectionState.CONNECTED;
+        // Validate the actual connection matches the claimed type
+        if (currentConnectionState != ConnectionState.CONNECTED) {
+            return false;
+        }
+        
+        // Check if the actual connection is available
+        boolean hasValidConnection = false;
+        if (currentConnectionType == ConnectionType.USB && usbPort != null) {
+            hasValidConnection = true;
+        } else if (currentConnectionType == ConnectionType.BLUETOOTH && bluetoothService != null && bluetoothService.isConnected()) {
+            hasValidConnection = true;
+        }
+        
+        if (!hasValidConnection) {
+            Log.w(TAG, "Connection validation failed: type=" + currentConnectionType 
+                    + " usbPort=" + (usbPort != null) 
+                    + " bluetoothService=" + (bluetoothService != null ? bluetoothService.isConnected() : false));
+            
+            // Auto-correct if we found an active connection of different type
+            if (usbPort != null && currentConnectionType != ConnectionType.USB) {
+                Log.i(TAG, "Auto-correcting: actual USB connection found, updating connection type");
+                updateConnectionState(ConnectionType.USB, ConnectionState.CONNECTED);
+                return true;
+            }
+            if (bluetoothService != null && bluetoothService.isConnected() && currentConnectionType != ConnectionType.BLUETOOTH) {
+                Log.i(TAG, "Auto-correcting: actual Bluetooth connection found, updating connection type");
+                updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.CONNECTED);
+                return true;
+            }
+            
+            return false;
+        }
+        
+        return true;
     }
 
     /**
@@ -180,7 +216,8 @@ public class ConnectionManager {
      * Connect to BLE device
      */
     public void connectBluetooth(RxBleDevice device) {
-        Log.d(TAG, "Connecting to BLE device: " + device.getMacAddress());
+        Log.d(TAG, "Connecting to BLE device: " + device.getMacAddress() 
+                + ", bluetoothService=" + (bluetoothService != null ? "ready" : "NOT_READY"));
         updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.CONNECTING);
         
         this.bleDevice = device;
@@ -188,9 +225,14 @@ public class ConnectionManager {
         // Save last connection
         saveLastConnection(ConnectionType.BLUETOOTH, device.getMacAddress(), device.getName());
         
-        // Connection will be handled by BluetoothService
-        // Update state after successful connection
-        updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.CONNECTED);
+        // Check if BluetoothService is available before marking as connected
+        if (bluetoothService != null && bluetoothService.isConnected()) {
+            updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.CONNECTED);
+            Log.d(TAG, "Bluetooth service ready, marked as CONNECTED");
+        } else {
+            Log.w(TAG, "Bluetooth service not ready yet, service=" + (bluetoothService != null ? "exists" : "NULL"));
+            // Service might connect later - listener will be updated by BluetoothService
+        }
     }
 
     /**
@@ -224,6 +266,19 @@ public class ConnectionManager {
         
         if (stateListener != null) {
             stateListener.onConnectionStateChanged(type, state);
+        }
+    }
+
+    /**
+     * Force-sync BLE connection status from UI/service callbacks.
+     */
+    public void syncBluetoothConnectionState(boolean connected) {
+        if (connected) {
+            updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.CONNECTED);
+        } else {
+            if (currentConnectionType == ConnectionType.BLUETOOTH) {
+                updateConnectionState(ConnectionType.NONE, ConnectionState.DISCONNECTED);
+            }
         }
     }
 
@@ -290,11 +345,42 @@ public class ConnectionManager {
     }
 
     /**
+     * Set MainActivity reference for service access
+     */
+    public void setMainActivity(MainActivity activity) {
+        this.mainActivity = activity;
+        Log.d(TAG, "MainActivity reference set");
+    }
+
+    /**
      * Set BluetoothService for BLE HID sending
      */
     public void setBluetoothService(BluetoothService service) {
         this.bluetoothService = service;
-        Log.d(TAG, "BluetoothService set for HID sending");
+        Log.d(TAG, "BluetoothService set for HID sending: " + (service != null ? "valid" : "NULL"));
+    }
+
+    /**
+     * Get or attempt to recover BluetoothService reference
+     */
+    private BluetoothService getBluetoothService() {
+        if (bluetoothService != null) {
+            return bluetoothService;
+        }
+        
+        // Try to get from MainActivity context if available
+        if (mainActivity != null) {
+            Log.d(TAG, "BluetoothService reference is NULL, attempting recovery from MainActivity...");
+            BluetoothService service = mainActivity.getBluetoothService();
+            if (service != null) {
+                this.bluetoothService = service;
+                Log.d(TAG, "Successfully recovered BluetoothService from MainActivity");
+                return service;
+            }
+        }
+        
+        Log.w(TAG, "BluetoothService reference is NULL and cannot be recovered");
+        return null;
     }
 
     /**
@@ -303,22 +389,91 @@ public class ConnectionManager {
      * @param keyCode HID key code
      */
     public void sendKeyEvent(int modifiers, int keyCode) {
+        BluetoothService service = bluetoothService;
+        
+        Log.i(TAG, "KEY_ATTEMPT keyCode=" + keyCode
+                + " modifiers=" + modifiers
+                + " connected=" + isConnected()
+                + " type=" + currentConnectionType
+                + " state=" + currentConnectionState
+                + " usbPort=" + (usbPort != null ? "valid" : "NULL")
+                + " bluetoothService=" + (service != null ? (service.isConnected() ? "connected" : "disconnected") : "NULL"));
+
         if (!isConnected()) {
             Log.w(TAG, "Cannot send key event: not connected");
             return;
         }
-        HIDSender.sendKeyEvent(usbPort, bluetoothService, modifiers, keyCode);
+        
+        // For Bluetooth: try to recover service if null
+        if (currentConnectionType == ConnectionType.BLUETOOTH && service == null) {
+            service = getBluetoothService();
+            if (service == null) {
+                Log.e(TAG, "ERROR: Bluetooth type selected but bluetoothService is NULL and cannot be recovered!");
+                return;
+            }
+        }
+        
+        HIDSender.sendKeyEvent(usbPort, service, modifiers, keyCode);
+
+        // Record user-generated outbound key events for macro capture.
+        if (macrosManager.shouldRecordKeyEvent()) {
+            macrosManager.recordKeyEvent(keyCode, modifiers);
+        }
     }
 
     /**
      * Send HID key release
      */
     public void sendKeyRelease() {
+        BluetoothService service = bluetoothService;
+        
+        Log.i(TAG, "KEY_RELEASE_ATTEMPT connected=" + isConnected()
+                + " type=" + currentConnectionType
+                + " state=" + currentConnectionState
+                + " usbPort=" + (usbPort != null ? "valid" : "NULL")
+                + " bluetoothService=" + (service != null ? (service.isConnected() ? "connected" : "disconnected") : "NULL"));
+
         if (!isConnected()) {
             Log.w(TAG, "Cannot send key release: not connected");
             return;
         }
-        HIDSender.sendKeyRelease(usbPort, null);
+        
+        // For Bluetooth: try to recover service if null
+        if (currentConnectionType == ConnectionType.BLUETOOTH && service == null) {
+            service = getBluetoothService();
+            if (service == null) {
+                Log.e(TAG, "ERROR: Bluetooth type selected but bluetoothService is NULL and cannot be recovered!");
+                return;
+            }
+        }
+        
+        HIDSender.sendKeyRelease(usbPort, service);
+    }
+
+    /**
+     * Send a raw HID keyboard report with the given modifier byte and key code.
+     * Unlike sendKeyEvent(), this does NOT skip keyCode=0, allowing pure modifier
+     * press/release packets needed for macOS Unicode hex input (Option + hex digits).
+     */
+    public void sendRawHIDReport(int modifier, int keyCode) {
+        if (!isConnected()) return;
+        BluetoothService service = bluetoothService;
+        if (currentConnectionType == ConnectionType.BLUETOOTH && service == null) {
+            service = getBluetoothService();
+            if (service == null) return;
+        }
+        // Build CH9329 keyboard packet: 5-byte header + modifier + reserved + 6 key slots + checksum
+        byte[] header = {(byte)0x57, (byte)0xAB, 0x00, 0x02, 0x08};
+        byte[] data = new byte[14];
+        System.arraycopy(header, 0, data, 0, 5);
+        data[5] = (byte) modifier;
+        data[6] = 0;
+        data[7] = (byte) keyCode;
+        // slots 2-6 = 0
+        int sum = 0;
+        for (int i = 0; i < 13; i++) sum += (data[i] & 0xFF);
+        data[13] = (byte)(sum & 0xFF);
+        HIDSender.sendPacket(usbPort, service, data, "RawHID");
     }
 
     /**

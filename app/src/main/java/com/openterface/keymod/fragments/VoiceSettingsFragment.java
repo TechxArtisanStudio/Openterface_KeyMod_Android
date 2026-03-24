@@ -29,11 +29,13 @@ import com.openterface.keymod.R;
  */
 public class VoiceSettingsFragment extends Fragment {
 
+    private static final String PREF_STT_ENGINE = "stt_engine";
     private static final String PREF_WHISPER_API_KEY = "whisper_api_key";
     private static final String PREF_VOICE_LANGUAGE = "voice_language";
     private static final String PREF_VOICE_SENSITIVITY = "voice_sensitivity";
 
     private EditText apiKeyEditText;
+    private Spinner sttEngineSpinner;
     private Spinner languageSpinner;
     private SeekBar sensitivitySeekBar;
     private TextView sensitivityValueText;
@@ -58,10 +60,17 @@ public class VoiceSettingsFragment extends Fragment {
 
     private void initializeViews(View view) {
         apiKeyEditText = view.findViewById(R.id.api_key_edittext);
+        sttEngineSpinner = view.findViewById(R.id.stt_engine_spinner);
         languageSpinner = view.findViewById(R.id.voice_language_spinner);
         sensitivitySeekBar = view.findViewById(R.id.sensitivity_seekbar);
         sensitivityValueText = view.findViewById(R.id.sensitivity_value_text);
         testConnectionButton = view.findViewById(R.id.test_connection_button);
+
+        String[] engines = {"System Voice Input", "Whisper API"};
+        ArrayAdapter<String> engineAdapter = new ArrayAdapter<>(requireContext(),
+            android.R.layout.simple_spinner_item, engines);
+        engineAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        sttEngineSpinner.setAdapter(engineAdapter);
         
         // Setup language spinner
         String[] languages = {"English", "中文", "Español", "Français", "Deutsch", "日本語"};
@@ -74,6 +83,9 @@ public class VoiceSettingsFragment extends Fragment {
     private void loadSettings() {
         String apiKey = prefs.getString(PREF_WHISPER_API_KEY, "");
         apiKeyEditText.setText(apiKey);
+
+        String sttEngine = prefs.getString(PREF_STT_ENGINE, "system");
+        sttEngineSpinner.setSelection("whisper".equals(sttEngine) ? 1 : 0);
         
         int languageIndex = prefs.getInt(PREF_VOICE_LANGUAGE, 0);
         languageSpinner.setSelection(languageIndex);
@@ -101,6 +113,17 @@ public class VoiceSettingsFragment extends Fragment {
             @Override
             public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
                 prefs.edit().putInt(PREF_VOICE_LANGUAGE, position).apply();
+            }
+
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
+
+        sttEngineSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                String engine = position == 1 ? "whisper" : "system";
+                prefs.edit().putString(PREF_STT_ENGINE, engine).apply();
             }
 
             @Override

@@ -173,8 +173,8 @@ public class BluetoothAutoConnectManager {
                             String deviceMac = device.getMacAddress();
                             int rssi = scanResult.getRssi();
                             
-                            // Only consider Openterface devices
-                            if (deviceName != null && deviceName.matches("(?i)openterface KM.*")) {
+                            // Keep matcher aligned with Bluetooth dialog to avoid auto-connect missing valid devices.
+                            if (deviceName != null && deviceName.matches("(?i)(openterface|kvm).*")) {
                                 Log.d(TAG, "Found Openterface device: " + deviceName + " (" + deviceMac + ", RSSI: " + rssi + ")");
                                 
                                 // Check if this is the target device (last connected)

@@ -534,7 +534,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
     }
 
     private void showImportDialog() {
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(requireContext());
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("Import Profile");
         builder.setMessage("Select import method:");
         
@@ -558,7 +558,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         input.setMinLines(5);
         input.setGravity(android.view.Gravity.TOP);
         
-        new android.app.AlertDialog.Builder(requireContext())
+        new AlertDialog.Builder(requireContext())
             .setTitle("Import from JSON")
             .setView(input)
             .setPositiveButton("Import", (dialog, which) -> {

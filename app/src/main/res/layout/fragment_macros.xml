@@ -5,165 +5,66 @@
     android:orientation="vertical"
     android:background="@color/background_light">
 
-    <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:padding="16dp"
-        android:background="@color/white"
+        android:background="@color/header_background"
         android:elevation="4dp">
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="Macros"
             android:textSize="24sp"
             android:textStyle="bold"
             android:textColor="@color/text_primary" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Record and playback key sequences"
-            android:textSize="14sp"
-            android:textColor="@color/text_secondary"
-            android:layout_marginTop="4dp" />
+        <ImageButton
+            android:id="@+id/edit_mode_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="Edit macros"
+            android:src="@android:drawable/ic_menu_edit"
+            android:tint="@color/text_secondary"
+            android:layout_marginEnd="8dp" />
 
+        <ImageButton
+            android:id="@+id/add_macro_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="Add macro"
+            android:src="@android:drawable/ic_input_add"
+            android:tint="@color/primary" />
     </LinearLayout>
 
-    <!-- Recording Controls -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
-
-        <!-- Macro Name Input -->
-        <EditText
-            android:id="@+id/macro_name_edittext"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Macro name (e.g., 'Open Browser')"
-            android:inputType="text"
-            android:maxLines="1"
-            android:background="@android:drawable/edit_text"
-            android:padding="12dp"
-            android:layout_marginBottom="12dp" />
-
-        <!-- Record/Stop Buttons -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/record_button"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="⏺ Record"
-                android:layout_marginEnd="8dp"
-                style="@style/Widget.MaterialComponents.Button" />
-
-            <Button
-                android:id="@+id/stop_button"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="⏹ Stop"
-                android:enabled="false"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-        </LinearLayout>
-
-    </LinearLayout>
-
-    <!-- Playback Controls -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="16dp"
-        android:paddingTop="0dp">
-
-        <Button
-            android:id="@+id/play_button"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="▶ Play"
-            android:enabled="false"
-            android:layout_marginEnd="8dp"
-            style="@style/Widget.MaterialComponents.Button" />
-
-        <Button
-            android:id="@+id/import_button"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="📥 Import"
-            android:layout_marginEnd="8dp"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-        <Button
-            android:id="@+id/export_button"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="📤 Export"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-    </LinearLayout>
-
-    <!-- Status -->
-    <TextView
-        android:id="@+id/status_textview"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Ready"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:textColor="@color/primary"
-        android:padding="12dp"
-        android:background="@color/white"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="8dp" />
-
-    <!-- Macros List -->
-    <ListView
-        android:id="@+id/macros_listview"
+    <GridView
+        android:id="@+id/macros_gridview"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:divider="@color/divider"
-        android:dividerHeight="1dp"
-        android:background="@color/white"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="16dp" />
+        android:numColumns="3"
+        android:stretchMode="columnWidth"
+        android:gravity="center"
+        android:horizontalSpacing="12dp"
+        android:verticalSpacing="12dp"
+        android:padding="16dp"
+        android:clipToPadding="false" />
 
-    <!-- Empty State -->
     <TextView
         android:id="@+id/empty_textview"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:text="No macros yet\nTap Record to create one"
+        android:layout_height="wrap_content"
+        android:text="No macros yet\nTap + to add one"
         android:textSize="16sp"
         android:textColor="@color/text_secondary"
         android:gravity="center"
         android:visibility="gone"
-        android:layout_margin="32dp" />
-
-    <!-- Clear All Button -->
-    <Button
-        android:id="@+id/clear_button"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="🗑 Clear All Macros"
-        android:textColor="@color/holo_red_light"
-        android:layout_margin="16dp"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+        android:layout_margin="24dp" />
 
 </LinearLayout>

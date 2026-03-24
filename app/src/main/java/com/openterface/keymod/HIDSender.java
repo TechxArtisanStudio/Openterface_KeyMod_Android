@@ -22,9 +22,20 @@ public class HIDSender {
      */
     public static void sendKeyEvent(UsbSerialPort usbPort, BluetoothService bluetoothService, 
                                     int modifiers, int keyCode) {
-        if (keyCode == 0) return;
+        if (keyCode == 0) {
+            Log.i(TAG, "KEY_SEND_IGNORED keyCode=0 modifiers=" + modifiers);
+            return;
+        }
         
         byte[] data = buildKeyboardPacket(modifiers, keyCode);
+        Log.i(TAG, "KEY_SEND keyCode=" + keyCode
+            + " key=" + describeKeyCode(keyCode)
+            + " modifiers=" + modifiers
+            + " [ctrl=" + ((modifiers & 0x01) != 0)
+            + ",shift=" + ((modifiers & 0x02) != 0)
+            + ",alt=" + ((modifiers & 0x04) != 0)
+            + ",cmd=" + ((modifiers & 0x08) != 0)
+            + "] packet=" + byteArrayToHexString(data));
         sendPacket(usbPort, bluetoothService, data, "Keyboard");
     }
 
@@ -33,11 +44,12 @@ public class HIDSender {
      */
     public static void sendKeyRelease(UsbSerialPort usbPort, BluetoothService bluetoothService) {
         byte[] data = buildKeyboardPacket(0, 0);
+        Log.i(TAG, "KEY_RELEASE packet=" + byteArrayToHexString(data));
         sendPacket(usbPort, bluetoothService, data, "Key Release");
     }
 
     /**
-     * Send mouse movement event
+     * Send mouse movement eventj
      */
     public static void sendMouseMovement(UsbSerialPort usbPort, BluetoothService bluetoothService,
                                          int deltaX, int deltaY, int buttons) {
@@ -93,7 +105,7 @@ public class HIDSender {
         // Bluetooth path
         else if (bluetoothService != null && bluetoothService.isConnected()) {
             bluetoothService.sendData(data);
-            Log.d(TAG, "Sent " + type + " via BLE: " + byteArrayToHexString(data));
+            Log.i(TAG, "Sent " + type + " via BLE: " + byteArrayToHexString(data));
         } else {
             Log.w(TAG, "No connection available for sending " + type);
         }
@@ -154,5 +166,34 @@ public class HIDSender {
             sb.append(String.format("%02X", b));
         }
         return sb.toString();
+    }
+
+    private static String describeKeyCode(int keyCode) {
+        switch (keyCode) {
+            case 40: return "Enter";
+            case 41: return "Escape";
+            case 42: return "Backspace";
+            case 43: return "Tab";
+            case 44: return "Space";
+            case 74: return "Home";
+            case 77: return "End";
+            case 79: return "Right";
+            case 80: return "Left";
+            case 81: return "Down";
+            case 82: return "Up";
+            default:
+                if (keyCode >= 4 && keyCode <= 29) {
+                    char c = (char) ('A' + (keyCode - 4));
+                    return String.valueOf(c);
+                }
+                if (keyCode >= 30 && keyCode <= 38) {
+                    char c = (char) ('1' + (keyCode - 30));
+                    return String.valueOf(c);
+                }
+                if (keyCode == 39) {
+                    return "0";
+                }
+                return "Unknown";
+        }
     }
 }

@@ -157,14 +157,17 @@ public class BluetoothService extends Service {
 
     @SuppressLint("CheckResult")
     public void     sendData(byte[] keyBoardData) {
+        String packetHex = bytesToHex(keyBoardData);
         if (activeConnection == null) {
-            Log.w(TAG, LOG_PREFIX + "Cannot send data: No active connection");
+            Log.w(TAG, LOG_PREFIX + "Cannot send data: No active connection, packet=" + packetHex);
             if (connectedDevice != null) {
                 Log.d(TAG, LOG_PREFIX + "Attempting to reconnect before sending data");
                 connectToDevice(connectedDevice);
             }
             return;
         }
+
+        Log.i(TAG, LOG_PREFIX + "BLE write request packet=" + packetHex);
 
         activeConnection.discoverServices()
                 .flatMap(services -> services.getCharacteristic(WRITE_CHARACTERISTIC_UUID))
@@ -176,15 +179,23 @@ public class BluetoothService extends Service {
 //                                byte[] dataBytes = CustomKeyboardView.hexStringToByteArray(keyBoardData);
                                 activeConnection.writeCharacteristic(WRITE_CHARACTERISTIC_UUID, keyBoardData)
                                         .subscribe(
-                                                writtenBytes -> Log.d(TAG, LOG_PREFIX + "Successfully sent data: " + Arrays.toString(keyBoardData)),
-                                                throwable -> Log.e(TAG, LOG_PREFIX + "Write error: " + throwable.toString())
+                                                writtenBytes -> Log.i(TAG, LOG_PREFIX + "BLE write success packet=" + packetHex),
+                                                throwable -> Log.e(TAG, LOG_PREFIX + "Write error packet=" + packetHex + " error=" + throwable.toString())
                                         );
                             } else {
                                 Log.w(TAG, LOG_PREFIX + "Characteristic " + WRITE_CHARACTERISTIC_UUID + " does not support write operations");
                             }
                         },
-                        throwable -> Log.e(TAG, LOG_PREFIX + "Error retrieving characteristic: " + throwable.toString())
+                        throwable -> Log.e(TAG, LOG_PREFIX + "Error retrieving characteristic for packet=" + packetHex + ": " + throwable.toString())
                 );
+    }
+
+    private String bytesToHex(byte[] data) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : data) {
+            sb.append(String.format("%02X", b));
+        }
+        return sb.toString();
     }
 
     public RxBleDevice getConnectedDevice() {

@@ -5,67 +5,74 @@
     android:orientation="vertical"
     android:background="@color/background_light">
 
-    <!-- Header -->
+    <!-- Mini toolbar aligned with iOS quick actions -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:background="@color/white"
-        android:elevation="4dp">
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:background="@color/header_background">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Voice Input"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary" />
+        <ImageButton
+            android:id="@+id/copy_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Copy text"
+            android:padding="8dp"
+            android:src="@drawable/ic_toolbar_copy"
+            android:tint="@color/text_secondary" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Speech-to-text with Whisper AI"
-            android:textSize="14sp"
-            android:textColor="@color/text_secondary"
-            android:layout_marginTop="4dp" />
+        <Space
+            android:layout_width="12dp"
+            android:layout_height="1dp" />
+
+        <ImageButton
+            android:id="@+id/clear_top_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Clear text"
+            android:padding="8dp"
+            android:src="@drawable/ic_toolbar_clear"
+            android:tint="@color/text_secondary" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <ImageButton
+            android:id="@+id/auto_line_return_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Auto return"
+            android:padding="8dp"
+            android:src="@drawable/ic_toolbar_return"
+            android:tint="@color/text_secondary" />
+
+        <Space
+            android:layout_width="12dp"
+            android:layout_height="1dp" />
+
+        <ImageButton
+            android:id="@+id/auto_send_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Auto send"
+            android:padding="8dp"
+            android:src="@drawable/ic_toolbar_send"
+            android:tint="@color/text_secondary" />
 
     </LinearLayout>
 
-    <!-- Status -->
-    <TextView
-        android:id="@+id/status_text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Ready - Set API key in Settings"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:textColor="@color/primary"
-        android:padding="16dp"
-        android:background="@color/white"
-        android:layout_marginTop="8dp" />
-
-    <!-- Waveform Visualization -->
-    <ImageView
-        android:id="@+id/waveform_view"
-        android:layout_width="match_parent"
-        android:layout_height="100dp"
-        android:src="@drawable/ic_voice"
-        android:scaleType="centerInside"
-        android:padding="16dp"
-        android:background="@color/white"
-        android:contentDescription="Audio waveform" />
-
-    <!-- Progress Bar -->
-    <ProgressBar
-        android:id="@+id/progress_bar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:visibility="gone"
-        style="@style/Widget.AppCompat.ProgressBar.Horizontal"
-        android:layout_margin="16dp" />
-
-    <!-- Transcribed Text -->
+    <!-- Transcribed Text (primary content, like iOS text area) -->
     <EditText
         android:id="@+id/transcribed_text"
         android:layout_width="match_parent"
@@ -74,58 +81,164 @@
         android:hint="Transcribed text will appear here..."
         android:gravity="top|start"
         android:padding="16dp"
-        android:background="@android:drawable/edit_text"
+        android:background="@drawable/voice_input_text_background"
         android:layout_margin="16dp"
         android:inputType="textMultiLine"
         android:scrollbars="vertical"
         android:fontFamily="sans-serif"
-        android:textSize="16sp" />
+        android:textSize="16sp"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_secondary" />
 
-    <!-- Action Buttons -->
+    <!-- Status + Progress -->
+    <TextView
+        android:id="@+id/status_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Ready - Set API key in Settings"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:textColor="@color/primary"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:background="@color/header_background" />
+
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="10dp"
+        android:visibility="gone" />
+
+    <!-- Hidden placeholder to keep existing fragment binding intact -->
+    <ImageView
+        android:id="@+id/waveform_view"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone"
+        android:contentDescription="Audio waveform" />
+
+    <!-- History Section (mirrors iOS resizable history panel) -->
+    <LinearLayout
+        android:id="@+id/history_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@color/header_background">
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/text_secondary"
+            android:alpha="0.2" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="History"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_secondary" />
+
+            <Button
+                android:id="@+id/clear_history_button"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:text="Clear All"
+                android:textSize="11sp"
+                android:textAllCaps="false"
+                android:minWidth="0dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/history_empty_text"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:gravity="center"
+            android:text="No messages sent yet"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary"
+            android:visibility="visible" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/history_recycler_view"
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:visibility="gone"
+            android:overScrollMode="ifContentScrolls" />
+
+    </LinearLayout>
+
+    <!-- Action Row (iOS-like clear / record / send) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="16dp">
-
-        <Button
-            android:id="@+id/record_button"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="2"
-            android:text="🎤 Record"
-            android:textSize="18sp"
-            android:layout_marginEnd="8dp"
-            style="@style/Widget.MaterialComponents.Button" />
-
-        <Button
-            android:id="@+id/paste_button"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="📤 Send"
-            android:layout_marginEnd="8dp"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="16dp"
+        android:background="@color/header_background">
 
         <Button
             android:id="@+id/clear_button"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="🗑 Clear"
+            android:text="Clear"
+            android:textAllCaps="false"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+        <Space
+            android:layout_width="12dp"
+            android:layout_height="1dp" />
+
+        <ImageButton
+            android:id="@+id/record_button"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="@drawable/bg_record_button_idle"
+            android:contentDescription="Start recording"
+            android:padding="14dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_toolbar_mic"
+            android:tint="@color/white" />
+
+        <Space
+            android:layout_width="12dp"
+            android:layout_height="1dp" />
+
+        <Button
+            android:id="@+id/paste_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Send"
+            android:textAllCaps="false"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
     </LinearLayout>
-
-    <!-- Instructions -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="1. Set Whisper API key in Settings\n2. Tap Record and speak\n3. Text appears automatically\n4. Tap Send to type on connected device"
-        android:textSize="13sp"
-        android:textColor="@color/text_secondary"
-        android:padding="16dp"
-        android:background="@color/primary_light"
-        android:layout_margin="16dp" />
 
 </LinearLayout>

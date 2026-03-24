@@ -88,9 +88,24 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:text="Speech Engine"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginBottom="8dp" />
+
+                <Spinner
+                    android:id="@+id/stt_engine_spinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:spinnerMode="dropdown" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:text="Language"
                     android:textSize="14sp"
                     android:textColor="@color/text_secondary"
+                    android:layout_marginTop="16dp"
                     android:layout_marginBottom="8dp" />
 
                 <Spinner

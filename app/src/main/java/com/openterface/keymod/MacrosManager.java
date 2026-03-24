@@ -22,6 +22,7 @@ public class MacrosManager {
     private static final String KEY_MACROS_LIST = "macros_list";
     private static final String KEY_RECORDING = "is_recording";
     private static final String KEY_PLAYING = "is_playing";
+    private static volatile MacrosManager instance;
 
     private final SharedPreferences prefs;
     private final Gson gson;
@@ -30,6 +31,17 @@ public class MacrosManager {
     private boolean isRecording;
     private boolean isPlaying;
     private MacrosListener listener;
+
+    public static MacrosManager getInstance(Context context) {
+        if (instance == null) {
+            synchronized (MacrosManager.class) {
+                if (instance == null) {
+                    instance = new MacrosManager(context.getApplicationContext());
+                }
+            }
+        }
+        return instance;
+    }
 
     public MacrosManager(Context context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -119,7 +131,7 @@ public class MacrosManager {
      * Record a key event during macro recording
      */
     public void recordKeyEvent(int keyCode, int modifiers) {
-        if (!isRecording || currentRecordingMacro == null) {
+        if (!shouldRecordKeyEvent()) {
             return;
         }
 
@@ -132,6 +144,13 @@ public class MacrosManager {
         if (listener != null) {
             listener.onKeyEventRecorded(event);
         }
+    }
+
+    /**
+     * Recording should only capture user-originated key events.
+     */
+    public boolean shouldRecordKeyEvent() {
+        return isRecording && !isPlaying && currentRecordingMacro != null;
     }
 
     /**
@@ -180,24 +199,39 @@ public class MacrosManager {
             delay = event.timestamp - prevTimestamp;
         }
 
-        // Ensure minimum delay
-        delay = Math.max(delay, 50);
+        // Ensure minimum spacing between macro events.
+        // BLE links can drop very short press/release sequences.
+        delay = Math.max(delay, 80);
 
         final long finalDelay = delay;
-        if (connectionManager != null) {
+        if (connectionManager != null && connectionManager.isConnected()) {
             connectionManager.sendKeyEvent(event.modifiers, event.keyCode);
+            Log.d(TAG, "Macro send key: keyCode=" + event.keyCode + ", modifiers=" + event.modifiers);
             
-            // Release after short delay
+            // Hold key a little longer to improve combo reliability (e.g., Ctrl+A).
             final long releaseDelay = finalDelay;
             new android.os.Handler().postDelayed(() -> {
-                if (isPlaying) {
+                if (isPlaying && connectionManager.isConnected()) {
                     connectionManager.sendKeyRelease();
+                    Log.d(TAG, "Macro sent key release");
+                    
                     // Schedule next event
                     new android.os.Handler().postDelayed(() -> {
                         playMacroEvents(macro, connectionManager, index + 1);
                     }, releaseDelay);
+                } else if (isPlaying) {
+                    // Connection lost during playback
+                    Log.w(TAG, "Connection lost during macro playback at index " + index);
+                    isPlaying = false;
+                    prefs.edit().putBoolean(KEY_PLAYING, false).apply();
                 }
-            }, 50);
+            }, 120);
+        } else {
+            // Connection lost or not available
+            Log.w(TAG, "Cannot play macro: connectionManager=" + (connectionManager != null) 
+                    + ", isConnected=" + (connectionManager != null ? connectionManager.isConnected() : false));
+            isPlaying = false;
+            prefs.edit().putBoolean(KEY_PLAYING, false).apply();
         }
     }
 
@@ -225,6 +259,126 @@ public class MacrosManager {
         if (listener != null) {
             listener.onMacroDeleted(macro);
         }
+    }
+
+    /**
+     * Update an existing macro name.
+     */
+    public boolean renameMacro(long macroId, String newName) {
+        if (newName == null || newName.trim().isEmpty()) {
+            return false;
+        }
+
+        for (Macro macro : macros) {
+            if (macro.id == macroId) {
+                macro.name = newName.trim();
+                saveMacros();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Replace key events for an existing macro and recalculate duration.
+     */
+    public boolean updateMacroEvents(long macroId, List<KeyEvent> newEvents) {
+        if (newEvents == null) {
+            return false;
+        }
+
+        for (Macro macro : macros) {
+            if (macro.id == macroId) {
+                macro.keyEvents = new ArrayList<>(newEvents);
+                if (!macro.keyEvents.isEmpty()) {
+                    macro.duration = macro.keyEvents.get(macro.keyEvents.size() - 1).timestamp;
+                } else {
+                    macro.duration = 0;
+                }
+                saveMacros();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Create a new macro directly from editor content.
+     */
+    public Macro createMacro(String name, List<KeyEvent> events) {
+        return createMacro(name, "", 100, false, 0L, 0, 0L, events);
+    }
+
+    /**
+     * Create a new macro from the editor fields.
+     */
+    public Macro createMacro(String name,
+                             String data,
+                             int intervalMs,
+                             boolean isScheduled,
+                             long scheduledAtMillis,
+                             int repeatCount,
+                             long repeatIntervalSeconds,
+                             List<KeyEvent> events) {
+        Macro macro = new Macro();
+        macro.id = System.currentTimeMillis();
+        macro.name = name;
+        macro.createdAt = System.currentTimeMillis();
+        macro.data = data;
+        macro.intervalMs = intervalMs;
+        macro.isScheduled = isScheduled;
+        macro.scheduledAtMillis = scheduledAtMillis;
+        macro.repeatCount = repeatCount;
+        macro.repeatIntervalSeconds = repeatIntervalSeconds;
+        macro.keyEvents = events != null ? new ArrayList<>(events) : new ArrayList<>();
+        macro.duration = macro.keyEvents.isEmpty() ? 0 : macro.keyEvents.get(macro.keyEvents.size() - 1).timestamp;
+
+        macros.add(macro);
+        saveMacros();
+        return macro;
+    }
+
+    /**
+     * Update name and key events of an existing macro.
+     */
+    public boolean updateMacro(long macroId, String name, List<KeyEvent> events) {
+        return updateMacro(macroId, name, "", 100, false, 0L, 0, 0L, events);
+    }
+
+    /**
+     * Update all editor fields of an existing macro.
+     */
+    public boolean updateMacro(long macroId,
+                               String name,
+                               String data,
+                               int intervalMs,
+                               boolean isScheduled,
+                               long scheduledAtMillis,
+                               int repeatCount,
+                               long repeatIntervalSeconds,
+                               List<KeyEvent> events) {
+        if (name == null || name.trim().isEmpty() || events == null) {
+            return false;
+        }
+
+        for (Macro macro : macros) {
+            if (macro.id == macroId) {
+                macro.name = name.trim();
+                macro.data = data;
+                macro.intervalMs = intervalMs;
+                macro.isScheduled = isScheduled;
+                macro.scheduledAtMillis = scheduledAtMillis;
+                macro.repeatCount = repeatCount;
+                macro.repeatIntervalSeconds = repeatIntervalSeconds;
+                macro.keyEvents = new ArrayList<>(events);
+                macro.duration = macro.keyEvents.isEmpty() ? 0 : macro.keyEvents.get(macro.keyEvents.size() - 1).timestamp;
+                saveMacros();
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -329,6 +483,12 @@ public class MacrosManager {
     public static class Macro {
         public long id;
         public String name;
+        public String data;
+        public int intervalMs = 100;
+        public boolean isScheduled = false;
+        public long scheduledAtMillis = 0L;
+        public int repeatCount = 0;
+        public long repeatIntervalSeconds = 0L;
         public long createdAt;
         public long duration;
         public List<KeyEvent> keyEvents;

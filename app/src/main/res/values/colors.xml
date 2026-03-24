@@ -43,4 +43,8 @@
     
     <!-- Settings Colors -->
     <color name="primary_light">#FFBBDEFB</color>
+
+    <!-- Voice Input Colors -->
+    <color name="voice_input_field_background">#FFFFFFFF</color>
+    <color name="voice_input_instruction_background">#FFBBDEFB</color>
 </resources>

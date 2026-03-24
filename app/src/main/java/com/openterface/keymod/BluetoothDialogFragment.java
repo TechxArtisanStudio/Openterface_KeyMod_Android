@@ -505,12 +505,8 @@ public class BluetoothDialogFragment extends DialogFragment {
                                 String deviceName = sanitizeDeviceName(device.getName());
                                 String deviceAddress = device.getMacAddress();
 
-                                Log.d(TAG, LOG_PREFIX + "Scan found device: " + deviceName + " (" + deviceAddress + ")");
-
-                                Log.d(TAG, LOG_PREFIX + "Found device: " + deviceName + " (" + deviceAddress + ")");
-                                
                                 if (!deviceName.matches("(?i)(openterface|kvm).*")) {
-                                    Log.d(TAG, LOG_PREFIX + "Device does NOT match Openterface KM pattern, skipping: " + deviceName);
+                                    // Log.d(TAG, LOG_PREFIX + "Device does NOT match Openterface KM pattern, skipping: " + deviceName);
                                     return;
                                 }
 

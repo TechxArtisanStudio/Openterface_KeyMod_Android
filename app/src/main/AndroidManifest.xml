@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     
     <!-- Storage permissions for profile import/export -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 

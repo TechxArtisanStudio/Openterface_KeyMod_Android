@@ -4,6 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="140dp"
     app:cardCornerRadius="12dp"
+    app:cardBackgroundColor="@color/card_unselected_bg"
     app:cardElevation="4dp"
     android:foreground="?android:attr/selectableItemBackground">
 
