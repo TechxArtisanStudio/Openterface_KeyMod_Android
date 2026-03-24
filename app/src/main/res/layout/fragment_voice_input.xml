@@ -42,9 +42,57 @@
             android:tint="@color/text_secondary" />
 
         <Space
+            android:layout_width="8dp"
+            android:layout_height="1dp" />
+
+        <ImageButton
+            android:id="@+id/os_macos_button"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Target macOS"
+            android:padding="8dp"
+            android:src="@drawable/ic_os_macos"
+            android:tint="@color/text_secondary" />
+
+        <ImageButton
+            android:id="@+id/os_windows_button"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Target Windows"
+            android:padding="8dp"
+            android:src="@drawable/ic_os_windows"
+            android:tint="@color/text_secondary" />
+
+        <ImageButton
+            android:id="@+id/os_linux_button"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Target Linux"
+            android:padding="8dp"
+            android:src="@drawable/ic_os_linux"
+            android:tint="@color/text_secondary" />
+
+        <Space
             android:layout_width="0dp"
             android:layout_height="1dp"
             android:layout_weight="1" />
+
+        <ImageButton
+            android:id="@+id/ai_refine_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="AI refinement"
+            android:padding="8dp"
+            android:src="@drawable/ic_toolbar_ai"
+            android:tint="@color/text_secondary" />
+
+        <Space
+            android:layout_width="8dp"
+            android:layout_height="1dp" />
 
         <ImageButton
             android:id="@+id/auto_line_return_button"

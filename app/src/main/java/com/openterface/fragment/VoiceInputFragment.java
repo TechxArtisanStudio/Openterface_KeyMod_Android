@@ -23,6 +23,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -74,8 +75,11 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
     private static final String STT_ENGINE_WHISPER = "whisper";
     private static final String PREF_AUTO_SEND = "voice_auto_send_to_target";
     private static final String PREF_AUTO_LINE_RETURN = "voice_auto_line_return";
+    private static final String PREF_AI_ENABLED = "ai_enabled";
     private static final long SEND_BUTTON_REFRESH_INTERVAL_MS = 1000L;
     private static final String PREF_HISTORY = "voice_input_history";
+    private static final String PREF_TARGET_OS = "voice_target_os";
+    // OS values: "macos", "windows", "linux"
 
     // UI Components
     private ImageButton recordButton;
@@ -89,6 +93,13 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
     private ImageView waveformView;
     private ImageButton autoSendButton;
     private ImageButton autoLineReturnButton;
+    private ImageButton aiRefineButton;
+
+    // Target OS selector
+    private ImageButton osMacosButton;
+    private ImageButton osWindowsButton;
+    private ImageButton osLinuxButton;
+    private String targetOs = "macos"; // default
 
     // History UI
     private RecyclerView historyRecyclerView;
@@ -160,6 +171,17 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
         waveformView = view.findViewById(R.id.waveform_view);
         autoSendButton = view.findViewById(R.id.auto_send_button);
         autoLineReturnButton = view.findViewById(R.id.auto_line_return_button);
+        aiRefineButton = view.findViewById(R.id.ai_refine_button);
+
+        // Target OS selector
+        osMacosButton = view.findViewById(R.id.os_macos_button);
+        osWindowsButton = view.findViewById(R.id.os_windows_button);
+        osLinuxButton = view.findViewById(R.id.os_linux_button);
+        targetOs = prefs.getString(PREF_TARGET_OS, "macos");
+        updateOsButtonState();
+        osMacosButton.setOnClickListener(v -> setTargetOs("macos"));
+        osWindowsButton.setOnClickListener(v -> setTargetOs("windows"));
+        osLinuxButton.setOnClickListener(v -> setTargetOs("linux"));
 
         // History views
         historyRecyclerView = view.findViewById(R.id.history_recycler_view);
@@ -254,6 +276,12 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
             prefs.edit().putBoolean(PREF_AUTO_LINE_RETURN, autoLineReturn).apply();
             updateMiniToolbarState();
         });
+
+        aiRefineButton.setOnClickListener(v -> {
+            boolean current = prefs.getBoolean(PREF_AI_ENABLED, false);
+            prefs.edit().putBoolean(PREF_AI_ENABLED, !current).apply();
+            updateMiniToolbarState();
+        });
     }
 
     private void updateMiniToolbarState() {
@@ -280,6 +308,14 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
             autoLineReturnButton.setColorFilter(autoLineReturn ? returnActive : neutralColor);
             autoLineReturnButton.setAlpha(autoLineReturn ? 1.0f : 0.7f);
             autoLineReturnButton.setBackgroundColor(Color.TRANSPARENT);
+        }
+
+        if (aiRefineButton != null) {
+            boolean aiEnabled = prefs.getBoolean(PREF_AI_ENABLED, false);
+            int aiActive = Color.parseColor("#9C27B0"); // purple
+            aiRefineButton.setColorFilter(aiEnabled ? aiActive : neutralColor);
+            aiRefineButton.setAlpha(aiEnabled ? 1.0f : 0.7f);
+            aiRefineButton.setBackgroundColor(Color.TRANSPARENT);
         }
     }
 
@@ -399,8 +435,12 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
                         appendTranscribedText(recognizedText);
                         statusText.setText("✅ Transcribed");
 
-                        if (autoSendToTarget && !recognizedText.isEmpty()) {
-                            sendTranscribedText(true);
+                        if (!recognizedText.isEmpty()) {
+                            if (prefs.getBoolean(PREF_AI_ENABLED, false)) {
+                                refineTextWithAI(recognizedText);
+                            } else if (autoSendToTarget) {
+                                sendTranscribedText(true);
+                            }
                         }
                         return;
                     }
@@ -607,8 +647,12 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
                         appendTranscribedText(result);
                         statusText.setText("✅ Transcribed");
                         Log.d(TAG, "Transcription: " + result);
-                        if (autoSendToTarget && !result.trim().isEmpty()) {
-                            sendTranscribedText(true);
+                        if (!result.trim().isEmpty()) {
+                            if (prefs.getBoolean(PREF_AI_ENABLED, false)) {
+                                refineTextWithAI(result);
+                            } else if (autoSendToTarget) {
+                                sendTranscribedText(true);
+                            }
                         }
                     } else {
                         statusText.setText("❌ Transcription failed");
@@ -776,10 +820,19 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
                 i += Character.charCount(codePoint);
 
                 if (codePoint > 0x7E) {
-                    // Non-ASCII (e.g. Chinese, emoji): use macOS Unicode Hex Input
-                    // Requires "Unicode Hex Input" keyboard enabled on the target macOS
+                    // Non-ASCII (e.g. Chinese): route to OS-specific Unicode input method
                     try {
-                        sendUnicodeCharMacOS(codePoint, connectionManager);
+                        switch (targetOs) {
+                            case "windows":
+                                sendUnicodeCharWindows(codePoint, connectionManager);
+                                break;
+                            case "linux":
+                                sendUnicodeCharLinux(codePoint, connectionManager);
+                                break;
+                            default: // macos
+                                sendUnicodeCharMacOS(codePoint, connectionManager);
+                                break;
+                        }
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
@@ -846,13 +899,27 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
         return "~!@#$%^&*()_+{}|:\"<>?".indexOf(c) >= 0;
     }
 
+    private void setTargetOs(String os) {
+        targetOs = os;
+        prefs.edit().putString(PREF_TARGET_OS, os).apply();
+        updateOsButtonState();
+    }
+
+    private void updateOsButtonState() {
+        if (osMacosButton == null) return;
+        int activeColor = requireContext().getColor(R.color.primary);
+        int inactiveColor = requireContext().getColor(R.color.text_secondary);
+        osMacosButton.setImageTintList(
+            android.content.res.ColorStateList.valueOf("macos".equals(targetOs) ? activeColor : inactiveColor));
+        osWindowsButton.setImageTintList(
+            android.content.res.ColorStateList.valueOf("windows".equals(targetOs) ? activeColor : inactiveColor));
+        osLinuxButton.setImageTintList(
+            android.content.res.ColorStateList.valueOf("linux".equals(targetOs) ? activeColor : inactiveColor));
+    }
+
     /**
-     * Send a non-ASCII Unicode character to a macOS target using the
-     * "Unicode Hex Input" method: hold Option (Alt), type the 4-hex-digit
-     * code point on the regular keyboard row, then release Option.
-     *
-     * Requires the target macOS to have "Unicode Hex Input" enabled in
-     * System Settings → Keyboard → Input Sources.
+     * macOS Unicode Hex Input: hold Option, type 4 hex digits, release Option.
+     * Requires "Unicode Hex Input" enabled in macOS Input Sources.
      */
     private void sendUnicodeCharMacOS(int codePoint, ConnectionManager cm)
             throws InterruptedException {
@@ -878,6 +945,100 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
         // 3. Release Alt → macOS commits the character
         cm.sendRawHIDReport(0x00, 0x00);
         Thread.sleep(100); // commit delay
+    }
+
+    /**
+     * Windows Unicode input: Alt down, NumpadPlus, then hex digits (uppercase numpad),
+     * then Alt up. Requires registry key EnableHexNumpad=1 and reboot on target Windows.
+     * Numpad codes: 0=0x62, 1=0x59, 2=0x5A, 3=0x5B, 4=0x5C, 5=0x5D,
+     *               6=0x5E, 7=0x5F, 8=0x60, 9=0x61
+     * A=0x04...F=0x09 sent with Shift (uppercase on physical keyboard)
+     */
+    private void sendUnicodeCharWindows(int codePoint, ConnectionManager cm)
+            throws InterruptedException {
+        String hex = String.format("%04X", codePoint); // uppercase for Windows
+        Log.d(TAG, "Windows Unicode input: U+" + hex);
+
+        final int kAlt = 0x04;
+        final int kNumpadPlus = 0x57;
+
+        cm.sendRawHIDReport(kAlt, 0x00);           // Alt down
+        Thread.sleep(50);
+        cm.sendRawHIDReport(kAlt, kNumpadPlus);    // Alt + NumpadPlus
+        Thread.sleep(50);
+        cm.sendRawHIDReport(kAlt, 0x00);           // NumpadPlus release (Alt still held)
+        Thread.sleep(50);
+
+        for (char c : hex.toCharArray()) {
+            int code = windowsHexKeyCode(c);
+            if (code < 0) continue;
+            cm.sendRawHIDReport(kAlt, code);
+            Thread.sleep(50);
+            cm.sendRawHIDReport(kAlt, 0x00);
+            Thread.sleep(50);
+        }
+
+        cm.sendRawHIDReport(0x00, 0x00);           // Alt up → Windows commits
+        Thread.sleep(100);
+    }
+
+    /** Windows uses numpad keys for hex digits 0-9, and regular A-F keys for letters. */
+    private int windowsHexKeyCode(char c) {
+        switch (c) {
+            // Numpad 0-9
+            case '0': return 0x62;
+            case '1': return 0x59;
+            case '2': return 0x5A;
+            case '3': return 0x5B;
+            case '4': return 0x5C;
+            case '5': return 0x5D;
+            case '6': return 0x5E;
+            case '7': return 0x5F;
+            case '8': return 0x60;
+            case '9': return 0x61;
+            // A-F (uppercase HID codes, same as lowercase letters)
+            case 'A': return 0x04;
+            case 'B': return 0x05;
+            case 'C': return 0x06;
+            case 'D': return 0x07;
+            case 'E': return 0x08;
+            case 'F': return 0x09;
+            default:  return -1;
+        }
+    }
+
+    /**
+     * Linux (GTK/IBus) Unicode input: Ctrl+Shift+U, type hex digits, press Enter.
+     * Works in most GTK apps and IBus-managed input fields.
+     */
+    private void sendUnicodeCharLinux(int codePoint, ConnectionManager cm)
+            throws InterruptedException {
+        String hex = String.format("%04x", codePoint);
+        Log.d(TAG, "Linux Unicode input: U+" + hex);
+
+        final int kCtrlShift = 0x01 | 0x02; // Ctrl + Shift
+
+        // Ctrl+Shift+U
+        cm.sendRawHIDReport(kCtrlShift, 0x18); // U = 0x18
+        Thread.sleep(80);
+        cm.sendRawHIDReport(0x00, 0x00);
+        Thread.sleep(80);
+
+        // Hex digits
+        for (char c : hex.toCharArray()) {
+            int code = hexCharToHidCode(c);
+            if (code < 0) continue;
+            cm.sendRawHIDReport(0x00, code);
+            Thread.sleep(50);
+            cm.sendRawHIDReport(0x00, 0x00);
+            Thread.sleep(50);
+        }
+
+        // Enter to commit
+        cm.sendRawHIDReport(0x00, 0x28);
+        Thread.sleep(80);
+        cm.sendRawHIDReport(0x00, 0x00);
+        Thread.sleep(50);
     }
 
     /** Maps lowercase hex chars (0-9, a-f) to their HID key codes on the regular keyboard row. */
@@ -1026,6 +1187,175 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
                 resendButton = itemView.findViewById(R.id.history_resend_button);
             }
         }
+    }
+
+    // ─── AI Refinement ──────────────────────────────────────────────────────
+
+    private void refineTextWithAI(String inputText) {
+        String aiApiKey;
+        String aiEndpoint;
+        String aiModel;
+        String systemPrompt;
+        String aiRole;
+        try {
+            // Per-provider key only — never cross-contaminate between providers
+            int providerIdx = prefs.getInt("ai_provider", 0);
+            String perProviderKey = prefs.getString("ai_api_key_" + providerIdx, "");
+            aiApiKey = perProviderKey;
+            aiEndpoint = prefs.getString("ai_endpoint", "https://api.openai.com/v1");
+            // For OpenAI-endpoint providers only, allow Whisper key as fallback
+            if (aiApiKey.isEmpty() && aiEndpoint.contains("api.openai.com")) {
+                aiApiKey = prefs.getString("whisper_api_key", "");
+            }
+            Log.d(TAG, "AI refine: providerIdx=" + providerIdx
+                    + " perProviderKey=" + (perProviderKey.isEmpty() ? "(empty)" : perProviderKey.substring(0, Math.min(8, perProviderKey.length())) + "...")
+                    + " endpoint=" + aiEndpoint);
+            aiModel    = prefs.getString("ai_model", "gpt-4o-mini");
+            systemPrompt = prefs.getString("ai_system_prompt", "");
+            aiRole = prefs.getString("ai_role", "text_refinement");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to read AI prefs", e);
+            if (autoSendToTarget) sendTranscribedText(true);
+            return;
+        }
+        if (systemPrompt.isEmpty()) {
+            systemPrompt = getDefaultSystemPrompt(aiRole);
+        }
+
+        if (aiApiKey.isEmpty()) {
+            String[] providerNames = {"OpenAI", "Anthropic", "Google Gemini", "Mistral AI",
+                    "Groq", "Alibaba (Qwen)", "DeepSeek", "Custom"};
+            int pIdx = prefs.getInt("ai_provider", 0);
+            String pName = (pIdx < providerNames.length) ? providerNames[pIdx] : "the selected provider";
+            Toast.makeText(getContext(),
+                    "No API key for " + pName + ". Go to AI Settings and enter your key.",
+                    Toast.LENGTH_LONG).show();
+            if (autoSendToTarget) sendTranscribedText(true);
+            return;
+        }
+
+        statusText.setText("🤖 Refining...");
+        progressBar.setVisibility(View.VISIBLE);
+
+        final String finalApiKey = aiApiKey;
+        final String finalSystemPrompt = systemPrompt;
+        final String finalModel = aiModel.isEmpty() ? "gpt-4o-mini" : aiModel;
+        final String finalEndpoint = aiEndpoint.isEmpty() ? "https://api.openai.com/v1" : aiEndpoint;
+
+        executor.execute(() -> {
+            try {
+                String refined = callAIChatAPI(finalApiKey, finalEndpoint, finalModel, finalSystemPrompt, inputText);
+                mainHandler.post(() -> {
+                    progressBar.setVisibility(View.GONE);
+                    if (refined != null && !refined.isEmpty()) {
+                        transcribedText.setText(refined);
+                        transcribedText.setSelection(refined.length());
+                        statusText.setText("✅ Refined");
+                        if (autoSendToTarget) sendTranscribedText(true);
+                    } else {
+                        statusText.setText("⚠️ Refinement failed — original kept");
+                        if (autoSendToTarget) sendTranscribedText(true);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "AI refinement error", e);
+                mainHandler.post(() -> {
+                    progressBar.setVisibility(View.GONE);
+                    statusText.setText("⚠️ AI error: " + e.getMessage());
+                    if (autoSendToTarget) sendTranscribedText(true);
+                });
+            }
+        });
+    }
+
+    private String callAIChatAPI(String apiKey, String endpoint, String model,
+                                  String systemPrompt, String userText) throws Exception {
+        String url = endpoint.endsWith("/") ? endpoint + "chat/completions"
+                                            : endpoint + "/chat/completions";
+        java.net.HttpURLConnection conn =
+                (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        conn.setConnectTimeout(30000);
+        conn.setReadTimeout(30000);
+        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+
+        JSONObject body = new JSONObject();
+        body.put("model", model);
+        JSONArray messages = new JSONArray();
+        JSONObject sysMsg = new JSONObject();
+        sysMsg.put("role", "system");
+        sysMsg.put("content", systemPrompt);
+        messages.put(sysMsg);
+        JSONObject userMsg = new JSONObject();
+        userMsg.put("role", "user");
+        userMsg.put("content", userText);
+        messages.put(userMsg);
+        body.put("messages", messages);
+        body.put("max_tokens", 2048);
+
+        byte[] bodyBytes = body.toString().getBytes("UTF-8");
+        java.io.OutputStream os = conn.getOutputStream();
+        os.write(bodyBytes);
+        os.flush();
+        os.close();
+
+        int responseCode = conn.getResponseCode();
+        Log.d(TAG, "AI API response code: " + responseCode + " for " + url);
+        if (responseCode == 200) {
+            java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(conn.getInputStream(), "UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) sb.append(line);
+            reader.close();
+            Log.d(TAG, "AI API response body: " + sb.toString().substring(0, Math.min(200, sb.length())));
+            JSONObject response = new JSONObject(sb.toString());
+            return response.getJSONArray("choices")
+                           .getJSONObject(0)
+                           .getJSONObject("message")
+                           .getString("content")
+                           .trim();
+        } else {
+            String errorBody = "(no body)";
+            java.io.InputStream errStream = conn.getErrorStream();
+            if (errStream != null) {
+                java.io.BufferedReader errorReader = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(errStream, "UTF-8"));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = errorReader.readLine()) != null) sb.append(line);
+                errorReader.close();
+                errorBody = sb.toString();
+            }
+            Log.e(TAG, "AI API error " + responseCode + ": " + errorBody);
+            throw new Exception("AI API error: " + responseCode + " — " + errorBody);
+        }
+    }
+
+    private String getDefaultSystemPrompt(String role) {
+        if ("command_assistant".equals(role)) {
+            String os = prefs.getString("ai_command_os", "macos");
+            switch (os) {
+                case "windows":
+                    return "You are a command assistant for Windows. Convert the user's natural language " +
+                           "description into the exact PowerShell or cmd command(s) needed. " +
+                           "Return only the raw command(s) — no markdown, no explanation, no code blocks.";
+                case "linux":
+                    return "You are a command assistant for Linux. Convert the user's natural language " +
+                           "description into the exact bash command(s) to accomplish the task. " +
+                           "Return only the raw command(s) — no markdown, no explanation, no code blocks.";
+                default:
+                    return "You are a command assistant for macOS. Convert the user's natural language " +
+                           "description into the exact shell command(s) to accomplish the task in macOS/zsh. " +
+                           "Return only the raw command(s) — no markdown, no explanation, no code blocks.";
+            }
+        }
+        return "You are a text refinement assistant. Your task is to improve the grammar, " +
+               "clarity, and readability of transcribed speech. Fix errors, remove filler words " +
+               "(um, uh, like), and ensure proper punctuation — while strictly preserving the " +
+               "original meaning and intent. Return only the refined text, no explanation.";
     }
 
     @Override
