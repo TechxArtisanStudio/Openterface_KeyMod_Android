@@ -1,14 +1,16 @@
 package com.openterface.keymod;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
-import android.view.ScaleGestureDetector;
 import android.view.View;
+
+import androidx.preference.PreferenceManager;
 
 /**
  * TouchPadView — gesture mapping aligned with iOS TouchpadUIView:
@@ -26,12 +28,16 @@ public class TouchPadView extends View {
     private static final long   TAP_DELAY_MS       = 150;   // wait before confirming single tap
     private static final long   TAP_DURATION_MAX_MS = 400;  // finger must lift within this time
     private static final float  TAP_MOVE_THRESHOLD  = 10f;  // px — movement cancels tap
+    private static final float  TWO_FINGER_TAP_MOVE_THRESHOLD = 12f;
+    private static final String PREF_TOUCHPAD_SCROLL_SENSITIVITY = "touchpad_scroll_sensitivity";
 
     public interface OnTouchPadListener {
         void onTouchMove(float startX, float startY, float lastX, float lastY);
         void onTouchClick();
         void onTouchDoubleClick();
         void onTouchRightClick();
+        /** Called when finger(s) are lifted/cancelled so host can release mouse state if needed */
+        default void onTouchRelease() {}
         /** Called when a long-press is detected — host can toggle drag mode */
         default void onTouchLongPress() {}
     }
@@ -47,10 +53,15 @@ public class TouchPadView extends View {
     private float tapDownX, tapDownY;
     private long  tapDownTime;
     private boolean tapCancelled = false;
+    private boolean suppressSingleTapFromDoubleTap = false;
     private Runnable pendingSingleTap = null;
 
     // 2-finger scroll state
     private float twoFingerPrevX, twoFingerPrevY;
+    private float twoFingerScrollAccumX = 0f;
+    private float twoFingerScrollAccumY = 0f;
+    private float twoFingerDownCenterX, twoFingerDownCenterY;
+    private boolean twoFingerMoved = false;
     private boolean isTwoFingerScrolling = false;
 
     private final GestureDetector gestureDetector;
@@ -71,8 +82,15 @@ public class TouchPadView extends View {
         return new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
 
             @Override
+            public boolean onDown(MotionEvent e) {
+                // Must return true so GestureDetector continues tracking for double-tap.
+                return true;
+            }
+
+            @Override
             public boolean onDoubleTap(MotionEvent e) {
                 cancelPendingSingleTap();
+                suppressSingleTapFromDoubleTap = true;
                 if (listener != null) listener.onTouchDoubleClick();
                 return true;
             }
@@ -111,46 +129,66 @@ public class TouchPadView extends View {
 
             switch (action) {
                 case MotionEvent.ACTION_POINTER_DOWN:
+                    twoFingerDownCenterX = (event.getX(0) + event.getX(1)) / 2f;
+                    twoFingerDownCenterY = (event.getY(0) + event.getY(1)) / 2f;
+                    twoFingerPrevX = twoFingerDownCenterX;
+                    twoFingerPrevY = twoFingerDownCenterY;
+                    twoFingerScrollAccumX = 0f;
+                    twoFingerScrollAccumY = 0f;
+                    twoFingerMoved = false;
+                    isTwoFingerScrolling = false;
+                    break;
                 case MotionEvent.ACTION_MOVE:
                     float cx = (event.getX(0) + event.getX(1)) / 2f;
                     float cy = (event.getY(0) + event.getY(1)) / 2f;
-                    if (!isTwoFingerScrolling) {
-                        // First move with 2 fingers — initialise scroll
-                        twoFingerPrevX = cx;
-                        twoFingerPrevY = cy;
-                        isTwoFingerScrolling = true;
-                    } else if (action == MotionEvent.ACTION_MOVE) {
-                        float dx = cx - twoFingerPrevX;
-                        float dy = cy - twoFingerPrevY;
-                        // Scroll: invert Y for natural scrolling, reduce sensitivity /3
-                        int scrollX = (int) (dx / 3f);
-                        int scrollY = (int) (-dy / 3f);
-                        if (listener != null && (scrollX != 0 || scrollY != 0)) {
-                            // Re-use onTouchMove with sentinel values to signal scroll,
-                            // OR add a dedicated scroll callback if available.
-                            // For now signal scroll via onTouchMove with a special marker
-                            // by passing deltaX/deltaY directly as startX/Y with 0 lastX/Y:
-                            // Actually: we'll call onTouchMove(dx, dy, 0, 0) — caller checks 0,0
-                            // Better: declare scroll via a separate path — use onTouchMove
-                            // with recognisable sentinel. Keep it simple: pass delta only.
-                            listener.onTouchMove(scrollX, scrollY, 0, 0);
-                        }
-                        twoFingerPrevX = cx;
-                        twoFingerPrevY = cy;
+                    float totalDist = dist(cx, cy, twoFingerDownCenterX, twoFingerDownCenterY);
+                    if (totalDist > TWO_FINGER_TAP_MOVE_THRESHOLD) {
+                        twoFingerMoved = true;
                     }
+
+                    float dx = cx - twoFingerPrevX;
+                    float dy = cy - twoFingerPrevY;
+                    if (Math.abs(dx) > 0f || Math.abs(dy) > 0f) {
+                        isTwoFingerScrolling = true;
+                    }
+
+                    float sensitivity = getScrollSensitivity();
+                    twoFingerScrollAccumX += (dx / 3f) * sensitivity;
+                    twoFingerScrollAccumY += (-dy / 3f) * sensitivity;
+
+                    int scrollX = (int) twoFingerScrollAccumX;
+                    int scrollY = (int) twoFingerScrollAccumY;
+
+                    if (scrollX != 0) {
+                        twoFingerScrollAccumX -= scrollX;
+                    }
+                    if (scrollY != 0) {
+                        twoFingerScrollAccumY -= scrollY;
+                    }
+
+                    if (listener != null && (scrollX != 0 || scrollY != 0)) {
+                        listener.onTouchMove(scrollX, scrollY, 0, 0);
+                    }
+                    twoFingerPrevX = cx;
+                    twoFingerPrevY = cy;
                     break;
 
                 case MotionEvent.ACTION_POINTER_UP:
-                    // Both fingers up counts as 2-finger tap if no scroll happened
-                    if (!isTwoFingerScrolling) {
+                    // 2-finger tap if there wasn't meaningful movement/scrolling
+                    if (!twoFingerMoved && !isTwoFingerScrolling) {
                         if (listener != null) listener.onTouchRightClick();
                     }
+                    if (listener != null) listener.onTouchRelease();
+                    twoFingerScrollAccumX = 0f;
+                    twoFingerScrollAccumY = 0f;
+                    twoFingerMoved = false;
                     isTwoFingerScrolling = false;
                     break;
             }
             return true;
         }
 
+        twoFingerMoved = false;
         isTwoFingerScrolling = false;
 
         // ---- 1-finger gestures ----
@@ -186,6 +224,14 @@ public class TouchPadView extends View {
             case MotionEvent.ACTION_UP:
                 long duration = event.getEventTime() - tapDownTime;
                 float distLifted = dist(x, y, tapDownX, tapDownY);
+                if (suppressSingleTapFromDoubleTap) {
+                    suppressSingleTapFromDoubleTap = false;
+                    if (listener != null) listener.onTouchRelease();
+                    lastMoveX = 0;
+                    lastMoveY = 0;
+                    isDragging = false;
+                    break;
+                }
                 boolean validTap = !tapCancelled
                         && duration < TAP_DURATION_MAX_MS
                         && distLifted <= TAP_MOVE_THRESHOLD;
@@ -200,6 +246,8 @@ public class TouchPadView extends View {
                     mainHandler.postDelayed(pendingSingleTap, TAP_DELAY_MS);
                 }
 
+                if (listener != null) listener.onTouchRelease();
+
                 lastMoveX = 0;
                 lastMoveY = 0;
                 isDragging = false;
@@ -207,6 +255,7 @@ public class TouchPadView extends View {
 
             case MotionEvent.ACTION_CANCEL:
                 cancelPendingSingleTap();
+                if (listener != null) listener.onTouchRelease();
                 isDragging = false;
                 break;
         }
@@ -224,5 +273,11 @@ public class TouchPadView extends View {
         float dx = x1 - x2;
         float dy = y1 - y2;
         return (float) Math.sqrt(dx * dx + dy * dy);
+    }
+
+    private float getScrollSensitivity() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
+        int sensitivityPercent = prefs.getInt(PREF_TOUCHPAD_SCROLL_SENSITIVITY, 100);
+        return Math.max(0.2f, Math.min(2.0f, sensitivityPercent / 100f));
     }
 }

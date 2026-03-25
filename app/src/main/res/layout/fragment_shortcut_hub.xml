@@ -172,17 +172,6 @@
 
             </LinearLayout>
 
-            <Button
-                android:id="@+id/activate_button"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Activate"
-                android:textSize="12sp"
-                android:minWidth="0dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                style="@style/Widget.MaterialComponents.Button" />
-
         </LinearLayout>
 
         <!-- Tab Bar: ⭐ My (fixed) | Category buttons (scrollable) -->

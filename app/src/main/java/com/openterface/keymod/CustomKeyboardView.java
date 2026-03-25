@@ -38,6 +38,7 @@ public class CustomKeyboardView extends LinearLayout {
     private boolean isWinLeftLocked = false;
     private boolean isRunning = true;
     private boolean isSymbolMode = false;
+    private boolean showExtraPortraitKeys = false;
     private List<List<Key>> lowerKeys;
     private UsbSerialPort port;
     private Handler repeatHandler = new Handler();
@@ -109,11 +110,27 @@ public class CustomKeyboardView extends LinearLayout {
         setOrientation(VERTICAL);
         
         // Load keyboard layout based on orientation (matching iOS behavior)
-        int keyboardResId = isLandscape(context) ? R.xml.keyboard_lower_landscape : R.xml.keyboard_lower_portrait;
-        lowerKeys = parseKeyboard(context, keyboardResId);
+        reloadForCurrentOrientation();
         
         Log.d(TAG, "Parsed keyboard (landscape=" + isLandscape(context) + "): lowerKeys=" + lowerKeys.size());
         bindService(context);
+        updateKeyboard();
+    }
+
+    public void reloadForCurrentOrientation() {
+        Context context = getContext();
+        int keyboardResId = isLandscape(context)
+                ? R.xml.keyboard_lower_landscape
+                : R.xml.keyboard_lower_portrait;
+        lowerKeys = parseKeyboard(context, keyboardResId);
+        removeAllViews();
+        updateKeyboard();
+    }
+
+    public void setShowExtraPortraitKeys(boolean enabled) {
+        if (showExtraPortraitKeys == enabled) return;
+        showExtraPortraitKeys = enabled;
+        removeAllViews();
         updateKeyboard();
     }
     
@@ -280,6 +297,28 @@ public class CustomKeyboardView extends LinearLayout {
         removeAllViews();
         List<List<Key>> currentKeys = lowerKeys;
 
+        // In fullscreen keyboard mode, hide arrow keys from the main keyboard area.
+        // Direction keys are provided by the extra middle panel in this mode.
+        if (showExtraPortraitKeys) {
+            List<List<Key>> filtered = new ArrayList<>();
+            for (List<Key> row : currentKeys) {
+                List<Key> out = new ArrayList<>();
+                for (Key k : row) {
+                    if ("Up_arrow".equals(k.label)
+                            || "Down_arrow".equals(k.label)
+                            || "Left_arrow".equals(k.label)
+                            || "Right_arrow".equals(k.label)) {
+                        continue;
+                    }
+                    out.add(k);
+                }
+                if (!out.isEmpty()) {
+                    filtered.add(out);
+                }
+            }
+            currentKeys = filtered;
+        }
+
         String[] functionalKeyCodes = {"46", "47", "48", "49", "4A", "4B", "4C", "4D", "4E", "3B", "3C", "3D", "3E", "3F", "29", "3A", "40", "41", "42", "43", "44", "45", "3D", "3F"};
 
         for (List<Key> row : currentKeys) {
@@ -405,6 +444,111 @@ public class CustomKeyboardView extends LinearLayout {
             }
             addView(rowLayout);
         }
+
+        if (showExtraPortraitKeys && !isLandscape(getContext())) {
+            addExtraPortraitKeys();
+        }
+    }
+
+    private void addExtraPortraitKeys() {
+        // iOS parity: top 101-key cluster
+        addExtraRow(new Key[]{
+            new Key("PrtSc", "", 0x46, "46", 33.33f, 0, 0f, false),
+            new Key("Scroll Lock", "", 0x47, "47", 33.33f, 0, 0f, false),
+            new Key("Pause", "", 0x48, "48", 33.34f, 0, 0f, false)
+        });
+
+        addExtraRow(new Key[]{
+            new Key("Insert", "", 0x49, "49", 33.33f, 0, 0f, false),
+            new Key("Home", "", 0x4A, "4A", 33.33f, 0, 0f, false),
+            new Key("PgUp", "", 0x4B, "4B", 33.34f, 0, 0f, false)
+        });
+
+        addExtraRow(new Key[]{
+            new Key("Delete", "", 0x4C, "4C", 33.33f, 0, 0f, false),
+            new Key("End", "", 0x4D, "4D", 33.33f, 0, 0f, false),
+            new Key("PgDn", "", 0x4E, "4E", 33.34f, 0, 0f, false)
+        });
+
+        // Keep middle direction keys (iOS extra panel style)
+        addExtraRow(new Key[]{
+            null,
+            new Key("↑", "", 0x52, "52", 33.33f, 0, 0f, false),
+            null
+        });
+
+        addExtraRow(new Key[]{
+            new Key("←", "", 0x50, "50", 33.33f, 0, 0f, false),
+            new Key("↓", "", 0x51, "51", 33.33f, 0, 0f, false),
+            new Key("→", "", 0x4F, "4F", 33.34f, 0, 0f, false)
+        });
+
+        addExtraRow(new Key[]{
+                new Key("7", "", 0x5F, "5F", 33.33f, 0, 0f, false),
+                new Key("8", "", 0x60, "60", 33.33f, 0, 0f, false),
+                new Key("9", "", 0x61, "61", 33.34f, 0, 0f, false)
+        });
+
+        addExtraRow(new Key[]{
+                new Key("4", "", 0x5C, "5C", 33.33f, 0, 0f, false),
+                new Key("5", "", 0x5D, "5D", 33.33f, 0, 0f, false),
+                new Key("6", "", 0x5E, "5E", 33.34f, 0, 0f, false)
+        });
+
+        addExtraRow(new Key[]{
+                new Key("1", "", 0x59, "59", 33.33f, 0, 0f, false),
+                new Key("2", "", 0x5A, "5A", 33.33f, 0, 0f, false),
+                new Key("3", "", 0x5B, "5B", 33.34f, 0, 0f, false)
+        });
+
+        addExtraRow(new Key[]{
+            new Key("0", "", 0x62, "62", 50f, 0, 0f, false),
+            new Key(".", "", 0x63, "63", 50f, 0, 0f, false)
+        });
+    }
+
+    private void addExtraRow(Key[] keys) {
+        LinearLayout rowLayout = new LinearLayout(getContext());
+        rowLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, 0.9f));
+        rowLayout.setOrientation(HORIZONTAL);
+
+        for (Key key : keys) {
+            float widthPercent = key != null ? key.widthPercent : (100f / keys.length);
+            float weight = widthPercent / 10.0f;
+            LayoutParams params = new LayoutParams(0, LayoutParams.MATCH_PARENT, weight);
+            params.setMargins(2, 2, 2, 2);
+
+            if (key == null) {
+                View spacer = new View(getContext());
+                spacer.setLayoutParams(params);
+                rowLayout.addView(spacer);
+                continue;
+            }
+
+            Button textButton = new Button(getContext());
+            textButton.setLayoutParams(params);
+            textButton.setBackgroundResource(R.drawable.function_button_background);
+            textButton.setGravity(Gravity.CENTER);
+            textButton.setTextSize(14);
+            textButton.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
+            textButton.setText(key.label);
+            textButton.setTextColor(Color.BLACK);
+
+            textButton.setOnClickListener(v -> handleKeyPress(key));
+            textButton.setOnTouchListener((v, event) -> {
+                if (event.getAction() == MotionEvent.ACTION_UP) {
+                    repeatHandler.postDelayed(() -> {
+                        sendReleaseData();
+                        Log.d(TAG, "Sent key release for extra key: " + key.label);
+                    }, 30);
+                }
+                return false;
+            });
+
+            rowLayout.addView(textButton);
+        }
+
+        addView(rowLayout);
     }
 
     public static byte[] hexStringToByteArray(String ByteData) {

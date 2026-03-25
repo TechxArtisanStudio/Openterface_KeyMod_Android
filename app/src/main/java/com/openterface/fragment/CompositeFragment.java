@@ -4,15 +4,15 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -32,13 +32,15 @@ public class CompositeFragment extends Fragment {
     private static final String TAG = "CompositeFragment";
     private CustomKeyboardView keyboardView;
     private TouchPadView touchPad;
+    private LinearLayout rootLayout;
     private LinearLayout touchpadSection;
     private LinearLayout toggleHandle;
+    private View toggleHandlePill;
+    private TextView touchPadTips;
     public UsbSerialPort port;
-    private Button leftClickButton, rightClickButton;
-    private ImageButton slideUpButton, slideDownButton;
     private BluetoothService bluetoothService;
     private boolean isServiceBound;
+    private boolean isDragMode = false;
 
     private enum DisplayMode { BOTH, KEYBOARD, TOUCHPAD }
     private DisplayMode displayMode = DisplayMode.BOTH;
@@ -130,6 +132,51 @@ public class CompositeFragment extends Fragment {
         }
     }
 
+    private void setDragMode(boolean enabled) {
+        isDragMode = enabled;
+        sendMouseButtonState(enabled ? 0x01 : 0x00);
+        updateTouchPadTips();
+        Log.d(TAG, "Drag mode " + (enabled ? "ON" : "OFF"));
+    }
+
+    private void updateTouchPadTips() {
+        if (touchPadTips == null) return;
+        String status = isDragMode ? "Drag Mode ON" : "Drag Mode OFF";
+        String tips = "Touch Pad\n"
+                + status + "\n"
+                + "Single tap -> Click\n"
+                + "Double tap -> Double click\n"
+                + "Two finger tap -> Right click\n"
+                + "Two finger drag -> Scroll\n"
+                + "Long press -> Toggle drag mode";
+        touchPadTips.setText(tips);
+    }
+
+    private void sendMouseButtonState(int buttonMask) {
+        new Thread(() -> {
+            try {
+                String buttonByte = String.format("%02X", buttonMask & 0xFF);
+                String sendMSData =
+                        CH9329MSKBMap.getKeyCodeMap().get("prefix1") +
+                        CH9329MSKBMap.getKeyCodeMap().get("prefix2") +
+                        CH9329MSKBMap.getKeyCodeMap().get("address") +
+                        CH9329MSKBMap.CmdData().get("CmdMS_REL") +
+                        CH9329MSKBMap.DataLen().get("DataLenRelMS") +
+                        CH9329MSKBMap.MSRelData().get("FirstData") +
+                        buttonByte + "00" + "00" + "00";
+                sendMSData += makeChecksum(sendMSData);
+                byte[] bytes = hexStringToByteArray(sendMSData);
+                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                    bluetoothService.sendData(bytes);
+                } else if (port != null) {
+                    port.write(bytes, 20);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error sending mouse button state: " + e.getMessage());
+            }
+        }).start();
+    }
+
     public void sendHexRelData(float StartMoveMSX, float StartMoveMSY, float LastMoveMSX, float LastMoveMSY) {
         new Thread(() -> {
             try {
@@ -162,6 +209,7 @@ public class CompositeFragment extends Fragment {
                     yByte = String.format("%02X", 0x100 + yMovement);
                 }
 
+                String buttonByte = isDragMode ? "01" : CH9329MSKBMap.MSAbsData().get("SecNullData");
                 String sendMSData =
                         CH9329MSKBMap.getKeyCodeMap().get("prefix1") +
                                 CH9329MSKBMap.getKeyCodeMap().get("prefix2") +
@@ -169,7 +217,7 @@ public class CompositeFragment extends Fragment {
                                 CH9329MSKBMap.CmdData().get("CmdMS_REL") +
                                 CH9329MSKBMap.DataLen().get("DataLenRelMS") +
                                 CH9329MSKBMap.MSRelData().get("FirstData") +
-                                CH9329MSKBMap.MSAbsData().get("SecNullData") + // MS key
+                        buttonByte + // MS key
                                 xByte +
                                 yByte +
                                 CH9329MSKBMap.DataNull().get("DataNull");
@@ -212,27 +260,47 @@ public class CompositeFragment extends Fragment {
     public void sendScrollData(int deltaX, int deltaY) {
         new Thread(() -> {
             try {
-                // CH9329 relative mouse: byte[9] = scroll wheel
-                String scrollByte = deltaY == 0 ? "00"
-                        : deltaY > 0 ? String.format("%02X", Math.min(deltaY, 0x7F))
-                        : String.format("%02X", 0x100 + Math.max(deltaY, -0x7F));
-                String sendMSData =
+                // Skip empty scroll events.
+                if (deltaX == 0 && deltaY == 0) return;
+
+                String base =
                         CH9329MSKBMap.getKeyCodeMap().get("prefix1") +
                         CH9329MSKBMap.getKeyCodeMap().get("prefix2") +
                         CH9329MSKBMap.getKeyCodeMap().get("address") +
                         CH9329MSKBMap.CmdData().get("CmdMS_REL") +
                         CH9329MSKBMap.DataLen().get("DataLenRelMS") +
                         CH9329MSKBMap.MSRelData().get("FirstData") +
-                        "00" + // no button
-                        "00" + // x
-                        "00" + // y
-                        scrollByte;
-                sendMSData += makeChecksum(sendMSData);
-                byte[] bytes = hexStringToByteArray(sendMSData);
-                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-                    bluetoothService.sendData(bytes);
-                } else if (port != null) {
-                    port.write(bytes, 20);
+                        "00"; // no button
+
+                // Vertical scroll (wheel byte)
+                if (deltaY != 0) {
+                    String wheelByte = deltaY > 0
+                            ? String.format("%02X", Math.min(deltaY, 0x7F))
+                            : String.format("%02X", 0x100 + Math.max(deltaY, -0x7F));
+                    String packet = base + "00" + "00" + wheelByte;
+                    packet += makeChecksum(packet);
+                    byte[] bytes = hexStringToByteArray(packet);
+                    if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                        bluetoothService.sendData(bytes);
+                    } else if (port != null) {
+                        port.write(bytes, 20);
+                    }
+                }
+
+                // Horizontal scroll fallback (put deltaX in X byte, wheel=0), matching iOS behavior.
+                if (deltaX != 0) {
+                    int boundedX = Math.max(-127, Math.min(127, deltaX));
+                    String xByte = boundedX >= 0
+                            ? String.format("%02X", boundedX)
+                            : String.format("%02X", 0x100 + boundedX);
+                    String packet = base + xByte + "00" + "00";
+                    packet += makeChecksum(packet);
+                    byte[] bytes = hexStringToByteArray(packet);
+                    if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                        bluetoothService.sendData(bytes);
+                    } else if (port != null) {
+                        port.write(bytes, 20);
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error sending scroll data: " + e.getMessage());
@@ -249,99 +317,17 @@ public class CompositeFragment extends Fragment {
         Intent intent = new Intent(requireContext(), BluetoothService.class);
         requireContext().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
 
-        leftClickButton = view.findViewById(R.id.leftClickButton);
-        rightClickButton = view.findViewById(R.id.rightClickButton);
-        slideDownButton = view.findViewById(R.id.slideDownButton);
-        slideUpButton = view.findViewById(R.id.slideUpButton);
-
-        leftClickButton.setOnClickListener(v -> {
-            Log.d(TAG, "Left Click Button Pressed");
-            try {
-                String sendKBData = "57AB0005050101000000";
-                sendKBData += makeChecksum(sendKBData);
-                byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
-                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-                    bluetoothService.sendData(sendKBDataBytes);
-                    Log.d(TAG, "Sent Bluetooth left click data: " + sendKBData);
-                } else if (port != null) {
-                    port.write(sendKBDataBytes, 20);
-                    Log.d(TAG, "Sent USB left click data: " + sendKBData);
-                } else {
-                    Log.w(TAG, "No connection available for left click");
-                }
-//                releaseAllMSData();
-            } catch (IOException e) {
-                Log.e(TAG, "Error sending left click data: " + e.getMessage());
-            }
-        });
-
-        rightClickButton.setOnClickListener(v -> {
-            Log.d(TAG, "Right Click Button Pressed");
-            try {
-                String sendKBData = "57AB0005050102000000";
-                sendKBData += makeChecksum(sendKBData);
-                byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
-                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-                    bluetoothService.sendData(sendKBDataBytes);
-                    Log.d(TAG, "Sent Bluetooth right click data: " + sendKBData);
-                } else if (port != null) {
-                    port.write(sendKBDataBytes, 20);
-                    Log.d(TAG, "Sent USB right click data: " + sendKBData);
-                } else {
-                    Log.w(TAG, "No connection available for right click");
-                }
-//                releaseAllMSData();
-            } catch (IOException e) {
-                Log.e(TAG, "Error sending right click data: " + e.getMessage());
-            }
-        });
-
-        slideDownButton.setOnClickListener(v -> {
-            Log.d(TAG, "Slide Down Button Pressed");
-            try {
-                String sendKBData = "57AB00050501000000FF";
-                sendKBData += makeChecksum(sendKBData);
-                byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
-                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-                    bluetoothService.sendData(sendKBDataBytes);
-                    Log.d(TAG, "Sent Bluetooth slide down data: " + sendKBData);
-                } else if (port != null) {
-                    port.write(sendKBDataBytes, 20);
-                    Log.d(TAG, "Sent USB slide down data: " + sendKBData);
-                } else {
-                    Log.w(TAG, "No connection available for slide down");
-                }
-//                releaseAllMSData();
-            } catch (IOException e) {
-                Log.e(TAG, "Error sending slide down data: " + e.getMessage());
-            }
-        });
-
-        slideUpButton.setOnClickListener(v -> {
-            Log.d(TAG, "Slide Up Button Pressed");
-            try {
-                String sendKBData = "57AB0005050100000001";
-                sendKBData += makeChecksum(sendKBData);
-                byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
-                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-                    bluetoothService.sendData(sendKBDataBytes);
-                    Log.d(TAG, "Sent Bluetooth slide up data: " + sendKBData);
-                } else if (port != null) {
-                    port.write(sendKBDataBytes, 20);
-                    Log.d(TAG, "Sent USB slide up data: " + sendKBData);
-                } else {
-                    Log.w(TAG, "No connection available for slide up");
-                }
-//                releaseAllMSData();
-            } catch (IOException e) {
-                Log.e(TAG, "Error sending slide up data: " + e.getMessage());
-            }
-        });
-
+        rootLayout = view.findViewById(R.id.composite_root);
         keyboardView = view.findViewById(R.id.keyboard_view);
         touchPad = view.findViewById(R.id.touchPad);
         touchpadSection = view.findViewById(R.id.touchpad_section);
         toggleHandle = view.findViewById(R.id.toggle_handle);
+        toggleHandlePill = view.findViewById(R.id.toggle_handle_pill);
+        touchPadTips = view.findViewById(R.id.touchPadTips);
+        updateTouchPadTips();
+
+        applyOrientationLayout();
+        applyDisplayMode();
 
         if (toggleHandle != null) {
             toggleHandle.setOnClickListener(v -> cycleDisplayMode());
@@ -433,7 +419,15 @@ public class CompositeFragment extends Fragment {
 
                 @Override
                 public void onTouchLongPress() {
-                    Log.d(TAG, "TouchPad long press -> drag mode (no-op placeholder)");
+                    setDragMode(!isDragMode);
+                }
+
+                @Override
+                public void onTouchRelease() {
+                    // Match iOS behavior: release only when drag mode is off.
+                    if (!isDragMode) {
+                        releaseAllMSData();
+                    }
                 }
             });
         }
@@ -458,12 +452,69 @@ public class CompositeFragment extends Fragment {
         if (keyboardView != null) {
             keyboardView.setVisibility(
                 displayMode != DisplayMode.TOUCHPAD ? View.VISIBLE : View.GONE);
+
+            // Ensure we always use the correct orientation keyboard keyset when mode changes.
+            keyboardView.reloadForCurrentOrientation();
+            keyboardView.setShowExtraPortraitKeys(displayMode == DisplayMode.KEYBOARD);
         }
+    }
+
+    private void applyOrientationLayout() {
+        if (rootLayout == null || touchpadSection == null || toggleHandle == null || keyboardView == null) {
+            return;
+        }
+
+        boolean isLandscape = getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+        if (isLandscape) {
+            rootLayout.setOrientation(LinearLayout.HORIZONTAL);
+
+            touchpadSection.setLayoutParams(new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.MATCH_PARENT, 1.0f));
+
+            toggleHandle.setLayoutParams(new LinearLayout.LayoutParams(
+                    dpToPx(36), ViewGroup.LayoutParams.MATCH_PARENT));
+            toggleHandle.setGravity(android.view.Gravity.CENTER);
+
+            keyboardView.setLayoutParams(new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.MATCH_PARENT, 2.0f));
+
+            if (toggleHandlePill != null) {
+                toggleHandlePill.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(4), dpToPx(40)));
+            }
+        } else {
+            rootLayout.setOrientation(LinearLayout.VERTICAL);
+
+            touchpadSection.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 2.0f));
+
+            toggleHandle.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(44)));
+            toggleHandle.setGravity(android.view.Gravity.CENTER);
+
+            keyboardView.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f));
+
+            if (toggleHandlePill != null) {
+                toggleHandlePill.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(40), dpToPx(4)));
+            }
+        }
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
+    }
+
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        applyOrientationLayout();
+        applyDisplayMode();
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        setDragMode(false);
         if (isServiceBound) {
             requireContext().unbindService(serviceConnection);
             isServiceBound = false;

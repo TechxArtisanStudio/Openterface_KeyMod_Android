@@ -20,6 +20,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.openterface.keymod.ConnectionManager;
@@ -128,9 +129,10 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
     private void loadProfiles() {
         profilesList.clear();
         profilesList.addAll(profileManager.getAllProfiles());
-        adapter.notifyDataSetChanged();
         
         activeProfile = profileManager.getActiveProfile();
+        adapter.setActiveProfileId(activeProfile != null ? activeProfile.id : null);
+        adapter.notifyDataSetChanged();
         updateActiveProfileDisplay();
         updateEmptyState();
     }
@@ -315,10 +317,12 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
     private void refreshShortcutsGrid() {
         if (selectedProfile == null) return;
 
+        boolean hasCategories = selectedProfile.categories != null && !selectedProfile.categories.isEmpty();
+
         List<ShortcutProfileManager.Shortcut> toShow = new ArrayList<>();
         
         // Priority 1: Show category shortcuts if a category is selected
-        if (currentCategoryId != null) {
+        if (currentCategoryId != null && hasCategories) {
             for (ShortcutProfileManager.ShortcutCategory cat : selectedProfile.categories) {
                 if (cat.id.equals(currentCategoryId)) {
                     toShow = new ArrayList<>(cat.shortcuts);
@@ -330,13 +334,28 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         else if (TAB_MY.equals(currentTab)) {
             toShow = myShortcutsList;
             if (toShow.isEmpty()) {
+                // Profiles without categories (e.g., Default) should still show their built-in keys.
+                if (!hasCategories) {
+                    toShow = selectedProfile.shortcuts != null
+                            ? new ArrayList<>(selectedProfile.shortcuts)
+                            : new ArrayList<>();
+                }
+
+                if (!toShow.isEmpty()) {
+                    shortcutsGridView.setVisibility(View.VISIBLE);
+                    emptyMyShortcuts.setVisibility(View.GONE);
+                    shortcutsAdapter.setShortcuts(toShow);
+                    shortcutsAdapter.notifyDataSetChanged();
+                    return;
+                }
+
                 shortcutsGridView.setVisibility(View.GONE);
                 emptyMyShortcuts.setVisibility(View.VISIBLE);
                 return;
             }
         } 
         // Priority 3: Show all flat shortcuts (for profiles without categories)
-        else if (selectedProfile.categories.isEmpty()) {
+        else if (!hasCategories) {
             toShow = selectedProfile.shortcuts != null ? selectedProfile.shortcuts : new ArrayList<>();
         }
         
@@ -412,6 +431,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
     private void activateProfile(ShortcutProfile profile) {
         profileManager.setActiveProfile(profile.id);
         activeProfile = profile;
+        loadProfiles();
         updateActiveProfileDisplay();
 
         // Refresh activate button state if in detail view
@@ -704,10 +724,15 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
     private static class ProfilesAdapter extends android.widget.BaseAdapter {
         private final Context context;
         private final List<ShortcutProfile> profiles;
+        private String activeProfileId;
 
         public ProfilesAdapter(Context context, List<ShortcutProfile> profiles) {
             this.context = context;
             this.profiles = profiles;
+        }
+
+        public void setActiveProfileId(String activeProfileId) {
+            this.activeProfileId = activeProfileId;
         }
 
         @Override
@@ -736,10 +761,17 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
             TextView nameText = convertView.findViewById(R.id.profile_name);
             TextView descText = convertView.findViewById(R.id.profile_description);
             TextView countText = convertView.findViewById(R.id.profile_count);
+            boolean isActive = profile.id != null && profile.id.equals(activeProfileId);
 
-            nameText.setText(profile.name);
+            nameText.setText(isActive ? profile.name + " (Active)" : profile.name);
             descText.setText(profile.description);
-            countText.setText(profile.getShortcutCount() + " shortcuts");
+            if (isActive) {
+                countText.setText("ACTIVE - " + profile.getShortcutCount() + " shortcuts");
+                countText.setBackgroundColor(ContextCompat.getColor(context, R.color.primary));
+            } else {
+                countText.setText(profile.getShortcutCount() + " shortcuts");
+                countText.setBackgroundColor(ContextCompat.getColor(context, R.color.primary));
+            }
 
             return convertView;
         }

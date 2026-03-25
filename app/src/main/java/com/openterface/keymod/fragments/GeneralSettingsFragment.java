@@ -9,6 +9,8 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.Spinner;
 import android.widget.ArrayAdapter;
+import android.widget.SeekBar;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -29,12 +31,15 @@ public class GeneralSettingsFragment extends Fragment {
     private static final String PREF_KEEP_SCREEN_ON = "keep_screen_on";
     private static final String PREF_HAPTIC_FEEDBACK = "haptic_feedback";
     private static final String PREF_ORIENTATION_LOCK = "orientation_lock";
+    private static final String PREF_TOUCHPAD_SCROLL_SENSITIVITY = "touchpad_scroll_sensitivity";
 
     private CheckBox autoConnectCheckBox;
     private CheckBox keepScreenOnCheckBox;
     private CheckBox hapticFeedbackCheckBox;
     private CheckBox orientationLockCheckBox;
     private Spinner languageSpinner;
+    private SeekBar touchpadScrollSensitivitySeekBar;
+    private TextView touchpadScrollSensitivityValueText;
 
     private SharedPreferences prefs;
 
@@ -59,6 +64,8 @@ public class GeneralSettingsFragment extends Fragment {
         hapticFeedbackCheckBox = view.findViewById(R.id.haptic_feedback_checkbox);
         orientationLockCheckBox = view.findViewById(R.id.orientation_lock_checkbox);
         languageSpinner = view.findViewById(R.id.language_spinner);
+        touchpadScrollSensitivitySeekBar = view.findViewById(R.id.touchpad_scroll_sensitivity_seekbar);
+        touchpadScrollSensitivityValueText = view.findViewById(R.id.touchpad_scroll_sensitivity_value_text);
         
         // Setup language spinner
         String[] languages = {"English", "中文 (Chinese)", "Español", "Français"};
@@ -77,6 +84,12 @@ public class GeneralSettingsFragment extends Fragment {
         // Load language preference
         int languageIndex = prefs.getInt("language_index", 0);
         languageSpinner.setSelection(languageIndex);
+
+        // Sensitivity is stored as an int percentage from 20..200; 100 means 1.0x.
+        int sensitivityPercent = prefs.getInt(PREF_TOUCHPAD_SCROLL_SENSITIVITY, 100);
+        int seekProgress = Math.max(0, Math.min(180, sensitivityPercent - 20));
+        touchpadScrollSensitivitySeekBar.setProgress(seekProgress);
+        touchpadScrollSensitivityValueText.setText(String.format("%.1fx", sensitivityPercent / 100f));
     }
 
     private void setupListeners() {
@@ -111,6 +124,22 @@ public class GeneralSettingsFragment extends Fragment {
 
             @Override
             public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
+
+        touchpadScrollSensitivitySeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int sensitivityPercent = progress + 20;
+                float multiplier = sensitivityPercent / 100f;
+                touchpadScrollSensitivityValueText.setText(String.format("%.1fx", multiplier));
+                prefs.edit().putInt(PREF_TOUCHPAD_SCROLL_SENSITIVITY, sensitivityPercent).apply();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
         });
     }
 }

@@ -10,8 +10,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.ImageButton;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -30,10 +29,10 @@ public class MouseFragment extends Fragment {
     private static final String TAG = "MouseFragment";
     private TouchPadView touchPad;
     public UsbSerialPort port;
-    private Button leftClickButton, rightClickButton;
-    private ImageButton slideUpButton, slideDownButton;
+    private TextView touchPadTips;
     private BluetoothService bluetoothService;
     private boolean isServiceBound;
+    private boolean isDragMode = false;
 
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         @Override
@@ -118,12 +117,30 @@ public class MouseFragment extends Fragment {
         }
     }
 
-    public void sendScrollData(int deltaX, int deltaY) {
+    private void setDragMode(boolean enabled) {
+        isDragMode = enabled;
+        sendMouseButtonState(enabled ? 0x01 : 0x00);
+        updateTouchPadTips();
+        Log.d(TAG, "Drag mode " + (enabled ? "ON" : "OFF"));
+    }
+
+    private void updateTouchPadTips() {
+        if (touchPadTips == null) return;
+        String status = isDragMode ? "Drag Mode ON" : "Drag Mode OFF";
+        String tips = "Touch Pad\n"
+                + status + "\n"
+                + "Single tap -> Click\n"
+                + "Double tap -> Double click\n"
+                + "Two finger tap -> Right click\n"
+                + "Two finger drag -> Scroll\n"
+                + "Long press -> Toggle drag mode";
+        touchPadTips.setText(tips);
+    }
+
+    private void sendMouseButtonState(int buttonMask) {
         new Thread(() -> {
             try {
-                String scrollByte = deltaY == 0 ? "00"
-                        : deltaY > 0 ? String.format("%02X", Math.min(deltaY, 0x7F))
-                        : String.format("%02X", 0x100 + Math.max(deltaY, -0x7F));
+                String buttonByte = String.format("%02X", buttonMask & 0xFF);
                 String sendMSData =
                         CH9329MSKBMap.getKeyCodeMap().get("prefix1") +
                         CH9329MSKBMap.getKeyCodeMap().get("prefix2") +
@@ -131,13 +148,62 @@ public class MouseFragment extends Fragment {
                         CH9329MSKBMap.CmdData().get("CmdMS_REL") +
                         CH9329MSKBMap.DataLen().get("DataLenRelMS") +
                         CH9329MSKBMap.MSRelData().get("FirstData") +
-                        "00" + "00" + "00" + scrollByte;
+                        buttonByte + "00" + "00" + "00";
                 sendMSData += makeChecksum(sendMSData);
                 byte[] bytes = hexStringToByteArray(sendMSData);
                 if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
                     bluetoothService.sendData(bytes);
                 } else if (port != null) {
                     port.write(bytes, 20);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error sending mouse button state: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    public void sendScrollData(int deltaX, int deltaY) {
+        new Thread(() -> {
+            try {
+                // Skip empty scroll events.
+                if (deltaX == 0 && deltaY == 0) return;
+
+                String base =
+                        CH9329MSKBMap.getKeyCodeMap().get("prefix1") +
+                        CH9329MSKBMap.getKeyCodeMap().get("prefix2") +
+                        CH9329MSKBMap.getKeyCodeMap().get("address") +
+                        CH9329MSKBMap.CmdData().get("CmdMS_REL") +
+                        CH9329MSKBMap.DataLen().get("DataLenRelMS") +
+                        CH9329MSKBMap.MSRelData().get("FirstData") +
+                        "00"; // no button
+
+                if (deltaY != 0) {
+                    String wheelByte = deltaY > 0
+                            ? String.format("%02X", Math.min(deltaY, 0x7F))
+                            : String.format("%02X", 0x100 + Math.max(deltaY, -0x7F));
+                    String packet = base + "00" + "00" + wheelByte;
+                    packet += makeChecksum(packet);
+                    byte[] bytes = hexStringToByteArray(packet);
+                    if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                        bluetoothService.sendData(bytes);
+                    } else if (port != null) {
+                        port.write(bytes, 20);
+                    }
+                }
+
+                if (deltaX != 0) {
+                    int boundedX = Math.max(-127, Math.min(127, deltaX));
+                    String xByte = boundedX >= 0
+                            ? String.format("%02X", boundedX)
+                            : String.format("%02X", 0x100 + boundedX);
+                    String packet = base + xByte + "00" + "00";
+                    packet += makeChecksum(packet);
+                    byte[] bytes = hexStringToByteArray(packet);
+                    if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                        bluetoothService.sendData(bytes);
+                    } else if (port != null) {
+                        port.write(bytes, 20);
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error sending scroll data: " + e.getMessage());
@@ -177,6 +243,7 @@ public class MouseFragment extends Fragment {
                     yByte = String.format("%02X", 0x100 + yMovement);
                 }
 
+                String buttonByte = isDragMode ? "01" : CH9329MSKBMap.MSAbsData().get("SecNullData");
                 String sendMSData =
                         CH9329MSKBMap.getKeyCodeMap().get("prefix1") +
                                 CH9329MSKBMap.getKeyCodeMap().get("prefix2") +
@@ -184,7 +251,7 @@ public class MouseFragment extends Fragment {
                                 CH9329MSKBMap.CmdData().get("CmdMS_REL") +
                                 CH9329MSKBMap.DataLen().get("DataLenRelMS") +
                                 CH9329MSKBMap.MSRelData().get("FirstData") +
-                                CH9329MSKBMap.MSAbsData().get("SecNullData") +
+                        buttonByte +
                                 xByte +
                                 yByte +
                                 CH9329MSKBMap.DataNull().get("DataNull");
@@ -230,90 +297,8 @@ public class MouseFragment extends Fragment {
         Intent intent = new Intent(requireContext(), BluetoothService.class);
         requireContext().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
 
-        leftClickButton = view.findViewById(R.id.leftClickButton);
-        rightClickButton = view.findViewById(R.id.rightClickButton);
-        slideDownButton = view.findViewById(R.id.slideDownButton);
-        slideUpButton = view.findViewById(R.id.slideUpButton);
-
-        leftClickButton.setOnClickListener(v -> {
-            Log.d(TAG, "Left Click Button Pressed");
-            try {
-                String sendKBData = "57AB0005050101000000";
-                sendKBData += makeChecksum(sendKBData);
-                byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
-                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-                    bluetoothService.sendData(sendKBDataBytes);
-                    Log.d(TAG, "Sent Bluetooth left click data: " + sendKBData);
-                } else if (port != null) {
-                    port.write(sendKBDataBytes, 20);
-                    Log.d(TAG, "Sent USB left click data: " + sendKBData);
-                } else {
-                    Log.w(TAG, "No connection available for left click");
-                }
-            } catch (IOException e) {
-                Log.e(TAG, "Error sending left click data: " + e.getMessage());
-            }
-        });
-
-        rightClickButton.setOnClickListener(v -> {
-            Log.d(TAG, "Right Click Button Pressed");
-            try {
-                String sendKBData = "57AB0005050102000000";
-                sendKBData += makeChecksum(sendKBData);
-                byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
-                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-                    bluetoothService.sendData(sendKBDataBytes);
-                    Log.d(TAG, "Sent Bluetooth right click data: " + sendKBData);
-                } else if (port != null) {
-                    port.write(sendKBDataBytes, 20);
-                    Log.d(TAG, "Sent USB right click data: " + sendKBData);
-                } else {
-                    Log.w(TAG, "No connection available for right click");
-                }
-            } catch (IOException e) {
-                Log.e(TAG, "Error sending right click data: " + e.getMessage());
-            }
-        });
-
-        slideDownButton.setOnClickListener(v -> {
-            Log.d(TAG, "Slide Down Button Pressed");
-            try {
-                String sendKBData = "57AB00050501000000FF";
-                sendKBData += makeChecksum(sendKBData);
-                byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
-                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-                    bluetoothService.sendData(sendKBDataBytes);
-                    Log.d(TAG, "Sent Bluetooth slide down data: " + sendKBData);
-                } else if (port != null) {
-                    port.write(sendKBDataBytes, 20);
-                    Log.d(TAG, "Sent USB slide down data: " + sendKBData);
-                } else {
-                    Log.w(TAG, "No connection available for slide down");
-                }
-            } catch (IOException e) {
-                Log.e(TAG, "Error sending slide down data: " + e.getMessage());
-            }
-        });
-
-        slideUpButton.setOnClickListener(v -> {
-            Log.d(TAG, "Slide Up Button Pressed");
-            try {
-                String sendKBData = "57AB0005050100000001";
-                sendKBData += makeChecksum(sendKBData);
-                byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
-                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-                    bluetoothService.sendData(sendKBDataBytes);
-                    Log.d(TAG, "Sent Bluetooth slide up data: " + sendKBData);
-                } else if (port != null) {
-                    port.write(sendKBDataBytes, 20);
-                    Log.d(TAG, "Sent USB slide up data: " + sendKBData);
-                } else {
-                    Log.w(TAG, "No connection available for slide up");
-                }
-            } catch (IOException e) {
-                Log.e(TAG, "Error sending slide up data: " + e.getMessage());
-            }
-        });
+        touchPadTips = view.findViewById(R.id.touchPadTips);
+        updateTouchPadTips();
 
         touchPad = view.findViewById(R.id.touchPad);
         if (touchPad != null) {
@@ -393,6 +378,19 @@ public class MouseFragment extends Fragment {
                         }
                     }).start();
                 }
+
+                @Override
+                public void onTouchLongPress() {
+                    setDragMode(!isDragMode);
+                }
+
+                @Override
+                public void onTouchRelease() {
+                    // Match iOS behavior: release only when drag mode is off.
+                    if (!isDragMode) {
+                        releaseAllMSData();
+                    }
+                }
             });
         }
 
@@ -406,6 +404,7 @@ public class MouseFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        setDragMode(false);
         if (isServiceBound) {
             requireContext().unbindService(serviceConnection);
             isServiceBound = false;

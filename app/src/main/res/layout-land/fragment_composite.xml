@@ -1,102 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/composite_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:background="@color/background_light">
 
-    <!-- Mouse Section (30% width) -->
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="3"
+        android:id="@+id/touchpad_section"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="2"
         android:orientation="vertical">
 
-        <!-- Mouse Control Buttons -->
-        <LinearLayout
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="2"
-            android:orientation="horizontal">
+            android:layout_height="match_parent">
 
-            <Button
-                android:id="@+id/leftClickButton"
-                android:layout_width="0dp"
+            <com.openterface.keymod.TouchPadView
+                android:id="@+id/touchPad"
+                android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:layout_weight="4"
-                android:background="@drawable/key_background"
-                android:text="Left"
-                android:textColor="@color/button_text"
-                android:textStyle="bold"
-                android:theme="@style/ButtonTheme"/>
+                android:background="@color/touchpad_background"/>
 
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="2"
-                android:orientation="vertical">
+            <TextView
+                android:id="@+id/touchPadTips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp"
+                android:padding="12dp"
+                android:background="@android:color/transparent"
+                android:text="Touch Pad&#10;Drag Mode OFF&#10;Single tap -> Click&#10;Double tap -> Double click&#10;Two finger tap -> Right click&#10;Two finger drag -> Scroll&#10;Long press -> Toggle drag mode"/>
 
-                <ImageButton
-                    android:id="@+id/slideUpButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/key_background"
-                    android:theme="@style/ButtonTheme"
-                    android:src="@drawable/chevron_double_up"
-                    android:contentDescription="Scroll Up"/>
-
-                <ImageButton
-                    android:id="@+id/slideDownButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/key_background"
-                    android:theme="@style/ButtonTheme"
-                    android:src="@drawable/chevron_double_down"
-                    android:contentDescription="Scroll Down"/>
-
-            </LinearLayout>
-
-            <Button
-                android:id="@+id/rightClickButton"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="4"
-                android:text="Right"
-                android:textColor="@color/button_text"
-                android:textStyle="bold"
-                android:background="@drawable/key_background"
-                android:theme="@style/ButtonTheme"/>
-
-        </LinearLayout>
-
-        <!-- TouchPad -->
-        <com.openterface.keymod.TouchPadView
-            android:id="@+id/touchPad"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="8"
-            android:background="@color/touchpad_background"/>
+        </FrameLayout>
 
     </LinearLayout>
 
-    <!-- Keyboard Section (70% width) -->
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="7"
-        android:orientation="vertical">
+        android:id="@+id/toggle_handle"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:gravity="center"
+        android:background="@color/background_light"
+        android:clickable="true"
+        android:focusable="true">
 
-        <com.openterface.keymod.CustomKeyboardView
-            android:id="@+id/keyboard_view"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_gravity="center_horizontal"
-            android:keyBackground="@drawable/key_background"
-            android:theme="@style/ButtonTheme"/>
+        <View
+            android:id="@+id/toggle_handle_pill"
+            android:layout_width="40dp"
+            android:layout_height="4dp"
+            android:background="@drawable/toggle_handle_pill"/>
 
     </LinearLayout>
+
+    <com.openterface.keymod.CustomKeyboardView
+        android:id="@+id/keyboard_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:keyBackground="@drawable/key_background"
+        android:theme="@style/ButtonTheme"/>
 
 </LinearLayout>
