@@ -61,7 +61,6 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
     private TextView detailProfileDescription;
     private Button tabMy;
     private LinearLayout tabsContainer;
-    private Button activateButton;
     private GridView shortcutsGridView;
     private TextView emptyMyShortcuts;
 
@@ -114,7 +113,6 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         detailProfileDescription = view.findViewById(R.id.detail_profile_description);
         tabMy = view.findViewById(R.id.tab_my);
         tabsContainer = view.findViewById(R.id.tabs_container);
-        activateButton = view.findViewById(R.id.activate_button);
         shortcutsGridView = view.findViewById(R.id.shortcuts_gridview);
         emptyMyShortcuts = view.findViewById(R.id.empty_my_shortcuts);
 
@@ -171,13 +169,6 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         // Back button - return to profile list
         backButton.setOnClickListener(v -> showProfileList());
 
-        // Activate button - set as active profile
-        activateButton.setOnClickListener(v -> {
-            if (selectedProfile != null) {
-                activateProfile(selectedProfile);
-            }
-        });
-
         // Tab: ⭐ My
         tabMy.setOnClickListener(v -> switchTab(TAB_MY, null));
 
@@ -217,11 +208,6 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
 
         // Load persisted My Shortcuts for this profile
         myShortcutsList = profileManager.getMyShortcuts(profile.id);
-
-        // Update activate button label
-        boolean isActive = activeProfile != null && activeProfile.id.equals(profile.id);
-        activateButton.setText(isActive ? "✓ Active" : "Activate");
-        activateButton.setEnabled(!isActive);
 
         // Build dynamic category tabs
         rebuildCategoryTabs(profile);
@@ -426,26 +412,6 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
 
         Log.d(TAG, "Sent shortcut: " + shortcut.name + " (" + shortcut.label + ")"
                 + " modifiers=" + shortcut.modifiers + " key=" + shortcut.keyCode);
-    }
-
-    private void activateProfile(ShortcutProfile profile) {
-        profileManager.setActiveProfile(profile.id);
-        activeProfile = profile;
-        loadProfiles();
-        updateActiveProfileDisplay();
-
-        // Refresh activate button state if in detail view
-        if (selectedProfile != null && selectedProfile.id.equals(profile.id)) {
-            activateButton.setText("✓ Active");
-            activateButton.setEnabled(false);
-        }
-
-        // Haptic feedback
-        if (vibrator != null && vibrator.hasVibrator()) {
-            vibrator.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE));
-        }
-
-        Toast.makeText(getContext(), "Activated: " + profile.name, Toast.LENGTH_SHORT).show();
     }
 
     private void showCreateProfileDialog() {
