@@ -13,4 +13,11 @@
     <!-- Voice Input Colors -->
     <color name="voice_input_field_background">#FF2C2C2E</color>
     <color name="voice_input_instruction_background">#FF1F2B38</color>
+
+    <!-- Keyboard Colors (Dark) -->
+    <color name="key_bg_normal">#FF3A3A3C</color>
+    <color name="key_bg_function">#FF4A4A4E</color>
+    <color name="key_bg_pressed">#FF6A7EA3</color>
+    <color name="key_border">#FF5A5A5F</color>
+    <color name="key_text">#FFFFFFFF</color>
 </resources>

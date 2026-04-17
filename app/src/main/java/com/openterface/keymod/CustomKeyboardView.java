@@ -6,18 +6,23 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.Intent;
 import android.content.res.Resources;
-import android.graphics.Color;
 import android.os.Handler;
 import android.os.IBinder;
 import android.text.SpannableString;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
+import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+
+import androidx.core.content.ContextCompat;
 
 import com.openterface.target.CH9329MSKBMap;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
@@ -32,18 +37,36 @@ import java.util.List;
 
 public class CustomKeyboardView extends LinearLayout {
     private static final String TAG = "CustomKeyboardView";
+    private static final int TOP_PANEL_COLUMNS = 7;
+    private static final int TOP_PANEL_ROWS = 2;
+    private static final int TOP_PANEL_PAGE_SIZE = TOP_PANEL_COLUMNS * TOP_PANEL_ROWS;
+    private static final float TOP_PANEL_ROW_WEIGHT = 0.8f;
+    private static final float TOP_PANEL_TOTAL_WEIGHT = TOP_PANEL_ROWS * TOP_PANEL_ROW_WEIGHT;
+    private static final int KEY_MODE_SYMBOLS = 0xF001;
+    private static final int KEY_MODE_ABC = 0xF002;
+    private static final int KEY_MODE_NUMBERS_VIEW = 0xF003;
+    private static final int KEY_MODE_SYMBOLS_VIEW = 0xF004;
     private boolean isShiftLeftLocked = false;
     private boolean isCtrlLeftLocked = false;
     private boolean isAltLeftLocked = false;
     private boolean isWinLeftLocked = false;
     private boolean isRunning = true;
     private boolean isSymbolMode = false;
+    private boolean isNumericLayout = false;
+    private boolean isNumberSubview = false;
     private boolean showExtraPortraitKeys = false;
     private List<List<Key>> lowerKeys;
     private UsbSerialPort port;
     private Handler repeatHandler = new Handler();
     private Runnable repeatRunnable;
     private boolean isRepeating = false;
+    private int topPanelPageIndex = 0;
+    private ShortcutProfileManager shortcutProfileManager;
+    private final List<TopShortcutPanel> topShortcutPanels = new ArrayList<>();
+    private FrameLayout topPanelViewport;
+    private LinearLayout previousTopPanelContainer;
+    private LinearLayout activeTopPanelContainer;
+    private LinearLayout nextTopPanelContainer;
 
     private BluetoothService bluetoothService;
     private boolean isServiceBound;
@@ -74,8 +97,12 @@ public class CustomKeyboardView extends LinearLayout {
         int iconResId;
         float horizontalGap;
         boolean isRepeatable;
+        boolean requiresShift;
+        int shortcutModifiers;
+        boolean isTopPanelKey;
 
-        Key(String label, String symbolLabel, int code, String codeStr, float widthPercent, int iconResId, float horizontalGap, boolean isRepeatable) {
+        Key(String label, String symbolLabel, int code, String codeStr, float widthPercent, int iconResId,
+            float horizontalGap, boolean isRepeatable, boolean requiresShift, int shortcutModifiers, boolean isTopPanelKey) {
             this.label = label;
             this.symbolLabel = symbolLabel;
             this.code = code;
@@ -84,6 +111,27 @@ public class CustomKeyboardView extends LinearLayout {
             this.iconResId = iconResId;
             this.horizontalGap = horizontalGap;
             this.isRepeatable = isRepeatable;
+            this.requiresShift = requiresShift;
+            this.shortcutModifiers = shortcutModifiers;
+            this.isTopPanelKey = isTopPanelKey;
+        }
+
+        Key(String label, String symbolLabel, int code, String codeStr, float widthPercent, int iconResId, float horizontalGap, boolean isRepeatable, boolean requiresShift) {
+            this(label, symbolLabel, code, codeStr, widthPercent, iconResId, horizontalGap, isRepeatable, requiresShift, -1, false);
+        }
+
+        Key(String label, String symbolLabel, int code, String codeStr, float widthPercent, int iconResId, float horizontalGap, boolean isRepeatable) {
+            this(label, symbolLabel, code, codeStr, widthPercent, iconResId, horizontalGap, isRepeatable, false);
+        }
+    }
+
+    private static class TopShortcutPanel {
+        String title;
+        List<Key> keys;
+
+        TopShortcutPanel(String title, List<Key> keys) {
+            this.title = title;
+            this.keys = keys;
         }
     }
 
@@ -98,16 +146,15 @@ public class CustomKeyboardView extends LinearLayout {
         
         // Reload keyboard layout when orientation changes
         boolean isLandscape = newConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
-        int keyboardResId = isLandscape ? R.xml.keyboard_lower_landscape : R.xml.keyboard_lower_portrait;
-        
         Log.d(TAG, "Orientation changed: landscape=" + isLandscape + ", reloading keyboard");
-        lowerKeys = parseKeyboard(getContext(), keyboardResId);
+        loadKeyboardForCurrentState(getContext());
         removeAllViews();
         updateKeyboard();
     }
 
     private void init(Context context) {
         setOrientation(VERTICAL);
+        shortcutProfileManager = new ShortcutProfileManager(context.getApplicationContext());
         
         // Load keyboard layout based on orientation (matching iOS behavior)
         reloadForCurrentOrientation();
@@ -119,17 +166,36 @@ public class CustomKeyboardView extends LinearLayout {
 
     public void reloadForCurrentOrientation() {
         Context context = getContext();
-        int keyboardResId = isLandscape(context)
-                ? R.xml.keyboard_lower_landscape
-                : R.xml.keyboard_lower_portrait;
-        lowerKeys = parseKeyboard(context, keyboardResId);
+        loadKeyboardForCurrentState(context);
         removeAllViews();
         updateKeyboard();
+    }
+
+    private void loadKeyboardForCurrentState(Context context) {
+        int keyboardResId;
+        if (isLandscape(context)) {
+            keyboardResId = R.xml.keyboard_lower_landscape;
+        } else {
+            if (!isNumericLayout) {
+                keyboardResId = R.xml.keyboard_lower_portrait;
+            } else {
+                keyboardResId = isNumberSubview
+                        ? R.xml.keyboard_lower_portrait_symbols_alt
+                        : R.xml.keyboard_lower_portrait_symbols;
+            }
+        }
+        lowerKeys = parseKeyboard(context, keyboardResId);
     }
 
     public void setShowExtraPortraitKeys(boolean enabled) {
         if (showExtraPortraitKeys == enabled) return;
         showExtraPortraitKeys = enabled;
+        // Switching to fullscreen keyboard mode: exit numeric/symbol subview
+        if (enabled && isNumericLayout) {
+            isNumericLayout = false;
+            isNumberSubview = false;
+            loadKeyboardForCurrentState(getContext());
+        }
         removeAllViews();
         updateKeyboard();
     }
@@ -247,6 +313,12 @@ public class CustomKeyboardView extends LinearLayout {
                             isRepeatable = Boolean.parseBoolean(isRepeatableStr);
                         }
 
+                        String requiresShiftStr = parser.getAttributeValue(CUSTOM_NS, "keyRequiresShift");
+                        boolean requiresShift = false;
+                        if (requiresShiftStr != null) {
+                            requiresShift = Boolean.parseBoolean(requiresShiftStr);
+                        }
+
                         int iconResId = 0;
                         if (label.equals("Win")) {
                             iconResId = R.drawable.windows;
@@ -269,7 +341,7 @@ public class CustomKeyboardView extends LinearLayout {
                         }
 
 //                        Log.d(TAG,"Parsed Key: label=" + label + ", symbolLabel=" + symbolLabel + ", code=0x" + Integer.toHexString(code).toUpperCase() + ", codeStr=" + codeStr + ", width=" + widthPercent + ", icon=" + iconResId + ", gap=" + horizontalGap + ", repeatable=" + isRepeatable);
-                        currentRow.add(new Key(label, symbolLabel, code, codeStr, widthPercent, iconResId, horizontalGap, isRepeatable));
+                        currentRow.add(new Key(label, symbolLabel, code, codeStr, widthPercent, iconResId, horizontalGap, isRepeatable, requiresShift));
                     }
                 } else if (eventType == XmlPullParser.END_TAG) {
                     if ("Row".equals(parser.getName()) && currentRow != null) {
@@ -295,6 +367,12 @@ public class CustomKeyboardView extends LinearLayout {
 
     private void updateKeyboard() {
         removeAllViews();
+
+        if (isNumericLayout && isNumberSubview) {
+            buildNumberPadLayout();
+            return;
+        }
+
         List<List<Key>> currentKeys = lowerKeys;
 
         // In fullscreen keyboard mode, hide arrow keys from the main keyboard area.
@@ -319,6 +397,11 @@ public class CustomKeyboardView extends LinearLayout {
             currentKeys = filtered;
         }
 
+        // Show two shortcut rows above letter keyboard (hidden in fullscreen mode)
+        if (!showExtraPortraitKeys && !isLandscape(getContext()) && !isNumericLayout) {
+            addTopFunctionRows();
+        }
+
         String[] functionalKeyCodes = {"46", "47", "48", "49", "4A", "4B", "4C", "4D", "4E", "3B", "3C", "3D", "3E", "3F", "29", "3A", "40", "41", "42", "43", "44", "45", "3D", "3F"};
 
         for (List<Key> row : currentKeys) {
@@ -337,10 +420,11 @@ public class CustomKeyboardView extends LinearLayout {
                 View button;
                 float weight = key.widthPercent / 10.0f;
                 LayoutParams params = new LayoutParams(0, LayoutParams.MATCH_PARENT, weight);
-                params.setMargins(2, 2, 2, 2);
+                int keyMargin = dpToPx(4);
+                params.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
 
                 if (key.horizontalGap > 0) {
-                    params.setMargins((int)(key.horizontalGap * getContext().getResources().getDisplayMetrics().widthPixels / 100), 2, 2, 2);
+                    params.setMargins((int)(key.horizontalGap * getContext().getResources().getDisplayMetrics().widthPixels / 100), keyMargin, keyMargin, keyMargin);
                 }
 
                 boolean isFunctionalKey = false;
@@ -365,6 +449,9 @@ public class CustomKeyboardView extends LinearLayout {
                     if (key.iconResId != 0) {
                         imageButton.setImageResource(key.iconResId);
                         imageButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
+                        if ("Win".equals(key.label) || "BackSpace".equals(key.label)) {
+                            imageButton.setColorFilter(resolveThemeTextColor());
+                        }
                     }
                     imageButton.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
                     button = imageButton;
@@ -380,7 +467,13 @@ public class CustomKeyboardView extends LinearLayout {
                         textButton.setBackgroundResource(R.drawable.function_button_background);
                     } else if (key.code == 0xE1 && isShiftLeftLocked) {
                         textButton.setBackgroundResource(R.drawable.press_button_background);
-                        textButton.setSelected(isSymbolMode);
+                        textButton.setSelected(isShiftLeftLocked);
+                    } else if (key.code == KEY_MODE_SYMBOLS && isNumericLayout) {
+                        textButton.setBackgroundResource(R.drawable.press_button_background);
+                    } else if (key.code == KEY_MODE_NUMBERS_VIEW && isNumericLayout && isNumberSubview) {
+                        textButton.setBackgroundResource(R.drawable.press_button_background);
+                    } else if (key.code == KEY_MODE_SYMBOLS_VIEW && isNumericLayout && !isNumberSubview) {
+                        textButton.setBackgroundResource(R.drawable.press_button_background);
                     } else if (key.code == 0xE0 && isCtrlLeftLocked) {
                         textButton.setBackgroundResource(R.drawable.press_button_background);
                     } else if (key.code == 0xE2 && isAltLeftLocked) {
@@ -392,8 +485,9 @@ public class CustomKeyboardView extends LinearLayout {
                     if (key.iconResId == 0 && !key.label.isEmpty()) {
                         String displayLabel = key.label;
                         String symbolLabel = key.symbolLabel;
+                        boolean showAlternateLabel = isShiftLeftLocked || isSymbolMode;
 
-                        if (!isSymbolMode && displayLabel.contains("\n")) {
+                        if (!showAlternateLabel && displayLabel.contains("\n")) {
                             String[] parts = displayLabel.split("\n");
                             if (parts.length == 2) {
                                 symbolLabel = parts[0];
@@ -402,10 +496,11 @@ public class CustomKeyboardView extends LinearLayout {
                             String combinedText = symbolLabel + "\n" + displayLabel;
                             SpannableString spannable = new SpannableString(combinedText);
                             textButton.setText(spannable);
+                            textButton.setTextColor(resolveThemeTextColor());
                             Log.d(TAG, "Applied Spannable: combinedText=" + combinedText + ", symbolLabel=" + symbolLabel + ", displayLabel=" + displayLabel);
                         } else {
-                            textButton.setText(isSymbolMode && !symbolLabel.isEmpty() ? symbolLabel : displayLabel);
-                            textButton.setTextColor(Color.BLACK);
+                            textButton.setText(showAlternateLabel && !symbolLabel.isEmpty() ? symbolLabel : displayLabel);
+                            textButton.setTextColor(resolveThemeTextColor());
                         }
                     }
 
@@ -418,18 +513,18 @@ public class CustomKeyboardView extends LinearLayout {
 
                 button.setOnClickListener(v -> handleKeyPress(key));
 
-                // Add touch listener to handle key release on all buttons
+                // Add touch listener to handle key release on all buttons.
+                // Repeatable keys (e.g. BackSpace) must also send release, otherwise they can remain stuck.
                 button.setOnTouchListener((v, event) -> {
-                    if (event.getAction() == MotionEvent.ACTION_UP) {
+                    int action = event.getAction();
+                    if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
                         if (key.isRepeatable) {
                             stopRepeatingDelete();
-                        } else {
-                            // Send key release after short delay for regular keys
-                            repeatHandler.postDelayed(() -> {
-                                sendReleaseData();
-                                Log.d(TAG, "Sent key release for: " + key.label);
-                            }, 30);
                         }
+                        repeatHandler.postDelayed(() -> {
+                            sendReleaseData();
+                            Log.d(TAG, "Sent key release for: " + key.label);
+                        }, 30);
                     }
                     return false;
                 });
@@ -448,6 +543,594 @@ public class CustomKeyboardView extends LinearLayout {
         if (showExtraPortraitKeys && !isLandscape(getContext())) {
             addExtraPortraitKeys();
         }
+    }
+
+    /** Attaches click + touch + long-click listeners to a key view. */
+    private void attachKeyListeners(View btn, Key key) {
+        btn.setOnClickListener(v -> handleKeyPress(key));
+        btn.setOnTouchListener((v, event) -> {
+            int action = event.getAction();
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                if (key.isRepeatable) stopRepeatingDelete();
+                repeatHandler.postDelayed(() -> sendReleaseData(), 30);
+            }
+            return false;
+        });
+        if (key.isRepeatable) {
+            btn.setOnLongClickListener(v -> {
+                startRepeatingDelete(key);
+                return true;
+            });
+        }
+    }
+
+    /**
+     * Builds the number-pad subview as a custom nested layout:
+     *   Top section (weight 3): left operator panel (+,-,*,/) + number grid (1-9 + right column)
+     *   Bottom row (weight 1): ABC , !?# 0 = . Enter
+     */
+    private void buildNumberPadLayout() {
+        int m = dpToPx(4);
+
+        // Single horizontal section: op panel (left, weight 1) + num grid (right, weight 9)
+        LinearLayout mainSection = new LinearLayout(getContext());
+        mainSection.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1.0f));
+        mainSection.setOrientation(LinearLayout.HORIZONTAL);
+
+        // ── Left panel: +, -, *, ABC (4 equal rows) ──────────────────
+        LinearLayout opPanel = new LinearLayout(getContext());
+        opPanel.setLayoutParams(new LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
+        opPanel.setOrientation(LinearLayout.VERTICAL);
+
+        // Row 4 of op panel is ABC (function); rows 1-3 are +, -, *
+        String[] opLabels   = {"+", "-", "*", "ABC"};
+        int[]    opCodes    = {0x2E, 0x2D, 0x25, 0xF002};
+        String[] opCodeStrs = {"2E",  "2D",  "25",  "F002"};
+        boolean[] opShift   = {true,  false, true,  false};
+        boolean[] opIsFn    = {false, false, false, true};
+        for (int i = 0; i < opLabels.length; i++) {
+            Key k = new Key(opLabels[i], "", opCodes[i], opCodeStrs[i], 10.0f, 0, 0f, false, opShift[i]);
+            Button btn = new Button(getContext());
+            LayoutParams p = new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1.0f);
+            p.setMargins(m, m, m, m);
+            btn.setLayoutParams(p);
+            btn.setBackgroundResource(opIsFn[i]
+                    ? R.drawable.function_button_background
+                    : R.drawable.key_background);
+            btn.setGravity(Gravity.CENTER);
+            btn.setTextSize(12);
+            btn.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
+            btn.setText(k.label);
+            btn.setTextColor(resolveThemeTextColor());
+            attachKeyListeners(btn, k);
+            opPanel.addView(btn);
+        }
+        mainSection.addView(opPanel);
+
+        // ── Number grid: 4 equal rows ─────────────────────────────────
+        // Right column (%, Space, ⌫, Enter) all have weight 1 → same column width.
+        // Number keys have weight 2. Row 4: [/(w2), 0(w2), !?#(w2), Enter(w1)]
+        // so 0 sits directly under 8.
+        LinearLayout numGrid = new LinearLayout(getContext());
+        numGrid.setLayoutParams(new LayoutParams(0, LayoutParams.MATCH_PARENT, 9.0f));
+        numGrid.setOrientation(LinearLayout.VERTICAL);
+
+        Key[][] numRows = {
+            {
+                new Key("1", "", 0x1E, "1E", 20.0f, 0, 0f, false),
+                new Key("2", "", 0x1F, "1F", 20.0f, 0, 0f, false),
+                new Key("3", "", 0x20, "20", 20.0f, 0, 0f, false),
+                new Key("%", "", 0x22, "22", 10.0f, 0, 0f, false, true)
+            },
+            {
+                new Key("4", "", 0x21, "21", 20.0f, 0, 0f, false),
+                new Key("5", "", 0x22, "22", 20.0f, 0, 0f, false),
+                new Key("6", "", 0x23, "23", 20.0f, 0, 0f, false),
+                new Key("Space", "", 0x2C, "2C", 10.0f, 0, 0f, false)
+            },
+            {
+                new Key("7", "", 0x24, "24", 20.0f, 0, 0f, false),
+                new Key("8", "", 0x25, "25", 20.0f, 0, 0f, false),
+                new Key("9", "", 0x26, "26", 20.0f, 0, 0f, false),
+                new Key("BackSpace", "", 0x2A, "2A", 10.0f, R.drawable.backspace, 0f, true)
+            },
+            {
+                // / under 7, 0 under 8 (same weight=2), !?# under 9, Enter in right col
+                new Key("/",    "", 0x38,   "38",   20.0f, 0, 0f, false),
+                new Key("0",    "", 0x27,   "27",   20.0f, 0, 0f, false),
+                new Key("!?#",  "", 0xF004, "F004", 20.0f, 0, 0f, false),
+                new Key("Enter","", 0x28,   "28",   10.0f, 0, 0f, false)
+            }
+        };
+
+        for (Key[] rowKeys : numRows) {
+            LinearLayout rowLayout = new LinearLayout(getContext());
+            rowLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1.0f));
+            rowLayout.setOrientation(LinearLayout.HORIZONTAL);
+            for (Key k : rowKeys) {
+                float weight = k.widthPercent / 10.0f;
+                LayoutParams p = new LayoutParams(0, LayoutParams.MATCH_PARENT, weight);
+                p.setMargins(m, m, m, m);
+                View btn;
+                if ("BackSpace".equals(k.label)) {
+                    ImageButton ib = new ImageButton(getContext());
+                    ib.setLayoutParams(p);
+                    ib.setBackgroundResource(R.drawable.key_background);
+                    ib.setImageResource(k.iconResId);
+                    ib.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
+                    ib.setColorFilter(resolveThemeTextColor());
+                    ib.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
+                    attachKeyListeners(ib, k);
+                    btn = ib;
+                } else {
+                    Button b = new Button(getContext());
+                    b.setLayoutParams(p);
+                    b.setGravity(Gravity.CENTER);
+                    b.setTextSize(12);
+                    b.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
+                    b.setText(k.label);
+                    b.setTextColor(resolveThemeTextColor());
+                    if ("Space".equals(k.label) || k.code == 0xF004 || k.code == 0x28) {
+                        b.setBackgroundResource(R.drawable.function_button_background);
+                    } else {
+                        b.setBackgroundResource(R.drawable.key_background);
+                    }
+                    attachKeyListeners(b, k);
+                    btn = b;
+                }
+                rowLayout.addView(btn);
+            }
+            numGrid.addView(rowLayout);
+        }
+        mainSection.addView(numGrid);
+        addView(mainSection);
+    }
+
+    /**
+     * Adds two compact shortcut rows above the letter keyboard.
+     * Row 1: ESC / - HOME ↑ END PGUP
+     * Row 2: ⇥ CTRL ALT ← ↓ → PGDN
+     */
+    private void addTopFunctionRows() {
+        rebuildTopShortcutPanels();
+        if (topShortcutPanels.isEmpty()) {
+            return;
+        }
+
+        if (topPanelPageIndex < 0) {
+            topPanelPageIndex = 0;
+        }
+        if (topPanelPageIndex >= topShortcutPanels.size()) {
+            topPanelPageIndex = topShortcutPanels.size() - 1;
+        }
+
+        FrameLayout viewport = new FrameLayout(getContext());
+        viewport.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, TOP_PANEL_TOTAL_WEIGHT));
+        topPanelViewport = viewport;
+        initializeTopPanelViewport();
+        addView(viewport);
+    }
+
+    private void initializeTopPanelViewport() {
+        if (topPanelViewport == null) {
+            return;
+        }
+
+        topPanelViewport.removeAllViews();
+        previousTopPanelContainer = createTopShortcutPanelView();
+        activeTopPanelContainer = createTopShortcutPanelView();
+        nextTopPanelContainer = createTopShortcutPanelView();
+        topPanelViewport.addView(previousTopPanelContainer);
+        topPanelViewport.addView(activeTopPanelContainer);
+        topPanelViewport.addView(nextTopPanelContainer);
+        syncTopPanelViewportContent();
+        topPanelViewport.post(() -> resetTopPanelPositions(0f));
+    }
+
+    private void syncTopPanelViewportContent() {
+        bindTopShortcutPanelView(previousTopPanelContainer,
+                topPanelPageIndex > 0 ? topShortcutPanels.get(topPanelPageIndex - 1) : null);
+        bindTopShortcutPanelView(activeTopPanelContainer, topShortcutPanels.get(topPanelPageIndex));
+        bindTopShortcutPanelView(nextTopPanelContainer,
+                topPanelPageIndex < topShortcutPanels.size() - 1 ? topShortcutPanels.get(topPanelPageIndex + 1) : null);
+        activeTopPanelContainer.bringToFront();
+    }
+
+    private LinearLayout createTopShortcutPanelView() {
+        LinearLayout topPanelContainer = new LinearLayout(getContext());
+        topPanelContainer.setLayoutParams(new FrameLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.MATCH_PARENT
+        ));
+        topPanelContainer.setOrientation(VERTICAL);
+        topPanelContainer.setOnTouchListener(createTopPanelTouchListener(null));
+        return topPanelContainer;
+    }
+
+    private void bindTopShortcutPanelView(LinearLayout topPanelContainer, TopShortcutPanel panel) {
+        if (topPanelContainer == null) {
+            return;
+        }
+        topPanelContainer.removeAllViews();
+        if (panel == null) {
+            topPanelContainer.setVisibility(View.INVISIBLE);
+            return;
+        }
+        topPanelContainer.setVisibility(View.VISIBLE);
+        addShortcutPanelRows(topPanelContainer, panel.keys);
+    }
+
+    private void rebuildTopShortcutPanels() {
+        topShortcutPanels.clear();
+        topShortcutPanels.add(new TopShortcutPanel("Standard", buildStandardTopPanelKeys()));
+
+        if (shortcutProfileManager == null) {
+            return;
+        }
+
+        ShortcutProfileManager.ShortcutProfile defaultProfile = shortcutProfileManager.getProfileById("default");
+        addProfilePanels(defaultProfile, "Default");
+
+        List<ShortcutProfileManager.ShortcutProfile> allProfiles = shortcutProfileManager.getAllProfiles();
+        for (ShortcutProfileManager.ShortcutProfile profile : allProfiles) {
+            if (profile == null || "default".equals(profile.id)) {
+                continue;
+            }
+            addProfilePanels(profile, profile.name);
+        }
+    }
+
+    private void addProfilePanels(ShortcutProfileManager.ShortcutProfile profile, String panelName) {
+        if (profile == null) {
+            return;
+        }
+
+        List<ShortcutProfileManager.Shortcut> source = shortcutProfileManager.getMyShortcuts(profile.id);
+        if (source == null || source.isEmpty()) {
+            source = profile.getAllShortcutsFlat();
+        }
+        if (source == null || source.isEmpty()) {
+            return;
+        }
+
+        for (int i = 0; i < source.size(); i += TOP_PANEL_PAGE_SIZE) {
+            int end = Math.min(i + TOP_PANEL_PAGE_SIZE, source.size());
+            List<Key> panelKeys = new ArrayList<>();
+            for (int j = i; j < end; j++) {
+                ShortcutProfileManager.Shortcut shortcut = source.get(j);
+                if (shortcut == null) {
+                    continue;
+                }
+                String label = compactShortcutName(shortcut);
+                String symbol = compactShortcutSymbol(shortcut);
+                panelKeys.add(new Key(
+                        label,
+                        symbol,
+                        shortcut.keyCode,
+                        String.format("%02X", shortcut.keyCode),
+                        1f,
+                        0,
+                        0f,
+                        false,
+                        false,
+                        shortcut.modifiers,
+                        true
+                ));
+            }
+
+            if (!panelKeys.isEmpty()) {
+                int page = (i / TOP_PANEL_PAGE_SIZE) + 1;
+                int totalPages = (int) Math.ceil((double) source.size() / TOP_PANEL_PAGE_SIZE);
+                String title = totalPages > 1
+                        ? panelName + " " + page + "/" + totalPages
+                        : panelName;
+                topShortcutPanels.add(new TopShortcutPanel(title, panelKeys));
+            }
+        }
+    }
+
+    private List<Key> buildStandardTopPanelKeys() {
+        List<Key> keys = new ArrayList<>(TOP_PANEL_PAGE_SIZE);
+        keys.add(new Key("ESC",  "", 0x29, "29", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("/",    "", 0x38, "38", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("-",    "", 0x2D, "2D", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("HOME", "", 0x4A, "4A", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("\u2191", "", 0x52, "52", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("END",  "", 0x4D, "4D", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PGUP", "", 0x4B, "4B", 1f, 0, 0f, false, false, -1, true));
+
+        keys.add(new Key("\u21E5",  "", 0x2B, "2B", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("CTRL",   "", 0xE0, "E0", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("ALT",    "", 0xE2, "E2", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("\u2190", "", 0x50, "50", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("\u2193", "", 0x51, "51", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("\u2192", "", 0x4F, "4F", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PGDN",   "", 0x4E, "4E", 1f, 0, 0f, false, false, -1, true));
+        return keys;
+    }
+
+    private String compactShortcutName(ShortcutProfileManager.Shortcut shortcut) {
+        String label = shortcut.name != null ? shortcut.name : shortcut.label;
+        if (label == null || label.trim().isEmpty()) {
+            label = "Key";
+        }
+        label = label.trim();
+        return label.length() > 8 ? label.substring(0, 8) : label;
+    }
+
+    private String compactShortcutSymbol(ShortcutProfileManager.Shortcut shortcut) {
+        String symbol = shortcut.label != null ? shortcut.label.trim() : "";
+        if (symbol.isEmpty()) {
+            return "";
+        }
+        return symbol.length() > 10 ? symbol.substring(0, 10) : symbol;
+    }
+
+    private void addShortcutPanelRows(LinearLayout parent, List<Key> panelKeys) {
+        int m = dpToPx(4);
+
+        for (int rowIndex = 0; rowIndex < TOP_PANEL_ROWS; rowIndex++) {
+            LinearLayout rowLayout = new LinearLayout(getContext());
+            rowLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT));
+            rowLayout.setOrientation(HORIZONTAL);
+            rowLayout.setOnTouchListener(createTopPanelTouchListener(null));
+
+            for (int col = 0; col < TOP_PANEL_COLUMNS; col++) {
+                int index = rowIndex * TOP_PANEL_COLUMNS + col;
+                LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(
+                        0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f);
+                p.setMargins(m, m, m, m);
+
+                if (index >= panelKeys.size()) {
+                    View spacer = new View(getContext());
+                    spacer.setLayoutParams(p);
+                    spacer.setOnTouchListener(createTopPanelTouchListener(null));
+                    rowLayout.addView(spacer);
+                    continue;
+                }
+
+                Key k = panelKeys.get(index);
+                Button b = new Button(getContext());
+                b.setLayoutParams(p);
+                boolean modifierLocked = (k.code == 0xE0 && isCtrlLeftLocked)
+                    || (k.code == 0xE1 && isShiftLeftLocked)
+                    || (k.code == 0xE2 && isAltLeftLocked)
+                    || (k.code == 0xE3 && isWinLeftLocked);
+                b.setBackgroundResource(modifierLocked
+                    ? R.drawable.press_button_background
+                    : R.drawable.function_button_background);
+                b.setSelected(modifierLocked);
+                b.setGravity(Gravity.CENTER);
+                b.setTextSize(9);
+                b.setPadding(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
+                String topButtonText = k.symbolLabel != null && !k.symbolLabel.isEmpty()
+                    ? k.symbolLabel + "\n" + k.label
+                    : k.label;
+                b.setText(topButtonText);
+                b.setTextColor(resolveThemeTextColor());
+                b.setAllCaps(false);
+                b.setTag(k);
+                b.setOnTouchListener(createTopPanelTouchListener(k));
+                rowLayout.addView(b);
+            }
+            parent.addView(rowLayout);
+        }
+    }
+
+    private OnTouchListener createTopPanelTouchListener(Key key) {
+        final float[] startX = new float[1];
+        final float[] startY = new float[1];
+        final boolean[] isDragging = new boolean[1];
+        final int touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
+        final int swipeThreshold = dpToPx(56);
+
+        return (v, event) -> {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    startX[0] = event.getRawX();
+                    startY[0] = event.getRawY();
+                    isDragging[0] = false;
+                    cancelTopPanelAnimations();
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    float dx = event.getRawX() - startX[0];
+                    float dy = event.getRawY() - startY[0];
+                    if (!isDragging[0] && Math.abs(dx) > touchSlop && Math.abs(dx) > Math.abs(dy)) {
+                        isDragging[0] = true;
+                    }
+                    if (isDragging[0] && activeTopPanelContainer != null) {
+                        updateTopPanelDrag(applyTopPanelEdgeResistance(dx));
+                    }
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                case MotionEvent.ACTION_UP:
+                    float totalDx = event.getRawX() - startX[0];
+                    if (isDragging[0]) {
+                        finishTopPanelSwipe(totalDx, swipeThreshold);
+                        return true;
+                    }
+                    if (event.getActionMasked() == MotionEvent.ACTION_UP && key != null) {
+                        v.performClick();
+                        handleKeyPress(key);
+                        repeatHandler.postDelayed(this::sendReleaseData, 30);
+                    }
+                    return true;
+                default:
+                    return false;
+            }
+        };
+    }
+
+    private float applyTopPanelEdgeResistance(float translationX) {
+        boolean draggingPastFirst = topPanelPageIndex == 0 && translationX > 0;
+        boolean draggingPastLast = topPanelPageIndex == topShortcutPanels.size() - 1 && translationX < 0;
+        if (draggingPastFirst || draggingPastLast) {
+            return translationX * 0.35f;
+        }
+        return translationX;
+    }
+
+    private void finishTopPanelSwipe(float translationX, int swipeThreshold) {
+        if (activeTopPanelContainer == null || topPanelViewport == null) {
+            return;
+        }
+
+        boolean moveToNext = translationX < -swipeThreshold && topPanelPageIndex < topShortcutPanels.size() - 1;
+        boolean moveToPrevious = translationX > swipeThreshold && topPanelPageIndex > 0;
+        if (!moveToNext && !moveToPrevious) {
+            animateTopPanelToRest();
+            return;
+        }
+
+        int targetPage = moveToNext ? topPanelPageIndex + 1 : topPanelPageIndex - 1;
+        float width = getTopPanelWidth();
+        if (moveToNext && nextTopPanelContainer != null) {
+            LinearLayout recycledContainer = previousTopPanelContainer;
+            activeTopPanelContainer.animate().translationX(-width).setDuration(140).start();
+            nextTopPanelContainer.animate()
+                    .translationX(0f)
+                    .setDuration(140)
+                    .withEndAction(() -> {
+                        topPanelPageIndex = targetPage;
+                        previousTopPanelContainer = activeTopPanelContainer;
+                        activeTopPanelContainer = nextTopPanelContainer;
+                        nextTopPanelContainer = recycledContainer;
+                        bindTopShortcutPanelView(nextTopPanelContainer,
+                                topPanelPageIndex < topShortcutPanels.size() - 1
+                                        ? topShortcutPanels.get(topPanelPageIndex + 1)
+                                        : null);
+                        resetTopPanelPositions(0f);
+                        activeTopPanelContainer.bringToFront();
+                    })
+                    .start();
+            if (previousTopPanelContainer != null) {
+                previousTopPanelContainer.animate().translationX(-2f * width).setDuration(140).start();
+            }
+            return;
+        }
+        if (moveToPrevious && previousTopPanelContainer != null) {
+            LinearLayout recycledContainer = nextTopPanelContainer;
+            activeTopPanelContainer.animate().translationX(width).setDuration(140).start();
+            previousTopPanelContainer.animate()
+                    .translationX(0f)
+                    .setDuration(140)
+                    .withEndAction(() -> {
+                        topPanelPageIndex = targetPage;
+                        nextTopPanelContainer = activeTopPanelContainer;
+                        activeTopPanelContainer = previousTopPanelContainer;
+                        previousTopPanelContainer = recycledContainer;
+                        bindTopShortcutPanelView(previousTopPanelContainer,
+                                topPanelPageIndex > 0
+                                        ? topShortcutPanels.get(topPanelPageIndex - 1)
+                                        : null);
+                        resetTopPanelPositions(0f);
+                        activeTopPanelContainer.bringToFront();
+                    })
+                    .start();
+            if (nextTopPanelContainer != null) {
+                nextTopPanelContainer.animate().translationX(2f * width).setDuration(140).start();
+            }
+            return;
+        }
+
+        animateTopPanelToRest();
+    }
+
+    private void cancelTopPanelAnimations() {
+        if (previousTopPanelContainer != null) {
+            previousTopPanelContainer.animate().cancel();
+        }
+        if (activeTopPanelContainer != null) {
+            activeTopPanelContainer.animate().cancel();
+        }
+        if (nextTopPanelContainer != null) {
+            nextTopPanelContainer.animate().cancel();
+        }
+    }
+
+    private void updateTopPanelDrag(float translationX) {
+        if (activeTopPanelContainer == null) {
+            return;
+        }
+        float width = getTopPanelWidth();
+        activeTopPanelContainer.setTranslationX(translationX);
+        if (previousTopPanelContainer != null) {
+            previousTopPanelContainer.setTranslationX(translationX - width);
+        }
+        if (nextTopPanelContainer != null) {
+            nextTopPanelContainer.setTranslationX(translationX + width);
+        }
+    }
+
+    private void resetTopPanelPositions(float activeTranslationX) {
+        if (activeTopPanelContainer == null) {
+            return;
+        }
+        float width = getTopPanelWidth();
+        activeTopPanelContainer.setTranslationX(activeTranslationX);
+        if (previousTopPanelContainer != null) {
+            previousTopPanelContainer.setTranslationX(activeTranslationX - width);
+        }
+        if (nextTopPanelContainer != null) {
+            nextTopPanelContainer.setTranslationX(activeTranslationX + width);
+        }
+    }
+
+    private void animateTopPanelToRest() {
+        if (activeTopPanelContainer == null) {
+            return;
+        }
+        float width = getTopPanelWidth();
+        if (previousTopPanelContainer != null) {
+            previousTopPanelContainer.animate().translationX(-width).setDuration(140).start();
+        }
+        activeTopPanelContainer.animate().translationX(0f).setDuration(140).start();
+        if (nextTopPanelContainer != null) {
+            nextTopPanelContainer.animate().translationX(width).setDuration(140).start();
+        }
+    }
+
+    private void refreshVisibleTopPanelButtonStates() {
+        refreshTopPanelButtonStates(previousTopPanelContainer);
+        refreshTopPanelButtonStates(activeTopPanelContainer);
+        refreshTopPanelButtonStates(nextTopPanelContainer);
+    }
+
+    private void refreshTopPanelButtonStates(View view) {
+        if (view == null) {
+            return;
+        }
+        if (view instanceof Button) {
+            Object tag = view.getTag();
+            if (tag instanceof Key) {
+                Key key = (Key) tag;
+                boolean modifierLocked = (key.code == 0xE0 && isCtrlLeftLocked)
+                        || (key.code == 0xE1 && isShiftLeftLocked)
+                        || (key.code == 0xE2 && isAltLeftLocked)
+                        || (key.code == 0xE3 && isWinLeftLocked);
+                view.setBackgroundResource(modifierLocked
+                        ? R.drawable.press_button_background
+                        : R.drawable.function_button_background);
+                view.setSelected(modifierLocked);
+            }
+            return;
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                refreshTopPanelButtonStates(group.getChildAt(i));
+            }
+        }
+    }
+
+    private float getTopPanelWidth() {
+        if (topPanelViewport != null && topPanelViewport.getWidth() > 0) {
+            return topPanelViewport.getWidth();
+        }
+        if (activeTopPanelContainer != null && activeTopPanelContainer.getWidth() > 0) {
+            return activeTopPanelContainer.getWidth();
+        }
+        return getWidth();
     }
 
     private void addExtraPortraitKeys() {
@@ -516,7 +1199,8 @@ public class CustomKeyboardView extends LinearLayout {
             float widthPercent = key != null ? key.widthPercent : (100f / keys.length);
             float weight = widthPercent / 10.0f;
             LayoutParams params = new LayoutParams(0, LayoutParams.MATCH_PARENT, weight);
-            params.setMargins(2, 2, 2, 2);
+            int keyMargin = dpToPx(4);
+            params.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
 
             if (key == null) {
                 View spacer = new View(getContext());
@@ -532,7 +1216,7 @@ public class CustomKeyboardView extends LinearLayout {
             textButton.setTextSize(14);
             textButton.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
             textButton.setText(key.label);
-            textButton.setTextColor(Color.BLACK);
+            textButton.setTextColor(resolveThemeTextColor());
 
             textButton.setOnClickListener(v -> handleKeyPress(key));
             textButton.setOnTouchListener((v, event) -> {
@@ -616,10 +1300,44 @@ public class CustomKeyboardView extends LinearLayout {
     private void handleKeyPress(Key key) {
         Log.d(TAG, "Key pressed: label=" + key.label + ", code=" + key.code);
 
+        if (key.shortcutModifiers >= 0) {
+            sendShortcutWithModifiers(key.shortcutModifiers, key.code);
+            return;
+        }
+
         boolean updateRequired = false;
         switch (key.code) {
+            case KEY_MODE_SYMBOLS:
+                if (!isNumericLayout) {
+                    isNumericLayout = true;
+                    isShiftLeftLocked = false;
+                    updateRequired = true;
+                }
+                break;
+            case KEY_MODE_ABC:
+                if (isNumericLayout) {
+                    isNumericLayout = false;
+                    // Default entry page for next ?123 tap is symbols view.
+                    isNumberSubview = false;
+                    isShiftLeftLocked = false;
+                    updateRequired = true;
+                }
+                break;
+            case KEY_MODE_NUMBERS_VIEW:
+                if (isNumericLayout) {
+                    isNumberSubview = true;
+                    isShiftLeftLocked = false;
+                    updateRequired = true;
+                }
+                break;
+            case KEY_MODE_SYMBOLS_VIEW:
+                if (isNumericLayout) {
+                    isNumberSubview = false;
+                    isShiftLeftLocked = false;
+                    updateRequired = true;
+                }
+                break;
             case 0xE1: // Shift Left
-                isSymbolMode = !isSymbolMode;
                 isShiftLeftLocked = !isShiftLeftLocked;
                 updateRequired = true;
                 break;
@@ -638,7 +1356,25 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         if (updateRequired) {
-            updateKeyboard();
+            if (key.code == KEY_MODE_SYMBOLS || key.code == KEY_MODE_ABC || key.code == KEY_MODE_NUMBERS_VIEW || key.code == KEY_MODE_SYMBOLS_VIEW) {
+                loadKeyboardForCurrentState(getContext());
+                updateKeyboard();
+            } else if (key.isTopPanelKey && (key.code == 0xE0 || key.code == 0xE1 || key.code == 0xE2 || key.code == 0xE3)) {
+                refreshVisibleTopPanelButtonStates();
+            } else {
+                updateKeyboard();
+            }
+        }
+
+        if (key.code == KEY_MODE_SYMBOLS
+            || key.code == KEY_MODE_ABC
+            || key.code == KEY_MODE_NUMBERS_VIEW
+            || key.code == KEY_MODE_SYMBOLS_VIEW
+            || key.code == 0xE0
+            || key.code == 0xE1
+            || key.code == 0xE2
+            || key.code == 0xE3) {
+            return;
         }
 
         int combinedValue = 0;
@@ -646,21 +1382,40 @@ public class CustomKeyboardView extends LinearLayout {
         combinedValue += isShiftLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift")) : 0;
         combinedValue += isAltLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Alt")) : 0;
         combinedValue += isWinLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Win")) : 0;
+        if (key.requiresShift) {
+            combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift"));
+        }
 
-        String sendKBData = String.format("57AB000208%02X00%02X0000000000", combinedValue, key.code);
+        sendKeyData(combinedValue, key.code);
+    }
+
+    private void sendShortcutWithModifiers(int shortcutModifiers, int keyCode) {
+        int combinedValue = 0;
+        if ((shortcutModifiers & 1) != 0) {
+            combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Ctrl"));
+        }
+        if ((shortcutModifiers & 2) != 0) {
+            combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift"));
+        }
+        if ((shortcutModifiers & 4) != 0) {
+            combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Alt"));
+        }
+        sendKeyData(combinedValue, keyCode);
+    }
+
+    private void sendKeyData(int modifiers, int keyCode) {
+        String sendKBData = String.format("57AB000208%02X00%02X0000000000", modifiers, keyCode);
         sendKBData += makeChecksum(sendKBData);
 
         if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
             byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
             bluetoothService.sendData(sendKBDataBytes);
             Log.d(TAG, "Sent Bluetooth data: " + sendKBData);
-//            sendReleaseData();
         } else if (port != null) {
             try {
                 byte[] sendKBDataBytes = hexStringToByteArray(sendKBData);
                 port.write(sendKBDataBytes, 20);
                 Log.d(TAG, "Sent USB data: " + sendKBData);
-//                sendReleaseData();
             } catch (IOException e) {
                 Log.e(TAG, "Error sending USB data: " + e.getMessage());
             }
@@ -696,6 +1451,11 @@ public class CustomKeyboardView extends LinearLayout {
     private int dpToPx(int dp) {
         float density = getContext().getResources().getDisplayMetrics().density;
         return Math.round(dp * density);
+    }
+
+    private int resolveThemeTextColor() {
+        int nightMode = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+        return nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES ? 0xFFFFFFFF : 0xFF000000;
     }
 
     @Override

@@ -485,7 +485,7 @@ public class CompositeFragment extends Fragment {
             rootLayout.setOrientation(LinearLayout.VERTICAL);
 
             touchpadSection.setLayoutParams(new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 2.0f));
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.5f));
 
             toggleHandle.setLayoutParams(new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(44)));

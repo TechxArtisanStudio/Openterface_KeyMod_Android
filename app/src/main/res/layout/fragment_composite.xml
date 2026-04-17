@@ -12,7 +12,7 @@
         android:id="@+id/touchpad_section"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="2"
+        android:layout_weight="1"
         android:orientation="vertical">
 
         <!-- TouchPad (fills remaining space in touchpad section) with center tips overlay -->
@@ -65,7 +65,7 @@
         android:id="@+id/keyboard_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_weight="2.4"
         android:keyBackground="@drawable/key_background"
         android:theme="@style/ButtonTheme"/>
 

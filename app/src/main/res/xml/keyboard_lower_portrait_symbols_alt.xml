@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Keyboard xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:custom="http://schemas.android.com/apk/res-auto"
+    android:keyWidth="10%p"
+    android:horizontalGap="0px"
+    android:verticalGap="0px"
+    android:keyHeight="10%p">
+
+    <Row android:keyHeight="8%p">
+        <Key android:codes="2E" android:keyLabel="+" custom:keyRequiresShift="true"/>
+        <Key android:codes="1E" android:keyLabel="1" android:keyWidth="20%p"/>
+        <Key android:codes="1F" android:keyLabel="2" android:keyWidth="20%p"/>
+        <Key android:codes="20" android:keyLabel="3" android:keyWidth="20%p"/>
+        <Key android:codes="22" android:keyLabel="%" custom:keyRequiresShift="true"/>
+    </Row>
+
+    <Row android:keyHeight="8%p">
+        <Key android:codes="2D" android:keyLabel="-"/>
+        <Key android:codes="21" android:keyLabel="4" android:keyWidth="20%p"/>
+        <Key android:codes="22" android:keyLabel="5" android:keyWidth="20%p"/>
+        <Key android:codes="23" android:keyLabel="6" android:keyWidth="20%p"/>
+        <Key android:codes="2C" android:keyLabel="@string/Space_Button"/>
+    </Row>
+
+    <Row android:keyHeight="8%p">
+        <Key android:codes="25" android:keyLabel="*" custom:keyRequiresShift="true"/>
+        <Key android:codes="24" android:keyLabel="7" android:keyWidth="20%p"/>
+        <Key android:codes="25" android:keyLabel="8" android:keyWidth="20%p"/>
+        <Key android:codes="26" android:keyLabel="9" android:keyWidth="20%p"/>
+        <Key android:codes="2A" android:keyLabel="@string/BackSpace" android:isRepeatable="true"/>
+    </Row>
+
+    <Row>
+        <Key android:codes="38" android:keyLabel="/"/>
+        <Key android:codes="F002" android:keyLabel="ABC" android:keyWidth="20%p"/>
+        <Key android:codes="36" android:keyLabel="," android:keyWidth="10%p"/>
+        <Key android:codes="F004" android:keyLabel="!?#" android:keyWidth="10%p"/>
+        <Key android:codes="27" android:keyLabel="0" android:keyWidth="20%p"/>
+        <Key android:codes="2E" android:keyLabel="="/>
+        <Key android:codes="37" android:keyLabel="."/>
+        <Key android:codes="28" android:keyLabel="@string/Enter_Button"/>
+    </Row>
+</Keyboard>

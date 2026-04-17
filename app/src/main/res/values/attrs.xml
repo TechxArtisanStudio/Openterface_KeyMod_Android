@@ -2,5 +2,6 @@
 <resources>
     <declare-styleable name="Keyboard">
         <attr name="keySymbolLabel" format="string" />
+        <attr name="keyRequiresShift" format="boolean" />
     </declare-styleable>
 </resources>

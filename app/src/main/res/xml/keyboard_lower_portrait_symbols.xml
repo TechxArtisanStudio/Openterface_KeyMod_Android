@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Keyboard xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:custom="http://schemas.android.com/apk/res-auto"
+    android:keyWidth="10%p"
+    android:horizontalGap="0px"
+    android:verticalGap="0px"
+    android:keyHeight="10%p">
+
+    <Row>
+        <Key android:codes="1E" android:keyLabel="1"/>
+        <Key android:codes="1F" android:keyLabel="2"/>
+        <Key android:codes="20" android:keyLabel="3"/>
+        <Key android:codes="21" android:keyLabel="4"/>
+        <Key android:codes="22" android:keyLabel="5"/>
+        <Key android:codes="23" android:keyLabel="6"/>
+        <Key android:codes="24" android:keyLabel="7"/>
+        <Key android:codes="25" android:keyLabel="8"/>
+        <Key android:codes="26" android:keyLabel="9"/>
+        <Key android:codes="27" android:keyLabel="0"/>
+    </Row>
+
+    <Row>
+        <Key android:codes="1F" android:keyLabel="@" custom:keyRequiresShift="true"/>
+        <Key android:codes="20" android:keyLabel="#" custom:keyRequiresShift="true"/>
+        <Key android:codes="21" android:keyLabel="$" custom:keyRequiresShift="true"/>
+        <Key android:codes="2D" android:keyLabel="_" custom:keyRequiresShift="true"/>
+        <Key android:codes="24" android:keyLabel="&amp;" custom:keyRequiresShift="true"/>
+        <Key android:codes="56" android:keyLabel="-"/>
+        <Key android:codes="57" android:keyLabel="+"/>
+        <Key android:codes="26" android:keyLabel="(" custom:keyRequiresShift="true"/>
+        <Key android:codes="27" android:keyLabel=")" custom:keyRequiresShift="true"/>
+        <Key android:codes="54" android:keyLabel="/"/>
+    </Row>
+
+    <Row>
+        <Key android:codes="2E" android:keyLabel="=" custom:keySymbolLabel="+"/>
+        <Key android:codes="55" android:keyLabel="*"/>
+        <Key android:codes="34" android:keyLabel="&quot;" custom:keyRequiresShift="true"/>
+        <Key android:codes="34" android:keyLabel="'"/>
+        <Key android:codes="33" android:keyLabel=":" custom:keyRequiresShift="true"/>
+        <Key android:codes="33" android:keyLabel=";"/>
+        <Key android:codes="1E" android:keyLabel="!" custom:keyRequiresShift="true"/>
+        <Key android:codes="38" android:keyLabel="&#63;" custom:keyRequiresShift="true"/>
+        <Key android:codes="2A" android:keyLabel="@string/BackSpace" android:isRepeatable="true" android:keyWidth="20%p"/>
+    </Row>
+
+    <Row>
+        <Key android:codes="F002" android:keyLabel="ABC" android:keyWidth="15%p"/>
+        <Key android:codes="36" android:keyLabel="," android:keyWidth="10%p"/>
+        <Key android:codes="F003" android:keyLabel="12&#10;34" android:keyWidth="15%p"/>
+        <Key android:codes="2C" android:keyLabel="@string/Space_Button" android:keyWidth="35%p"/>
+        <Key android:codes="37" android:keyLabel="." android:keyWidth="10%p"/>
+        <Key android:codes="28" android:keyLabel="@string/Enter_Button" android:keyWidth="15%p"/>
+    </Row>
+</Keyboard>
