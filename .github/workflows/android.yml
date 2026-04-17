@@ -30,6 +30,15 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-write: ${{ github.event_name != 'pull_request' }}
 
+      - name: Prepare signing keystore
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystore.jks
+          echo "RELEASE_STORE_FILE=keystore.jks" >> gradle.properties
+          echo "RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> gradle.properties
+          echo "RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> gradle.properties
+          echo "RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> gradle.properties
+
       - name: Clean Gradle
         run: ./gradlew clean --info
 
