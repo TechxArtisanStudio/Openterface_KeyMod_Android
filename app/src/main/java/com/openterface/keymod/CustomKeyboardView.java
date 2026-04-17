@@ -398,7 +398,7 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         // Show two shortcut rows above letter keyboard (hidden in fullscreen mode)
-        if (!showExtraPortraitKeys && !isLandscape(getContext()) && !isNumericLayout) {
+        if (!showExtraPortraitKeys && !isNumericLayout) {
             addTopFunctionRows();
         }
 
