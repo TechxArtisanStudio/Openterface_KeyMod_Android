@@ -33,7 +33,9 @@ jobs:
       - name: Prepare signing keystore
         if: github.event_name != 'pull_request'
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystore.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore.jks
+          ls -la app/keystore.jks
+          file app/keystore.jks
           echo "RELEASE_STORE_FILE=keystore.jks" >> gradle.properties
           echo "RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> gradle.properties
           echo "RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> gradle.properties
