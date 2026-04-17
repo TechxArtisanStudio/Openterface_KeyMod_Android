@@ -35,17 +35,10 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore.jks
-          ls -la app/keystore.jks
-          file app/keystore.jks
-          # Verify keystore can be read
-          keytool -list -v -keystore app/keystore.jks -storepass "${{ secrets.KEY_STORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" || echo "KEYSTORE VERIFICATION FAILED"
           echo "RELEASE_STORE_FILE=keystore.jks" >> gradle.properties
           echo "RELEASE_STORE_PASSWORD=${{ secrets.KEY_STORE_PASSWORD }}" >> gradle.properties
           echo "RELEASE_KEY_ALIAS=${{ secrets.ALIAS }}" >> gradle.properties
           echo "RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> gradle.properties
-          # Show what gradle.properties contains (mask sensitive parts)
-          echo "gradle.properties contents:"
-          cat gradle.properties
 
       - name: Clean Gradle
         run: ./gradlew clean --info
