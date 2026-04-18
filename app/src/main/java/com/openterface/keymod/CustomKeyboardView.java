@@ -55,6 +55,7 @@ public class CustomKeyboardView extends LinearLayout {
     private boolean isNumericLayout = false;
     private boolean isNumberSubview = false;
     private boolean showExtraPortraitKeys = false;
+
     /** Split keyboard mode: which half to render (for landscape split mode with touchpad in middle) */
     public static final int SPLIT_NONE = 0;
     public static final int SPLIT_LEFT = 1;

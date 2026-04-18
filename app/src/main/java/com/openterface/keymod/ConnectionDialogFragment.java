@@ -48,6 +48,8 @@ public class ConnectionDialogFragment extends DialogFragment {
     private TextView bluetoothStatus;
     private ImageView usbStatusIcon;
     private ImageView bluetoothStatusIcon;
+    private ImageView usbSignal;
+    private ImageView bluetoothSignal;
     private CheckBox autoConnectCheckbox;
     private TextView lastConnectedInfo;
     private ImageButton closeButton;
@@ -132,6 +134,8 @@ public class ConnectionDialogFragment extends DialogFragment {
         bluetoothStatus = view.findViewById(R.id.bluetooth_status);
         usbStatusIcon = view.findViewById(R.id.usb_status_icon);
         bluetoothStatusIcon = view.findViewById(R.id.bluetooth_status_icon);
+        usbSignal = view.findViewById(R.id.usb_signal);
+        bluetoothSignal = view.findViewById(R.id.bluetooth_signal);
         autoConnectCheckbox = view.findViewById(R.id.auto_connect_checkbox);
         lastConnectedInfo = view.findViewById(R.id.last_connected_info);
         closeButton = view.findViewById(R.id.close_button);
@@ -363,9 +367,16 @@ public class ConnectionDialogFragment extends DialogFragment {
         if (isUsbConnected) {
             usbStatus.setText(R.string.connected);
             usbStatusIcon.setImageResource(R.drawable.ic_connection_connected);
+            usbStatusIcon.setColorFilter(0xFF4CAF50);
+            if (usbSignal != null) {
+                usbSignal.setVisibility(View.VISIBLE);
+                usbSignal.setColorFilter(0xFF4CAF50);
+            }
         } else {
             usbStatus.setText(R.string.not_connected);
             usbStatusIcon.setImageResource(R.drawable.ic_connection_disconnected);
+            usbStatusIcon.setColorFilter(0xFF9E9E9E);
+            if (usbSignal != null) usbSignal.setVisibility(View.GONE);
         }
     }
 
@@ -378,10 +389,17 @@ public class ConnectionDialogFragment extends DialogFragment {
         if (isBluetoothConnected) {
             String deviceName = connectionManager.getLastBleDeviceName();
             bluetoothStatus.setText(deviceName != null ? deviceName : getString(R.string.connected));
-            bluetoothStatusIcon.setImageResource(R.drawable.ic_connection_connected);
+            bluetoothStatusIcon.setImageResource(R.drawable.ic_bluetooth);
+            bluetoothStatusIcon.setColorFilter(0xFF4CAF50);
+            if (bluetoothSignal != null) {
+                bluetoothSignal.setVisibility(View.VISIBLE);
+                bluetoothSignal.setColorFilter(0xFF4CAF50);
+            }
         } else {
             bluetoothStatus.setText(R.string.not_connected);
-            bluetoothStatusIcon.setImageResource(R.drawable.ic_connection_disconnected);
+            bluetoothStatusIcon.setImageResource(R.drawable.ic_bluetooth);
+            bluetoothStatusIcon.setColorFilter(0xFF9E9E9E);
+            if (bluetoothSignal != null) bluetoothSignal.setVisibility(View.GONE);
         }
     }
 

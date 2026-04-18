@@ -274,12 +274,12 @@
 
     </LinearLayout>
 
-    <!-- Choose Mode Button (returns to LaunchPanel) -->
+    <!-- LaunchPad Button (returns to LaunchPanel) -->
     <Button
         android:id="@+id/choose_mode_button"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Choose Mode"
+        android:text="LaunchPad"
         android:textSize="14sp"
         android:textColor="@color/card_selected_bg"
         android:padding="@dimen/sidebar_item_padding"

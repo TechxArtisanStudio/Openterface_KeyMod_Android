@@ -3,7 +3,6 @@ package com.openterface.keymod;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.os.Handler;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.Toast;
@@ -20,6 +19,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
     private static final String PREFS_NAME = "LaunchPanelPrefs";
     private static final String REMEMBER_CHOICE_KEY = "rememberChoice";
     private static final String LAST_MODE_KEY = "lastMode";
+    public static final String SHOW_PANEL = "show_panel";
 
     // Mode constants
     public static final String MODE_KEYBOARD_MOUSE = "keyboard_mouse";
@@ -44,14 +44,23 @@ public class LaunchPanelActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_launch_panel);
 
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+
+        // Skip launch panel only if auto-launch is enabled AND not explicitly requesting the panel
+        boolean rememberChoice = prefs.getBoolean(REMEMBER_CHOICE_KEY, false);
+        boolean showPanel = getIntent().getBooleanExtra(SHOW_PANEL, false);
+        if (rememberChoice && !showPanel) {
+            String lastMode = prefs.getString(LAST_MODE_KEY, MODE_KEYBOARD_MOUSE);
+            launchModeInternal(lastMode);
+            return;
+        }
+
+        setContentView(R.layout.activity_launch_panel);
 
         initializeViews();
         setupClickListeners();
         updateCardSelections();
-        checkLastMode();
     }
 
     private void initializeViews() {
@@ -107,22 +116,6 @@ public class LaunchPanelActivity extends AppCompatActivity {
             prefs.edit().putBoolean(REMEMBER_CHOICE_KEY, false).apply();
             launchModeInternal(MODE_KEYBOARD_MOUSE);
         });
-    }
-
-    private void checkLastMode() {
-        boolean rememberChoice = prefs.getBoolean(REMEMBER_CHOICE_KEY, false);
-        
-        if (rememberChoice) {
-            String lastMode = prefs.getString(LAST_MODE_KEY, MODE_KEYBOARD_MOUSE);
-            
-            // Show toast that we're auto-launching
-            Toast.makeText(this, "Launching " + getModeDisplayName(lastMode), Toast.LENGTH_SHORT).show();
-            
-            // Small delay for user to see the toast
-            new Handler().postDelayed(() -> {
-                launchModeInternal(lastMode);
-            }, 800);
-        }
     }
 
     private void launchMode(String mode) {

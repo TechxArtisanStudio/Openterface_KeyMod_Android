@@ -49,17 +49,41 @@
                 android:paddingEnd="@dimen/spacing_small"
                 android:fontFamily="sans-serif-medium"/>
 
-            <!-- Connection Status Button (Right side) -->
-            <ImageButton
-                android:id="@+id/connection_button"
-                android:layout_width="@dimen/header_icon_size"
-                android:layout_height="@dimen/header_icon_size"
+            <!-- Connection Status Container (Right side) -->
+            <LinearLayout
+                android:id="@+id/connection_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
-                android:src="@drawable/ic_connection_disconnected"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:clickable="true"
+                android:focusable="true"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/connection"
-                android:padding="@dimen/button_icon_padding"/>
+                android:minWidth="@dimen/header_icon_size"
+                android:minHeight="@dimen/header_icon_size"
+                android:padding="4dp">
+
+                <ImageView
+                    android:id="@+id/connection_button"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_bluetooth"
+                    android:tint="@color/text_secondary"
+                    android:contentDescription="@string/connection"/>
+
+                <ImageView
+                    android:id="@+id/signal_bars"
+                    android:layout_width="24dp"
+                    android:layout_height="12dp"
+                    android:layout_marginTop="1dp"
+                    android:src="@drawable/ic_signal_bars"
+                    android:tint="#4CAF50"
+                    android:visibility="gone"
+                    android:contentDescription="Signal strength"/>
+
+            </LinearLayout>
 
         </RelativeLayout>
 

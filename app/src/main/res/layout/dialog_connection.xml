@@ -137,6 +137,16 @@
                 android:layout_height="22dp"
                 android:src="@drawable/ic_connection_disconnected"
                 android:contentDescription="@string/connection_status" />
+
+            <ImageView
+                android:id="@+id/usb_signal"
+                android:layout_width="20dp"
+                android:layout_height="10dp"
+                android:layout_marginStart="4dp"
+                android:src="@drawable/ic_signal_bars"
+                android:tint="#4CAF50"
+                android:visibility="gone"
+                android:contentDescription="Signal strength" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
@@ -199,6 +209,16 @@
                 android:layout_height="22dp"
                 android:src="@drawable/ic_connection_disconnected"
                 android:contentDescription="@string/connection_status" />
+
+            <ImageView
+                android:id="@+id/bluetooth_signal"
+                android:layout_width="20dp"
+                android:layout_height="10dp"
+                android:layout_marginStart="4dp"
+                android:src="@drawable/ic_signal_bars"
+                android:tint="#4CAF50"
+                android:visibility="gone"
+                android:contentDescription="Signal strength" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 

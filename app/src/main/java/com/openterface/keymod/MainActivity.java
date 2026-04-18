@@ -17,6 +17,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
+import android.widget.ImageView;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageButton;
@@ -67,7 +68,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private static final String ACTION_USB_PERMISSION = "com.openterface.ch32v208serial.USB_PERMISSION";
 
     // New UI components for Phase 1
-    private ImageButton connectionButton;
+    private ImageView connectionButton;
+    private ImageView signalBars;
     private ImageButton menuButton;
     private DrawerLayout drawerLayout;
     private String currentNavMode = LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
@@ -312,7 +314,11 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
 
         // Initialize new header buttons
         connectionButton = findViewById(R.id.connection_button);
+        signalBars = findViewById(R.id.signal_bars);
         menuButton = findViewById(R.id.menu_button);
+
+        View connectionContainer = findViewById(R.id.connection_container);
+        connectionContainer.setOnClickListener(v -> showConnectionDialog());
         
         // Initialize drawer layout and nav items
         drawerLayout = findViewById(R.id.drawer_layout);
@@ -455,22 +461,35 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     
     private void updateConnectionButton(ConnectionManager.ConnectionType type, ConnectionManager.ConnectionState state) {
         if (connectionButton == null) return;
-        
-        int iconRes = R.drawable.ic_connection_disconnected;
-        
+
         switch (state) {
             case CONNECTED:
-                iconRes = R.drawable.ic_connection_connected;
+                connectionButton.setImageResource(R.drawable.ic_bluetooth);
+                connectionButton.setColorFilter(0xFF4CAF50);
+                if (signalBars != null) {
+                    signalBars.setVisibility(View.VISIBLE);
+                    signalBars.setColorFilter(0xFF4CAF50);
+                }
                 break;
             case CONNECTING:
-                iconRes = R.drawable.ic_connection_connecting;
+                connectionButton.setImageResource(R.drawable.ic_bluetooth);
+                connectionButton.setColorFilter(0xFFFF9800);
+                if (signalBars != null) signalBars.setVisibility(View.GONE);
                 break;
             case DISCONNECTED:
-                iconRes = R.drawable.ic_connection_disconnected;
+                connectionButton.setImageResource(R.drawable.ic_bluetooth);
+                connectionButton.setColorFilter(0xFF9E9E9E);
+                if (signalBars != null) signalBars.setVisibility(View.GONE);
                 break;
         }
-        
-        connectionButton.setImageResource(iconRes);
+    }
+
+    private void showConnectionDialog() {
+        ConnectionDialogFragment dialog = ConnectionDialogFragment.newInstance();
+        dialog.setConnectionManager(connectionManager);
+        dialog.setRxBleClient(rxBleClient);
+        dialog.setConnectionDialogListener((type, state) -> updateConnectionButton(type, state));
+        dialog.show(getSupportFragmentManager(), "ConnectionDialog");
     }
 
     private void startScan() {
@@ -503,19 +522,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     }
 
     private void setupButtonListeners() {
-        // Connection button handler
-        if (connectionButton != null) {
-            connectionButton.setOnClickListener(v -> {
-                ConnectionDialogFragment dialog = ConnectionDialogFragment.newInstance();
-                dialog.setConnectionManager(connectionManager);
-                dialog.setRxBleClient(rxBleClient);
-                dialog.setConnectionDialogListener((type, state) -> {
-                    // Connection state changes are handled by the listener
-                    updateConnectionButton(type, state);
-                });
-                dialog.show(getSupportFragmentManager(), "ConnectionDialog");
-            });
-        }
+        // Connection button handler removed - click handled by connection_container
         
         // Menu button handler - toggle drawer
         if (menuButton != null) {
@@ -600,12 +607,13 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             });
         }
 
-        // Choose Mode button - returns to LaunchPanelActivity
+        // LaunchPad button - returns to LaunchPanelActivity
         View chooseModeButton = findViewById(R.id.choose_mode_button);
         if (chooseModeButton != null) {
             chooseModeButton.setOnClickListener(v -> {
                 drawerLayout.closeDrawer(android.view.Gravity.START);
                 Intent intent = new Intent(MainActivity.this, LaunchPanelActivity.class);
+                intent.putExtra(LaunchPanelActivity.SHOW_PANEL, true);
                 startActivity(intent);
                 finish();
             });
