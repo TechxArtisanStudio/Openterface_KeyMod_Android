@@ -16,10 +16,11 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
+            android:orientation="horizontal"
             android:padding="16dp"
             android:background="@color/header_background"
-            android:elevation="4dp">
+            android:elevation="4dp"
+            android:gravity="center_vertical">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -30,29 +31,21 @@
                 android:textColor="@color/text_primary" />
 
             <TextView
+                android:id="@+id/active_profile_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Choose a profile to load its shortcuts"
-                android:textSize="14sp"
-                android:textColor="@color/text_secondary"
-                android:layout_marginTop="4dp" />
+                android:text="Active: Default"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/primary"
+                android:layout_marginStart="12dp"
+                android:background="@drawable/active_badge_bg"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp" />
 
         </LinearLayout>
-
-        <!-- Active Profile -->
-        <TextView
-            android:id="@+id/active_profile_text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Active: Default (8 shortcuts)"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="@color/primary"
-            android:padding="12dp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:background="@color/header_background"
-            android:layout_marginTop="8dp" />
 
         <!-- Action Buttons -->
         <LinearLayout
@@ -171,6 +164,17 @@
                     android:layout_marginTop="2dp" />
 
             </LinearLayout>
+
+            <Button
+                android:id="@+id/add_shortcut_button"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="+ Add"
+                android:textSize="12sp"
+                android:minWidth="0dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
         </LinearLayout>
 
