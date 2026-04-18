@@ -50,6 +50,7 @@ public class BluetoothDialogFragment extends DialogFragment {
     private static final int REQUEST_ENABLE_BLUETOOTH = 1002;
     private static final String PREFS_NAME = "BluetoothPrefs";
     private static final String KEY_PAIRED_DEVICES = "paired_devices";
+    private static final String KEY_LAST_CONNECTED = "last_connected_times";
 
     private BluetoothAdapter bluetoothAdapter;
     private Switch bluetoothSwitch;
@@ -107,6 +108,7 @@ public class BluetoothDialogFragment extends DialogFragment {
                     updateDeviceList();
                 } else if (!pairedDevices.isEmpty()) {
                     bluetoothService.connectToDevice(pairedDevices.get(0));
+                    saveLastConnected(pairedDevices.get(0).getMacAddress());
                 }
             }
         }
@@ -130,11 +132,13 @@ public class BluetoothDialogFragment extends DialogFragment {
         int type;
         String title;
         RxBleDevice bleDevice;
+        String lastConnectedTime;
 
-        DeviceItem(int type, String title, RxBleDevice bleDevice) {
+        DeviceItem(int type, String title, RxBleDevice bleDevice, String lastConnectedTime) {
             this.type = type;
             this.title = title;
             this.bleDevice = bleDevice;
+            this.lastConnectedTime = lastConnectedTime;
         }
     }
 
@@ -160,18 +164,26 @@ public class BluetoothDialogFragment extends DialogFragment {
                 textView.setTypeface(null, android.graphics.Typeface.BOLD);
                 convertView.setEnabled(false);
                 convertView.setOnClickListener(null);
-//                convert comienza a partir de aquíconvertView.setOnClickListener(null);
             } else {
                 if (convertView == null || convertView.getTag() == null || !convertView.getTag().equals("DEVICE")) {
-                    convertView = LayoutInflater.from(getContext()).inflate(android.R.layout.simple_list_item_1, parent, false);
+                    convertView = LayoutInflater.from(getContext()).inflate(R.layout.list_item_bluetooth_device, parent, false);
                     convertView.setTag("DEVICE");
                 }
-                TextView textView = convertView.findViewById(android.R.id.text1);
+                TextView nameView = convertView.findViewById(R.id.device_name);
+                TextView addressView = convertView.findViewById(R.id.device_address);
+                TextView lastConnectedView = convertView.findViewById(R.id.last_connected);
+
                 String deviceName = sanitizeDeviceName(item.bleDevice.getName());
                 String deviceAddress = item.bleDevice.getMacAddress();
-                textView.setText(deviceName + "\n" + deviceAddress);
-                textView.setTextSize(16);
-                textView.setTypeface(null, android.graphics.Typeface.NORMAL);
+                nameView.setText(deviceName);
+                addressView.setText(deviceAddress);
+
+                if (item.lastConnectedTime != null) {
+                    lastConnectedView.setText("Last connected: " + item.lastConnectedTime);
+                    lastConnectedView.setVisibility(View.VISIBLE);
+                } else {
+                    lastConnectedView.setVisibility(View.GONE);
+                }
             }
             return convertView;
         }
@@ -255,11 +267,12 @@ public class BluetoothDialogFragment extends DialogFragment {
 
         devicesList = new ArrayList<>();
         pairedDevices = pairedDevices != null ? pairedDevices : new ArrayList<>();
-        devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Paired Devices", null));
+        devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Paired Devices", null, null));
         for (RxBleDevice device : pairedDevices) {
-            devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device));
+            String lastTime = formatLastConnected(getLastConnected(device.getMacAddress()));
+            devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device, lastTime));
         }
-        devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Scanned BLE Devices", null));
+        devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Scanned BLE Devices", null, null));
         devicesAdapter = new CustomDeviceAdapter(requireContext(), devicesList);
         devicesListView.setAdapter(devicesAdapter);
 
@@ -303,6 +316,7 @@ public class BluetoothDialogFragment extends DialogFragment {
                             Log.d(TAG, LOG_PREFIX + "Initiating connection to: " + deviceName);
                             showToast("Connecting to " + deviceName + "...");
                             bluetoothService.connectToDevice(selectedBleDevice);
+                            saveLastConnected(selectedBleDevice.getMacAddress());
                             // Add to pairedDevices if not already present
                             if (!isPaired) {
                                 pairedDevices.add(selectedBleDevice);
@@ -426,6 +440,7 @@ public class BluetoothDialogFragment extends DialogFragment {
             updateDeviceList();
         } else if (!isScanning && isServiceBound && !pairedDevices.isEmpty()) {
             bluetoothService.connectToDevice(pairedDevices.get(0));
+            saveLastConnected(pairedDevices.get(0).getMacAddress());
         } else if (!isScanning) {
             startBleScan();
         }
@@ -441,11 +456,12 @@ public class BluetoothDialogFragment extends DialogFragment {
             bluetoothAdapter.disable();
             stopScan();
             devicesList.clear();
-            devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Paired Devices", null));
+            devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Paired Devices", null, null));
             for (RxBleDevice device : pairedDevices) {
-                devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device));
+                String lastTime = formatLastConnected(getLastConnected(device.getMacAddress()));
+                devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device, lastTime));
             }
-            devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Scanned BLE Devices", null));
+            devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Scanned BLE Devices", null, null));
             mainHandler.post(() -> devicesAdapter.notifyDataSetChanged());
             showToast("Bluetooth disabled");
             // Notify MainActivity of disconnection
@@ -520,7 +536,8 @@ public class BluetoothDialogFragment extends DialogFragment {
                                         }
                                     }
 
-                                    devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device));
+                                    String lastTime = formatLastConnected(getLastConnected(deviceAddress));
+                                    devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device, lastTime));
                                     mainHandler.post(() -> {
                                         devicesAdapter.notifyDataSetChanged();
                                         showToast("Found: " + deviceName);
@@ -564,11 +581,12 @@ public class BluetoothDialogFragment extends DialogFragment {
 
     private void updateDeviceList() {
         devicesList.clear();
-        devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Paired Devices", null));
+        devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Paired Devices", null, null));
         for (RxBleDevice device : pairedDevices) {
-            devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device));
+            String lastTime = formatLastConnected(getLastConnected(device.getMacAddress()));
+            devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device, lastTime));
         }
-        devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Scanned BLE Devices", null));
+        devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Scanned BLE Devices", null, null));
         mainHandler.post(() -> devicesAdapter.notifyDataSetChanged());
     }
 
@@ -583,6 +601,40 @@ public class BluetoothDialogFragment extends DialogFragment {
 
         prefs.edit().putStringSet(KEY_PAIRED_DEVICES, pairedDeviceSet).apply();
         Log.d(TAG, LOG_PREFIX + "Saved paired device: " + deviceEntry);
+    }
+
+    private void saveLastConnected(String macAddress) {
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String now = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(new java.util.Date());
+        prefs.edit().putString(KEY_LAST_CONNECTED + "_" + macAddress, now).apply();
+    }
+
+    private String getLastConnected(String macAddress) {
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getString(KEY_LAST_CONNECTED + "_" + macAddress, null);
+    }
+
+    private String formatLastConnected(String timestamp) {
+        if (timestamp == null) return null;
+        try {
+            java.text.SimpleDateFormat inputFormat = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+            java.util.Date date = inputFormat.parse(timestamp);
+            if (date == null) return timestamp;
+
+            long now = System.currentTimeMillis();
+            long diff = now - date.getTime();
+            long minutes = diff / 60000;
+            long hours = diff / 3600000;
+            long days = diff / 86400000;
+
+            if (minutes < 1) return "Just now";
+            if (minutes < 60) return minutes + " min ago";
+            if (hours < 24) return hours + " hour" + (hours > 1 ? "s" : "") + " ago";
+            if (days < 7) return days + " day" + (days > 1 ? "s" : "") + " ago";
+            return timestamp;
+        } catch (Exception e) {
+            return timestamp;
+        }
     }
 
     private void loadPairedDevices() {
