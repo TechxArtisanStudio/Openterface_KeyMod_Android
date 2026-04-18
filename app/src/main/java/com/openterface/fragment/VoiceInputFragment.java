@@ -151,7 +151,12 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
 
         prefs = PreferenceManager.getDefaultSharedPreferences(requireContext());
         initSpeechRecognizerLauncher();
-        
+
+        // Register for global OS changes from sidebar
+        if (requireActivity() instanceof MainActivity) {
+            ((MainActivity) requireActivity()).addOsChangeListener(this::onTargetOsChanged);
+        }
+
         initializeViews(view);
         loadSettings();
         setupListeners();
@@ -159,6 +164,14 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
         updateSendButtonState();
 
         return view;
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (requireActivity() instanceof MainActivity) {
+            ((MainActivity) requireActivity()).removeOsChangeListener(this::onTargetOsChanged);
+        }
     }
 
     private void initializeViews(View view) {
@@ -179,7 +192,12 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
         osMacosButton = view.findViewById(R.id.os_macos_button);
         osWindowsButton = view.findViewById(R.id.os_windows_button);
         osLinuxButton = view.findViewById(R.id.os_linux_button);
-        targetOs = prefs.getString(PREF_TARGET_OS, "macos");
+        // Read from global preference
+        if (requireActivity() instanceof MainActivity) {
+            targetOs = ((MainActivity) requireActivity()).getTargetOs();
+        } else {
+            targetOs = prefs.getString(PREF_TARGET_OS, "macos");
+        }
         updateOsButtonState();
         osMacosButton.setOnClickListener(v -> setTargetOs("macos"));
         osWindowsButton.setOnClickListener(v -> setTargetOs("windows"));
@@ -978,7 +996,17 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
 
     private void setTargetOs(String os) {
         targetOs = os;
-        prefs.edit().putString(PREF_TARGET_OS, os).apply();
+        if (requireActivity() instanceof MainActivity) {
+            ((MainActivity) requireActivity()).setTargetOs(os);
+        } else {
+            prefs.edit().putString(PREF_TARGET_OS, os).apply();
+        }
+        updateOsButtonState();
+    }
+
+    /** Called when global OS changes from sidebar */
+    private void onTargetOsChanged(String os) {
+        targetOs = os;
         updateOsButtonState();
     }
 

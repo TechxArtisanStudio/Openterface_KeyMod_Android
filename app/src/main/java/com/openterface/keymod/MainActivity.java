@@ -49,6 +49,7 @@ import com.polidea.rxandroidble2.RxBleClient;
 import com.polidea.rxandroidble2.RxBleDevice;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import io.reactivex.disposables.Disposable;
@@ -77,6 +78,34 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private LinearLayout navShortcuts;
     private LinearLayout navMacros;
     private LinearLayout navVoice;
+    private ImageButton navOsMacosButton;
+    private ImageButton navOsWindowsButton;
+    private ImageButton navOsLinuxButton;
+
+    /** Global target OS preference key */
+    private static final String PREF_TARGET_OS = "target_os";
+
+    /** Callback notified when target OS changes in the sidebar */
+    public interface OnTargetOsChangeListener {
+        void onTargetOsChanged(String targetOs);
+    }
+    private final List<OnTargetOsChangeListener> osChangeListeners = new ArrayList<>();
+
+    public void addOsChangeListener(OnTargetOsChangeListener listener) {
+        osChangeListeners.add(listener);
+    }
+    public void removeOsChangeListener(OnTargetOsChangeListener listener) {
+        osChangeListeners.remove(listener);
+    }
+    public String getTargetOs() {
+        return getSharedPreferences("AppPrefs", MODE_PRIVATE).getString(PREF_TARGET_OS, "macos");
+    }
+    public void setTargetOs(String os) {
+        getSharedPreferences("AppPrefs", MODE_PRIVATE).edit().putString(PREF_TARGET_OS, os).apply();
+        for (OnTargetOsChangeListener listener : osChangeListeners) {
+            listener.onTargetOsChanged(os);
+        }
+    }
     
     // Old button bar components (now hidden but kept for backward compatibility)
     private Button usbConnect, bluetooth, keyBoard, mouse, keyBoardMouse, question, info, shortcut;
@@ -292,6 +321,10 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         navShortcuts = findViewById(R.id.nav_shortcuts);
         navMacros = findViewById(R.id.nav_macros);
         navVoice = findViewById(R.id.nav_voice);
+        navOsMacosButton = findViewById(R.id.nav_os_macos_button);
+        navOsWindowsButton = findViewById(R.id.nav_os_windows_button);
+        navOsLinuxButton = findViewById(R.id.nav_os_linux_button);
+        updateNavOsButtonState();
         
         // Initialize old buttons (kept for backward compatibility, but hidden - may be null)
         // These are in hidden layout, won't be found
@@ -547,6 +580,26 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             });
         }
 
+        // Target OS buttons in sidebar
+        if (navOsMacosButton != null) {
+            navOsMacosButton.setOnClickListener(v -> {
+                setTargetOs("macos");
+                updateNavOsButtonState();
+            });
+        }
+        if (navOsWindowsButton != null) {
+            navOsWindowsButton.setOnClickListener(v -> {
+                setTargetOs("windows");
+                updateNavOsButtonState();
+            });
+        }
+        if (navOsLinuxButton != null) {
+            navOsLinuxButton.setOnClickListener(v -> {
+                setTargetOs("linux");
+                updateNavOsButtonState();
+            });
+        }
+
         // Choose Mode button - returns to LaunchPanelActivity
         View chooseModeButton = findViewById(R.id.choose_mode_button);
         if (chooseModeButton != null) {
@@ -660,6 +713,24 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (navShortcuts != null) navShortcuts.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_SHORTCUTS));
         if (navMacros != null) navMacros.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_MACROS));
         if (navVoice != null) navVoice.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_VOICE));
+    }
+
+    private void updateNavOsButtonState() {
+        String targetOs = getTargetOs();
+        int activeColor = getColor(R.color.primary);
+        int inactiveColor = getColor(R.color.text_secondary);
+        if (navOsMacosButton != null) {
+            navOsMacosButton.setImageTintList(
+                android.content.res.ColorStateList.valueOf("macos".equals(targetOs) ? activeColor : inactiveColor));
+        }
+        if (navOsWindowsButton != null) {
+            navOsWindowsButton.setImageTintList(
+                android.content.res.ColorStateList.valueOf("windows".equals(targetOs) ? activeColor : inactiveColor));
+        }
+        if (navOsLinuxButton != null) {
+            navOsLinuxButton.setImageTintList(
+                android.content.res.ColorStateList.valueOf("linux".equals(targetOs) ? activeColor : inactiveColor));
+        }
     }
 
     private void showKeyboardFragment() {

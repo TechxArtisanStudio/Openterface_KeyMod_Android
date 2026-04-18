@@ -111,6 +111,8 @@
     <string name="Ctrl">Ctrl</string>
     <string name="Alt">Alt</string>
     <string name="Win">Win</string>
+    <string name="Cmd">Cmd</string>
+    <string name="Super">Super</string>
     <string name="Fn">Fn</string>
     <string name="Symbols_123">\?123</string>
     <string name="BackSpace">BackSpace</string>

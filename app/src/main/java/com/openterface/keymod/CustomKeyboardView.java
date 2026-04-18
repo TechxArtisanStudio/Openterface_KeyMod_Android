@@ -198,6 +198,43 @@ public class CustomKeyboardView extends LinearLayout {
             }
         }
         lowerKeys = parseKeyboard(context, keyboardResId);
+        applyTargetOsLabels(context);
+    }
+
+    /** Update key labels based on target OS (Win → Cmd for macOS) */
+    public void reloadForTargetOs() {
+        Context context = getContext();
+        if (context == null) return;
+        loadKeyboardForCurrentState(context);
+        removeAllViews();
+        updateKeyboard();
+    }
+
+    private void applyTargetOsLabels(Context context) {
+        String targetOs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+                .getString("target_os", "macos");
+
+        String newLabel;
+        int newIconResId;
+        if ("macos".equals(targetOs)) {
+            newLabel = context.getString(R.string.Cmd);
+            newIconResId = R.drawable.ic_os_macos;
+        } else if ("linux".equals(targetOs)) {
+            newLabel = context.getString(R.string.Super);
+            newIconResId = R.drawable.ic_os_linux;
+        } else {
+            newLabel = context.getString(R.string.Win);
+            newIconResId = R.drawable.windows;
+        }
+
+        for (List<Key> row : lowerKeys) {
+            for (Key key : row) {
+                if ("Win".equals(key.label)) {
+                    key.label = newLabel;
+                    key.iconResId = newIconResId;
+                }
+            }
+        }
     }
 
     public void setShowExtraPortraitKeys(boolean enabled) {
@@ -562,7 +599,7 @@ public class CustomKeyboardView extends LinearLayout {
                     }
                 }
 
-                if (key.label.equals("Win") || key.label.equals("BackSpace") ||
+                if (key.label.equals("Win") || key.label.equals("Cmd") || key.label.equals("Super") || key.label.equals("BackSpace") ||
                         key.label.equals("Up_arrow") || key.label.equals("Down_arrow") ||
                         key.label.equals("Left_arrow") || key.label.equals("Right_arrow")) {
                     ImageButton imageButton = new ImageButton(getContext());
@@ -575,7 +612,7 @@ public class CustomKeyboardView extends LinearLayout {
                     if (key.iconResId != 0) {
                         imageButton.setImageResource(key.iconResId);
                         imageButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
-                        if ("Win".equals(key.label) || "BackSpace".equals(key.label)) {
+                        if ("Win".equals(key.label) || "Cmd".equals(key.label) || "Super".equals(key.label) || "BackSpace".equals(key.label)) {
                             imageButton.setColorFilter(resolveThemeTextColor());
                         }
                     }
@@ -989,7 +1026,15 @@ public class CustomKeyboardView extends LinearLayout {
         if (symbol.isEmpty()) {
             return "";
         }
+        symbol = com.openterface.keymod.util.KeyParser.displayLabel(symbol, getTargetOs());
         return symbol.length() > 10 ? symbol.substring(0, 10) : symbol;
+    }
+
+    private String getTargetOs() {
+        Context ctx = getContext();
+        if (ctx == null) return "macos";
+        return ctx.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+                .getString("target_os", "macos");
     }
 
     private void addShortcutPanelRows(LinearLayout parent, List<Key> panelKeys) {

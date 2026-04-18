@@ -100,6 +100,28 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         return view;
     }
 
+    private final MainActivity.OnTargetOsChangeListener osChangeListener = os -> {
+        if (shortcutsAdapter != null) {
+            shortcutsAdapter.notifyDataSetChanged();
+        }
+    };
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (requireActivity() instanceof MainActivity) {
+            ((MainActivity) requireActivity()).addOsChangeListener(osChangeListener);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (requireActivity() instanceof MainActivity) {
+            ((MainActivity) requireActivity()).removeOsChangeListener(osChangeListener);
+        }
+    }
+
     private void initializeViews(View view) {
         // Profile list panel
         panelProfilesList = view.findViewById(R.id.panel_profiles_list);
@@ -1067,6 +1089,11 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
             this.shortcuts = shortcuts;
         }
 
+        private String getTargetOs() {
+            return context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+                    .getString("target_os", "macos");
+        }
+
         public void setShortcuts(List<ShortcutProfileManager.Shortcut> shortcuts) {
             this.shortcuts = shortcuts;
         }
@@ -1098,7 +1125,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
             TextView labelText = convertView.findViewById(R.id.shortcut_label);
 
             nameText.setText(shortcut.name);
-            labelText.setText(shortcut.label);
+            labelText.setText(KeyParser.displayLabel(shortcut.label, getTargetOs()));
 
             return convertView;
         }

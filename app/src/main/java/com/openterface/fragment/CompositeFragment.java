@@ -21,12 +21,15 @@ import androidx.fragment.app.Fragment;
 
 import com.openterface.keymod.BluetoothService;
 import com.openterface.keymod.CustomKeyboardView;
+import com.openterface.keymod.MainActivity;
 import com.openterface.keymod.R;
 import com.openterface.keymod.TouchPadView;
 import com.openterface.target.CH9329MSKBMap;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class CompositeFragment extends Fragment {
 
@@ -47,6 +50,8 @@ public class CompositeFragment extends Fragment {
     private TextView splitTouchPadTips;
     /** Container to swap between normal and split layouts */
     private FrameLayout contentContainer;
+    /** Track registered keyboard views for OS change listener cleanup */
+    private final List<MainActivity.OnTargetOsChangeListener> osChangeListeners = new ArrayList<>();
     public UsbSerialPort port;
     private BluetoothService bluetoothService;
     private boolean isServiceBound;
@@ -362,7 +367,35 @@ public class CompositeFragment extends Fragment {
 
         setupTouchPad(touchPad, touchPadTips);
 
+        // Register keyboard view for OS change updates
+        registerKeyboardOsListener(keyboardView);
+
         return contentContainer;
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (requireActivity() instanceof MainActivity) {
+            for (MainActivity.OnTargetOsChangeListener listener : osChangeListeners) {
+                ((MainActivity) requireActivity()).removeOsChangeListener(listener);
+            }
+            osChangeListeners.clear();
+        }
+        setDragMode(false);
+        if (isServiceBound) {
+            requireContext().unbindService(serviceConnection);
+            isServiceBound = false;
+            Log.d(TAG, "Unbound from BluetoothService");
+        }
+    }
+    private void registerKeyboardOsListener(CustomKeyboardView kbdView) {
+        if (kbdView == null || !(requireActivity() instanceof MainActivity)) return;
+        MainActivity.OnTargetOsChangeListener listener = os -> {
+            kbdView.reloadForTargetOs();
+        };
+        osChangeListeners.add(listener);
+        ((MainActivity) requireActivity()).addOsChangeListener(listener);
     }
 
     private void setupNormalViews(View view) {
@@ -402,6 +435,8 @@ public class CompositeFragment extends Fragment {
             if (keyboardViewRight != null) {
                 keyboardViewLeft.setSplitPartner(keyboardViewRight);
             }
+            // Register for OS change updates
+            registerKeyboardOsListener(keyboardViewLeft);
             // Create shared top panel from the left keyboard
             if (topPanelContainer != null) {
                 View topPanel = keyboardViewLeft.createTopPanel();
@@ -417,6 +452,8 @@ public class CompositeFragment extends Fragment {
             if (keyboardViewLeft != null) {
                 keyboardViewRight.setSplitPartner(keyboardViewLeft);
             }
+            // Register for OS change updates
+            registerKeyboardOsListener(keyboardViewRight);
         }
 
         setupTouchPad(splitTouchPad, splitTouchPadTips);
@@ -651,17 +688,6 @@ public class CompositeFragment extends Fragment {
         } else {
             applyOrientationLayout();
             applyDisplayMode();
-        }
-    }
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        setDragMode(false);
-        if (isServiceBound) {
-            requireContext().unbindService(serviceConnection);
-            isServiceBound = false;
-            Log.d(TAG, "Unbound from BluetoothService");
         }
     }
 }

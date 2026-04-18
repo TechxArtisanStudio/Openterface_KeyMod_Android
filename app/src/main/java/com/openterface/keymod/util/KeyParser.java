@@ -198,6 +198,24 @@ public class KeyParser {
     /**
      * Convert keyCode + modifiers back to macro token format (e.g. <CTRL><SHIFT>F</SHIFT></CTRL>).
      */
+    /**
+     * Convert shortcut label for display based on target OS.
+     * For macOS: Ctrl → Cmd, Alt → Opt
+     * For Windows/Linux: unchanged
+     */
+    public static String displayLabel(String label, String targetOs) {
+        if (label == null) return "";
+        if ("macos".equals(targetOs)) {
+            return label
+                    .replace("Ctrl+", "Cmd+")
+                    .replace("Alt+", "Opt+");
+        }
+        return label;
+    }
+
+    /**
+     * Convert keyCode + modifiers back to macro token format (e.g. <CTRL><SHIFT>F</SHIFT></CTRL>).
+     */
     public static String toToken(int keyCode, int modifiers) {
         StringBuilder sb = new StringBuilder();
         // Open modifiers
