@@ -55,6 +55,13 @@ public class CustomKeyboardView extends LinearLayout {
     private boolean isNumericLayout = false;
     private boolean isNumberSubview = false;
     private boolean showExtraPortraitKeys = false;
+    /** Split keyboard mode: which half to render (for landscape split mode with touchpad in middle) */
+    public static final int SPLIT_NONE = 0;
+    public static final int SPLIT_LEFT = 1;
+    public static final int SPLIT_RIGHT = 2;
+    private int splitPart = SPLIT_NONE;
+    /** The paired keyboard view in split mode, for syncing modifier states */
+    private CustomKeyboardView splitPartner;
     private List<List<Key>> lowerKeys;
     private UsbSerialPort port;
     private Handler repeatHandler = new Handler();
@@ -174,7 +181,13 @@ public class CustomKeyboardView extends LinearLayout {
     private void loadKeyboardForCurrentState(Context context) {
         int keyboardResId;
         if (isLandscape(context)) {
-            keyboardResId = R.xml.keyboard_lower_landscape;
+            if (!isNumericLayout) {
+                keyboardResId = R.xml.keyboard_lower_landscape;
+            } else {
+                keyboardResId = isNumberSubview
+                        ? R.xml.keyboard_lower_landscape_symbols_alt
+                        : R.xml.keyboard_lower_landscape_symbols;
+            }
         } else {
             if (!isNumericLayout) {
                 keyboardResId = R.xml.keyboard_lower_portrait;
@@ -198,6 +211,88 @@ public class CustomKeyboardView extends LinearLayout {
         }
         removeAllViews();
         updateKeyboard();
+    }
+
+    /** Set which half of the keyboard to render (for landscape split mode). */
+    public void setSplitPart(int part) {
+        if (splitPart == part) return;
+        splitPart = part;
+        // Reload keys to restore original widths before re-filtering
+        loadKeyboardForCurrentState(getContext());
+        removeAllViews();
+        updateKeyboard();
+    }
+
+    /** Set the paired keyboard view in split mode for syncing modifier states. */
+    public void setSplitPartner(CustomKeyboardView partner) {
+        splitPartner = partner;
+    }
+
+    /** Sync modifier lock states to the paired keyboard. */
+    private void syncModifierStates() {
+        if (splitPartner == null) return;
+        splitPartner.isShiftLeftLocked = isShiftLeftLocked;
+        splitPartner.isCtrlLeftLocked = isCtrlLeftLocked;
+        splitPartner.isAltLeftLocked = isAltLeftLocked;
+        splitPartner.isWinLeftLocked = isWinLeftLocked;
+        splitPartner.post(() -> splitPartner.updateKeyboard());
+    }
+
+    /** Sync numeric layout state to the paired keyboard. */
+    private void syncNumericState() {
+        if (splitPartner == null) return;
+        splitPartner.isNumericLayout = isNumericLayout;
+        splitPartner.isNumberSubview = isNumberSubview;
+        splitPartner.post(() -> {
+            splitPartner.loadKeyboardForCurrentState(getContext());
+            splitPartner.updateKeyboard();
+        });
+    }
+
+    /** Create a shared top scrolling panel view for split mode. */
+    public FrameLayout createTopPanel() {
+        rebuildTopShortcutPanels();
+        if (topShortcutPanels.isEmpty()) {
+            return null;
+        }
+
+        if (topPanelPageIndex < 0) {
+            topPanelPageIndex = 0;
+        }
+        if (topPanelPageIndex >= topShortcutPanels.size()) {
+            topPanelPageIndex = topShortcutPanels.size() - 1;
+        }
+
+        FrameLayout viewport = new FrameLayout(getContext());
+        int rowHeightPx = dpToPx(24);
+        int panelHeight = rowHeightPx * 2;
+        viewport.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, panelHeight));
+
+        previousTopPanelContainer = createTopShortcutPanelView();
+        activeTopPanelContainer = createTopShortcutPanelView();
+        nextTopPanelContainer = createTopShortcutPanelView();
+        viewport.addView(previousTopPanelContainer);
+        viewport.addView(activeTopPanelContainer);
+        viewport.addView(nextTopPanelContainer);
+
+        syncTopPanelViewportContent();
+
+        // Post to wait for layout, then set initial positions
+        viewport.post(() -> {
+            float width = viewport.getWidth();
+            if (width > 0) {
+                activeTopPanelContainer.setTranslationX(0);
+                if (previousTopPanelContainer != null) {
+                    previousTopPanelContainer.setTranslationX(-width);
+                }
+                if (nextTopPanelContainer != null) {
+                    nextTopPanelContainer.setTranslationX(width);
+                }
+            }
+        });
+
+        return viewport;
     }
     
     /**
@@ -375,6 +470,32 @@ public class CustomKeyboardView extends LinearLayout {
 
         List<List<Key>> currentKeys = lowerKeys;
 
+        // In split keyboard mode, divide each row into left or right half
+        if (splitPart != SPLIT_NONE) {
+            List<List<Key>> splitKeys = new ArrayList<>();
+            for (List<Key> row : currentKeys) {
+                int mid = (row.size() + 1) / 2; // round up for odd rows
+                List<Key> sideKeys = new ArrayList<>();
+                if (splitPart == SPLIT_LEFT) {
+                    for (int i = 0; i < mid; i++) sideKeys.add(row.get(i));
+                } else {
+                    for (int i = mid; i < row.size(); i++) sideKeys.add(row.get(i));
+                }
+                // Rescale widths to fill half of the row
+                float sideWeightSum = 0;
+                for (Key k : sideKeys) sideWeightSum += k.widthPercent;
+                if (sideWeightSum > 0) {
+                    for (Key k : sideKeys) {
+                        k.widthPercent = (k.widthPercent / sideWeightSum) * 50f;
+                    }
+                }
+                if (!sideKeys.isEmpty()) {
+                    splitKeys.add(sideKeys);
+                }
+            }
+            currentKeys = splitKeys;
+        }
+
         // In fullscreen keyboard mode, hide arrow keys from the main keyboard area.
         // Direction keys are provided by the extra middle panel in this mode.
         if (showExtraPortraitKeys) {
@@ -397,8 +518,13 @@ public class CustomKeyboardView extends LinearLayout {
             currentKeys = filtered;
         }
 
-        // Show two shortcut rows above letter keyboard (hidden in fullscreen mode)
-        if (!showExtraPortraitKeys && !isNumericLayout) {
+        // Show two shortcut rows above letter keyboard in portrait normal mode
+        if (!showExtraPortraitKeys && !isNumericLayout && splitPart == SPLIT_NONE) {
+            addTopFunctionRows();
+        }
+
+        // In landscape fullscreen mode, always show the top scrolling panel
+        if (showExtraPortraitKeys && isLandscape(getContext()) && splitPart == SPLIT_NONE) {
             addTopFunctionRows();
         }
 
@@ -1311,6 +1437,7 @@ public class CustomKeyboardView extends LinearLayout {
                 if (!isNumericLayout) {
                     isNumericLayout = true;
                     isShiftLeftLocked = false;
+                    syncNumericState();
                     updateRequired = true;
                 }
                 break;
@@ -1320,6 +1447,7 @@ public class CustomKeyboardView extends LinearLayout {
                     // Default entry page for next ?123 tap is symbols view.
                     isNumberSubview = false;
                     isShiftLeftLocked = false;
+                    syncNumericState();
                     updateRequired = true;
                 }
                 break;
@@ -1327,6 +1455,7 @@ public class CustomKeyboardView extends LinearLayout {
                 if (isNumericLayout) {
                     isNumberSubview = true;
                     isShiftLeftLocked = false;
+                    syncNumericState();
                     updateRequired = true;
                 }
                 break;
@@ -1334,23 +1463,28 @@ public class CustomKeyboardView extends LinearLayout {
                 if (isNumericLayout) {
                     isNumberSubview = false;
                     isShiftLeftLocked = false;
+                    syncNumericState();
                     updateRequired = true;
                 }
                 break;
             case 0xE1: // Shift Left
                 isShiftLeftLocked = !isShiftLeftLocked;
+                syncModifierStates();
                 updateRequired = true;
                 break;
             case 0xE0: // Ctrl Left
                 isCtrlLeftLocked = !isCtrlLeftLocked;
+                syncModifierStates();
                 updateRequired = true;
                 break;
             case 0xE2: // Alt Left
                 isAltLeftLocked = !isAltLeftLocked;
+                syncModifierStates();
                 updateRequired = true;
                 break;
             case 0xE3: // Win Left
                 isWinLeftLocked = !isWinLeftLocked;
+                syncModifierStates();
                 updateRequired = true;
                 break;
         }

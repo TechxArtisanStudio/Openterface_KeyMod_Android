@@ -11,6 +11,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -37,12 +38,21 @@ public class CompositeFragment extends Fragment {
     private LinearLayout toggleHandle;
     private View toggleHandlePill;
     private TextView touchPadTips;
+    /** Split mode views */
+    private View splitRoot;
+    private CustomKeyboardView keyboardViewLeft;
+    private CustomKeyboardView keyboardViewRight;
+    private ViewGroup splitTouchpadSection;
+    private TouchPadView splitTouchPad;
+    private TextView splitTouchPadTips;
+    /** Container to swap between normal and split layouts */
+    private FrameLayout contentContainer;
     public UsbSerialPort port;
     private BluetoothService bluetoothService;
     private boolean isServiceBound;
     private boolean isDragMode = false;
 
-    private enum DisplayMode { BOTH, KEYBOARD, TOUCHPAD }
+    private enum DisplayMode { BOTH, KEYBOARD, TOUCHPAD, SPLIT }
     private DisplayMode displayMode = DisplayMode.BOTH;
 
     private final ServiceConnection serviceConnection = new ServiceConnection() {
@@ -136,6 +146,7 @@ public class CompositeFragment extends Fragment {
         isDragMode = enabled;
         sendMouseButtonState(enabled ? 0x01 : 0x00);
         updateTouchPadTips();
+        updateSplitTouchPadTips();
         Log.d(TAG, "Drag mode " + (enabled ? "ON" : "OFF"));
     }
 
@@ -150,6 +161,19 @@ public class CompositeFragment extends Fragment {
                 + "Two finger drag -> Scroll\n"
                 + "Long press -> Toggle drag mode";
         touchPadTips.setText(tips);
+    }
+
+    private void updateSplitTouchPadTips() {
+        if (splitTouchPadTips == null) return;
+        String status = isDragMode ? "Drag Mode ON" : "Drag Mode OFF";
+        String tips = "Touch Pad\n"
+                + status + "\n"
+                + "Single tap -> Click\n"
+                + "Double tap -> Double click\n"
+                + "Two finger tap -> Right click\n"
+                + "Two finger drag -> Scroll\n"
+                + "Long press -> Toggle drag mode";
+        splitTouchPadTips.setText(tips);
     }
 
     private void sendMouseButtonState(int buttonMask) {
@@ -311,21 +335,20 @@ public class CompositeFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_composite, container, false);
-
         // Bind to BluetoothService
         Intent intent = new Intent(requireContext(), BluetoothService.class);
         requireContext().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
 
-        rootLayout = view.findViewById(R.id.composite_root);
-        keyboardView = view.findViewById(R.id.keyboard_view);
-        touchPad = view.findViewById(R.id.touchPad);
-        touchpadSection = view.findViewById(R.id.touchpad_section);
-        toggleHandle = view.findViewById(R.id.toggle_handle);
-        toggleHandlePill = view.findViewById(R.id.toggle_handle_pill);
-        touchPadTips = view.findViewById(R.id.touchPadTips);
-        updateTouchPadTips();
+        // Create container to swap between normal and split layouts
+        contentContainer = new FrameLayout(requireContext());
+        contentContainer.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
+        // Initially inflate normal layout
+        View normalView = inflater.inflate(R.layout.fragment_composite, contentContainer, false);
+        contentContainer.addView(normalView);
+
+        setupNormalViews(normalView);
         applyOrientationLayout();
         applyDisplayMode();
 
@@ -337,114 +360,178 @@ public class CompositeFragment extends Fragment {
             keyboardView.setPort(port);
         }
 
-        if (touchPad != null) {
-            touchPad.setOnTouchPadListener(new TouchPadView.OnTouchPadListener() {
-                @Override
-                public void onTouchMove(float startX, float startY, float lastX, float lastY) {
-                    // 2-finger scroll is signalled with lastX==0 && lastY==0
-                    if (lastX == 0 && lastY == 0) {
-                        Log.d(TAG, "TouchPad 2-finger scroll: dx=" + startX + " dy=" + startY);
-                        sendScrollData((int) startX, (int) startY);
-                    } else {
-                        Log.d(TAG, "TouchPad Move: " + startX + ", " + startY + " -> " + lastX + ", " + lastY);
-                        sendHexRelData(startX, startY, lastX, lastY);
-                    }
-                }
+        setupTouchPad(touchPad, touchPadTips);
 
-                @Override
-                public void onTouchClick() {
-                    Log.d(TAG, "TouchPad single tap -> left click");
-                    new Thread(() -> {
-                        try {
-                            String sendKBData = "57AB0005050101000000";
-                            sendKBData += makeChecksum(sendKBData);
-                            byte[] bytes = hexStringToByteArray(sendKBData);
-                            if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-                                bluetoothService.sendData(bytes);
-                            } else if (port != null) {
-                                port.write(bytes, 20);
-                            }
-                            Thread.sleep(30);
-                            releaseAllMSData();
-                        } catch (IOException | InterruptedException e) {
-                            Log.e(TAG, "Error sending tap left click: " + e.getMessage());
-                        }
-                    }).start();
-                }
+        return contentContainer;
+    }
 
-                @Override
-                public void onTouchDoubleClick() {
-                    Log.d(TAG, "TouchPad double tap -> double click");
-                    new Thread(() -> {
-                        try {
-                            String clickData = "57AB0005050101000000";
-                            clickData += makeChecksum(clickData);
-                            byte[] bytes = hexStringToByteArray(clickData);
-                            for (int i = 0; i < 2; i++) {
-                                if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-                                    bluetoothService.sendData(bytes);
-                                } else if (port != null) {
-                                    port.write(bytes, 20);
-                                }
-                                Thread.sleep(30);
-                                releaseAllMSData();
-                                Thread.sleep(30);
-                            }
-                        } catch (IOException | InterruptedException e) {
-                            Log.e(TAG, "Error sending double click: " + e.getMessage());
-                        }
-                    }).start();
-                }
+    private void setupNormalViews(View view) {
+        rootLayout = view.findViewById(R.id.composite_root);
+        keyboardView = view.findViewById(R.id.keyboard_view);
+        touchPad = view.findViewById(R.id.touchPad);
+        touchpadSection = view.findViewById(R.id.touchpad_section);
+        toggleHandle = view.findViewById(R.id.toggle_handle);
+        toggleHandlePill = view.findViewById(R.id.toggle_handle_pill);
+        touchPadTips = view.findViewById(R.id.touchPadTips);
+        updateTouchPadTips();
+    }
 
-                @Override
-                public void onTouchRightClick() {
-                    Log.d(TAG, "TouchPad 2-finger tap -> right click");
-                    new Thread(() -> {
-                        try {
-                            String sendKBData = "57AB0005050102000000";
-                            sendKBData += makeChecksum(sendKBData);
-                            byte[] bytes = hexStringToByteArray(sendKBData);
-                            if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-                                bluetoothService.sendData(bytes);
-                            } else if (port != null) {
-                                port.write(bytes, 20);
-                            }
-                            Thread.sleep(30);
-                            releaseAllMSData();
-                        } catch (IOException | InterruptedException e) {
-                            Log.e(TAG, "Error sending right click: " + e.getMessage());
-                        }
-                    }).start();
-                }
+    private void setupSplitViews(View view) {
+        splitRoot = view.findViewById(R.id.split_root);
+        FrameLayout topPanelContainer = view.findViewById(R.id.split_top_panel);
+        keyboardViewLeft = view.findViewById(R.id.keyboard_view_left);
+        keyboardViewRight = view.findViewById(R.id.keyboard_view_right);
+        splitTouchpadSection = view.findViewById(R.id.touchpad_section);
+        splitTouchPad = view.findViewById(R.id.touchPad);
+        splitTouchPadTips = view.findViewById(R.id.touchPadTips);
+        View splitToggleHandle = view.findViewById(R.id.toggle_handle);
 
-                @Override
-                public void onTouchLongPress() {
-                    setDragMode(!isDragMode);
-                }
-
-                @Override
-                public void onTouchRelease() {
-                    // Match iOS behavior: release only when drag mode is off.
-                    if (!isDragMode) {
-                        releaseAllMSData();
-                    }
-                }
-            });
+        if (splitTouchPadTips != null) {
+            updateSplitTouchPadTips();
         }
 
-        return view;
+        if (splitToggleHandle != null) {
+            splitToggleHandle.setOnClickListener(v -> cycleDisplayMode());
+        }
+
+        // Suppress top panels inside each keyboard half by setting split part
+        if (keyboardViewLeft != null) {
+            keyboardViewLeft.setPort(port);
+            keyboardViewLeft.setSplitPart(CustomKeyboardView.SPLIT_LEFT);
+            // Link to right keyboard for modifier state syncing
+            if (keyboardViewRight != null) {
+                keyboardViewLeft.setSplitPartner(keyboardViewRight);
+            }
+            // Create shared top panel from the left keyboard
+            if (topPanelContainer != null) {
+                View topPanel = keyboardViewLeft.createTopPanel();
+                if (topPanel != null) {
+                    topPanelContainer.addView(topPanel);
+                }
+            }
+        }
+        if (keyboardViewRight != null) {
+            keyboardViewRight.setPort(port);
+            keyboardViewRight.setSplitPart(CustomKeyboardView.SPLIT_RIGHT);
+            // Link to left keyboard for modifier state syncing
+            if (keyboardViewLeft != null) {
+                keyboardViewRight.setSplitPartner(keyboardViewLeft);
+            }
+        }
+
+        setupTouchPad(splitTouchPad, splitTouchPadTips);
+    }
+
+    private void setupTouchPad(TouchPadView pad, TextView tips) {
+        if (pad == null) return;
+        pad.setOnTouchPadListener(new TouchPadView.OnTouchPadListener() {
+            @Override
+            public void onTouchMove(float startX, float startY, float lastX, float lastY) {
+                if (lastX == 0 && lastY == 0) {
+                    sendScrollData((int) startX, (int) startY);
+                } else {
+                    sendHexRelData(startX, startY, lastX, lastY);
+                }
+            }
+
+            @Override
+            public void onTouchClick() {
+                new Thread(() -> {
+                    try {
+                        String sendKBData = "57AB0005050101000000";
+                        sendKBData += makeChecksum(sendKBData);
+                        byte[] bytes = hexStringToByteArray(sendKBData);
+                        if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                            bluetoothService.sendData(bytes);
+                        } else if (port != null) {
+                            port.write(bytes, 20);
+                        }
+                        Thread.sleep(30);
+                        releaseAllMSData();
+                    } catch (IOException | InterruptedException e) {
+                        Log.e(TAG, "Error sending tap left click: " + e.getMessage());
+                    }
+                }).start();
+            }
+
+            @Override
+            public void onTouchDoubleClick() {
+                new Thread(() -> {
+                    try {
+                        String clickData = "57AB0005050101000000";
+                        clickData += makeChecksum(clickData);
+                        byte[] bytes = hexStringToByteArray(clickData);
+                        for (int i = 0; i < 2; i++) {
+                            if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                                bluetoothService.sendData(bytes);
+                            } else if (port != null) {
+                                port.write(bytes, 20);
+                            }
+                            Thread.sleep(30);
+                            releaseAllMSData();
+                            Thread.sleep(30);
+                        }
+                    } catch (IOException | InterruptedException e) {
+                        Log.e(TAG, "Error sending double click: " + e.getMessage());
+                    }
+                }).start();
+            }
+
+            @Override
+            public void onTouchRightClick() {
+                new Thread(() -> {
+                    try {
+                        String sendKBData = "57AB0005050102000000";
+                        sendKBData += makeChecksum(sendKBData);
+                        byte[] bytes = hexStringToByteArray(sendKBData);
+                        if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
+                            bluetoothService.sendData(bytes);
+                        } else if (port != null) {
+                            port.write(bytes, 20);
+                        }
+                        Thread.sleep(30);
+                        releaseAllMSData();
+                    } catch (IOException | InterruptedException e) {
+                        Log.e(TAG, "Error sending right click: " + e.getMessage());
+                    }
+                }).start();
+            }
+
+            @Override
+            public void onTouchLongPress() {
+                setDragMode(!isDragMode);
+            }
+
+            @Override
+            public void onTouchRelease() {
+                if (!isDragMode) {
+                    releaseAllMSData();
+                }
+            }
+        });
     }
 
     private void cycleDisplayMode() {
         switch (displayMode) {
             case BOTH:     displayMode = DisplayMode.KEYBOARD;  break;
             case KEYBOARD: displayMode = DisplayMode.TOUCHPAD;  break;
-            case TOUCHPAD: displayMode = DisplayMode.BOTH;      break;
+            case TOUCHPAD: displayMode = DisplayMode.SPLIT;     break;
+            case SPLIT:    displayMode = DisplayMode.BOTH;      break;
         }
         applyDisplayMode();
     }
 
     private void applyDisplayMode() {
+        boolean isInSplit = displayMode == DisplayMode.SPLIT;
+
+        if (isInSplit) {
+            ensureSplitLayout();
+            return;
+        }
+
+        // Ensure we have the normal layout
+        ensureNormalLayout();
+
         if (touchpadSection != null) {
             touchpadSection.setVisibility(
                 displayMode != DisplayMode.KEYBOARD ? View.VISIBLE : View.GONE);
@@ -453,10 +540,54 @@ public class CompositeFragment extends Fragment {
             keyboardView.setVisibility(
                 displayMode != DisplayMode.TOUCHPAD ? View.VISIBLE : View.GONE);
 
-            // Ensure we always use the correct orientation keyboard keyset when mode changes.
             keyboardView.reloadForCurrentOrientation();
             keyboardView.setShowExtraPortraitKeys(displayMode == DisplayMode.KEYBOARD);
         }
+    }
+
+    private void ensureSplitLayout() {
+        if (splitRoot == null) {
+            View normal = contentContainer.getChildAt(0);
+            if (normal != null) {
+                contentContainer.removeView(normal);
+            }
+            View splitView = LayoutInflater.from(requireContext()).inflate(
+                    R.layout.fragment_composite_split, contentContainer, false);
+            contentContainer.addView(splitView);
+            setupSplitViews(splitView);
+        }
+
+        // Update split keyboard views
+        if (keyboardViewLeft != null) {
+            keyboardViewLeft.reloadForCurrentOrientation();
+        }
+        if (keyboardViewRight != null) {
+            keyboardViewRight.reloadForCurrentOrientation();
+        }
+    }
+
+    private void ensureNormalLayout() {
+        if (splitRoot != null) {
+            View split = contentContainer.getChildAt(0);
+            if (split != null) {
+                contentContainer.removeView(split);
+            }
+            splitRoot = null;
+            keyboardViewLeft = null;
+            keyboardViewRight = null;
+
+            View normalView = LayoutInflater.from(requireContext()).inflate(
+                    R.layout.fragment_composite, contentContainer, false);
+            contentContainer.addView(normalView);
+            setupNormalViews(normalView);
+            if (toggleHandle != null) {
+                toggleHandle.setOnClickListener(v -> cycleDisplayMode());
+            }
+            if (keyboardView != null && port != null) {
+                keyboardView.setPort(port);
+            }
+        }
+        applyOrientationLayout();
     }
 
     private void applyOrientationLayout() {
@@ -507,8 +638,20 @@ public class CompositeFragment extends Fragment {
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        applyOrientationLayout();
-        applyDisplayMode();
+        if (displayMode == DisplayMode.SPLIT) {
+            // Reconfigure split keyboard views for new orientation
+            if (keyboardViewLeft != null) {
+                keyboardViewLeft.reloadForCurrentOrientation();
+                keyboardViewLeft.setSplitPart(CustomKeyboardView.SPLIT_LEFT);
+            }
+            if (keyboardViewRight != null) {
+                keyboardViewRight.reloadForCurrentOrientation();
+                keyboardViewRight.setSplitPart(CustomKeyboardView.SPLIT_RIGHT);
+            }
+        } else {
+            applyOrientationLayout();
+            applyDisplayMode();
+        }
     }
 
     @Override
