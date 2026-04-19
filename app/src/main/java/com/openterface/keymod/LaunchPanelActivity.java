@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -31,6 +32,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
     private CheckBox rememberChoiceCheckBox;
     private Button startButton;
     private Button skipButton;
+    private TextView showTutorialLink;
     private SharedPreferences prefs;
     private String selectedMode = MODE_KEYBOARD_MOUSE;
 
@@ -67,6 +69,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
         rememberChoiceCheckBox = findViewById(R.id.remember_choice_checkbox);
         startButton = findViewById(R.id.start_button);
         skipButton = findViewById(R.id.skip_button);
+        showTutorialLink = findViewById(R.id.show_tutorial_link);
 
         // Mode cards
         keyboardMouseCard = findViewById(R.id.keyboard_mouse_card);
@@ -115,6 +118,16 @@ public class LaunchPanelActivity extends AppCompatActivity {
         skipButton.setOnClickListener(v -> {
             prefs.edit().putBoolean(REMEMBER_CHOICE_KEY, false).apply();
             launchModeInternal(MODE_KEYBOARD_MOUSE);
+        });
+
+        showTutorialLink.setOnClickListener(v -> {
+            // Clear the tutorial flag so it will show again
+            getSharedPreferences(TutorialOverlay.PREFS_NAME, MODE_PRIVATE)
+                .edit().putBoolean(TutorialOverlay.KEY_TUTORIAL_SHOWN, false).apply();
+            finish();
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
         });
     }
 

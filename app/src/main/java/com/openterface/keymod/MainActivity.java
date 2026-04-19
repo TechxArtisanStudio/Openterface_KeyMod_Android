@@ -17,6 +17,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -245,6 +246,11 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 connectionManager.autoConnect();
             }
         }, 500);
+
+        // Show beginner tutorial on first launch
+        if (!TutorialOverlay.isShown(this)) {
+            new Handler().postDelayed(this::showTutorial, 800);
+        }
     }
 
     @Override
@@ -974,5 +980,64 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
 
     public BluetoothService getBluetoothService() {
         return bluetoothService;
+    }
+
+    private void showTutorial() {
+        TutorialOverlay overlay = new TutorialOverlay(this);
+
+        overlay.setSteps(new TutorialOverlay.Step[]{
+            new TutorialOverlay.Step() {
+                public int[] targetViewIds() { return new int[]{R.id.menu_button}; }
+                public String description() { return "Tap here to open the navigation menu where you can switch modes and settings."; }
+                public String buttonText() { return "Next"; }
+            },
+            new TutorialOverlay.Step() {
+                public int[] targetViewIds() { return new int[]{R.id.connection_container}; }
+                public String description() { return "Tap the Bluetooth icon to connect via USB or Bluetooth. Green signal bars appear when connected."; }
+                public String buttonText() { return "Next"; }
+            },
+            new TutorialOverlay.Step() {
+                public int[] targetViewIds() { return new int[]{R.id.nav_keyboard_mouse}; }
+                public String description() { return "Open the menu to choose your preferred input mode: Keyboard & Mouse, Numpad, Shortcuts, Macros, or Voice."; }
+                public String buttonText() { return "Next"; }
+                public void onShow(android.content.Context context) {
+                    androidx.drawerlayout.widget.DrawerLayout drawer = ((android.app.Activity) context).findViewById(R.id.drawer_layout);
+                    if (drawer != null) drawer.openDrawer(android.view.Gravity.START);
+                }
+                public int delayMs() { return 400; }
+            },
+            new TutorialOverlay.Step() {
+                public int[] targetViewIds() { return new int[]{R.id.target_os_section}; }
+                public String description() { return "Select the target OS (macOS, Windows, or Linux) for correct key mappings."; }
+                public String buttonText() { return "Next"; }
+            },
+            new TutorialOverlay.Step() {
+                public int[] targetViewIds() { return new int[]{R.id.keyboard_view, R.id.keyboard_view_left}; }
+                public String description() { return "Tap ABC, !?#, or 123 keys on the keyboard to switch between letter, number, and symbol layouts."; }
+                public String buttonText() { return "Next"; }
+                public void onShow(android.content.Context context) {
+                    androidx.drawerlayout.widget.DrawerLayout drawer = ((android.app.Activity) context).findViewById(R.id.drawer_layout);
+                    if (drawer != null && drawer.isDrawerOpen(android.view.Gravity.START)) drawer.closeDrawer(android.view.Gravity.START);
+                }
+                public int delayMs() { return 400; }
+            },
+            new TutorialOverlay.Step() {
+                public int[] targetViewIds() { return new int[]{R.id.keyboard_view}; }
+                public String description() { return "The keyboard shortcuts row at the top can be scrolled left or right to reveal more options."; }
+                public String buttonText() { return "Next"; }
+                public int insetTopDp() { return 0; }
+                public int insetBottomDp() { return -200; }
+            },
+            new TutorialOverlay.Step() {
+                public int[] targetViewIds() { return new int[]{R.id.touchPad}; }
+                public String description() { return "Use the touchpad to control the cursor. Long press to toggle drag mode."; }
+                public String buttonText() { return "Done"; }
+            }
+        });
+
+        // Add overlay to activity root so it appears above both content and drawer
+        ViewGroup root = findViewById(android.R.id.content);
+        root.addView(overlay, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
 }

@@ -549,10 +549,11 @@ public class CompositeFragment extends Fragment {
     }
 
     private void cycleDisplayMode() {
+        boolean isPortrait = getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT;
         switch (displayMode) {
             case BOTH:     displayMode = DisplayMode.KEYBOARD;  break;
-            case KEYBOARD: displayMode = DisplayMode.TOUCHPAD;  break;
-            case TOUCHPAD: displayMode = DisplayMode.SPLIT;     break;
+            case KEYBOARD: displayMode = isPortrait ? DisplayMode.BOTH : DisplayMode.TOUCHPAD;  break;
+            case TOUCHPAD: displayMode = isPortrait ? DisplayMode.BOTH : DisplayMode.SPLIT;     break;
             case SPLIT:    displayMode = DisplayMode.BOTH;      break;
         }
         applyDisplayMode();
@@ -675,6 +676,15 @@ public class CompositeFragment extends Fragment {
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        boolean isPortrait = newConfig.orientation == Configuration.ORIENTATION_PORTRAIT;
+
+        if (displayMode == DisplayMode.SPLIT && isPortrait) {
+            displayMode = DisplayMode.BOTH;
+            ensureNormalLayout();
+            applyDisplayMode();
+            return;
+        }
+
         if (displayMode == DisplayMode.SPLIT) {
             // Reconfigure split keyboard views for new orientation
             if (keyboardViewLeft != null) {

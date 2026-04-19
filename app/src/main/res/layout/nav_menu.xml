@@ -220,27 +220,34 @@
         android:layout_marginBottom="8dp" />
 
     <!-- Target OS selector -->
-    <TextView
-        android:id="@+id/target_os_label"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Target OS"
-        android:textSize="11sp"
-        android:textStyle="bold"
-        android:textColor="@color/text_secondary"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp" />
-
     <LinearLayout
+        android:id="@+id/target_os_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="8dp">
+        android:orientation="vertical"
+        android:paddingBottom="4dp">
+
+        <TextView
+            android:id="@+id/target_os_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Target OS"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_secondary"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="8dp">
 
         <ImageButton
             android:id="@+id/nav_os_macos_button"
@@ -272,6 +279,7 @@
             android:src="@drawable/ic_os_linux"
             android:tint="@color/text_secondary" />
 
+    </LinearLayout>
     </LinearLayout>
 
     <!-- LaunchPad Button (returns to LaunchPanel) -->
