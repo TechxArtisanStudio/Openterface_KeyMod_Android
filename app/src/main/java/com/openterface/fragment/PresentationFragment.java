@@ -1,5 +1,6 @@
 package com.openterface.fragment;
 
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -13,8 +14,13 @@ import android.view.GestureDetector;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.InputDevice;
+import android.view.KeyEvent;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -71,6 +77,10 @@ public class PresentationFragment extends Fragment {
     private Button btnLaser;
     private Button btnPointer;
     private Button btnList;
+    private ImageButton btnEditSlideCount;
+    private ImageButton btnEditTimer;
+    private ImageButton btnTimerStart;
+    private ImageButton btnTimerReset;
     private View settingsButton;
     private TextView connectionStatus;
     private TextView batteryLevel;
@@ -158,6 +168,10 @@ public class PresentationFragment extends Fragment {
         btnLaser = view.findViewById(R.id.btn_laser);
         btnPointer = view.findViewById(R.id.btn_pointer);
         btnList = view.findViewById(R.id.btn_list);
+        btnEditSlideCount = view.findViewById(R.id.btn_edit_slide_count);
+        btnEditTimer = view.findViewById(R.id.btn_edit_timer);
+        btnTimerStart = view.findViewById(R.id.btn_timer_start);
+        btnTimerReset = view.findViewById(R.id.btn_timer_reset);
         settingsButton = view.findViewById(R.id.settings_button);
         connectionStatus = view.findViewById(R.id.connection_status);
         batteryLevel = view.findViewById(R.id.battery_level);
@@ -211,6 +225,36 @@ public class PresentationFragment extends Fragment {
         btnList.setOnClickListener(v -> {
             Toast.makeText(requireContext(), "Slide list coming soon", Toast.LENGTH_SHORT).show();
         });
+
+        // Edit slide count button
+        btnEditSlideCount.setOnClickListener(v -> {
+            showEditSlideCountDialog();
+        });
+
+        // Edit timer button
+        btnEditTimer.setOnClickListener(v -> {
+            showEditTimerDialog();
+        });
+
+        // Timer start/pause button
+        btnTimerStart.setOnClickListener(v -> {
+            vibrate();
+            if (timerRunning) {
+                stopTimer();
+            } else {
+                startTimer();
+            }
+            updateTimerButton();
+        });
+
+        // Timer reset button
+        btnTimerReset.setOnClickListener(v -> {
+            vibrate();
+            resetTimer();
+            updateTimerButton();
+        });
+
+        updateTimerButton();
 
         // Settings button
         if (settingsButton != null) {
@@ -416,6 +460,63 @@ public class PresentationFragment extends Fragment {
         updateProgressDots();
     }
 
+    private void showEditSlideCountDialog() {
+        EditText editText = new EditText(requireContext());
+        editText.setText(String.valueOf(totalSlides));
+        editText.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        editText.setHint("Total slides");
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Total Slides")
+                .setView(editText)
+                .setPositiveButton("OK", (dialog, which) -> {
+                    String input = editText.getText().toString().trim();
+                    if (!input.isEmpty()) {
+                        int newTotal = Integer.parseInt(input);
+                        if (newTotal > 0) {
+                            totalSlides = newTotal;
+                            if (currentSlide > totalSlides) {
+                                currentSlide = totalSlides;
+                            }
+                            updateSlideDisplay();
+                            saveState();
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showEditTimerDialog() {
+        EditText editText = new EditText(requireContext());
+        int currentMinutes = timerDuration / 60;
+        editText.setText(String.valueOf(currentMinutes));
+        editText.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        editText.setHint("Minutes");
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Timer Duration (minutes)")
+                .setView(editText)
+                .setPositiveButton("OK", (dialog, which) -> {
+                    String input = editText.getText().toString().trim();
+                    if (!input.isEmpty()) {
+                        int newMinutes = Integer.parseInt(input);
+                        if (newMinutes > 0) {
+                            timerDuration = newMinutes * 60;
+                            timerRemainingSec = timerDuration;
+                            timerRunning = false;
+                            timerHandler.removeCallbacks(timerRunnable);
+                            updateTimerDisplay();
+                            timerTotal.setText(" of " + formatTime(timerDuration));
+                            updatePaceGauge();
+                            saveState();
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     private void updateProgressDots() {
         slideProgressDots.removeAllViews();
 
@@ -522,6 +623,7 @@ public class PresentationFragment extends Fragment {
         if (timerRunning) return;
         timerRunning = true;
         timerStartTime = System.currentTimeMillis();
+        updateTimerButton();
         saveState();
 
         timerRunnable = new Runnable() {
@@ -554,6 +656,7 @@ public class PresentationFragment extends Fragment {
         if (timerRunnable != null) {
             timerHandler.removeCallbacks(timerRunnable);
         }
+        updateTimerButton();
         saveState();
     }
 
@@ -562,6 +665,7 @@ public class PresentationFragment extends Fragment {
         timerRemainingSec = timerDuration;
         updateTimerDisplay();
         updatePaceGauge();
+        updateTimerButton();
         saveState();
     }
 
@@ -596,6 +700,16 @@ public class PresentationFragment extends Fragment {
 
         paceGauge.setPaceState(paceState);
         paceGauge.setProgress(progress);
+    }
+
+    private void updateTimerButton() {
+        if (timerRunning) {
+            btnTimerStart.setImageResource(R.drawable.ic_pause);
+            btnTimerStart.setContentDescription(getString(R.string.timer_pause));
+        } else {
+            btnTimerStart.setImageResource(R.drawable.ic_play);
+            btnTimerStart.setContentDescription(getString(R.string.timer_start));
+        }
     }
 
     // ── Persistence ──────────────────────────────────────────────────

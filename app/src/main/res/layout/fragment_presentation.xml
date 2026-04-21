@@ -103,7 +103,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:text="@string/list"
-                    android:textColor="@color/presentation_text_secondary"
+                    android:textColor="@android:color/white"
                     android:textSize="12sp"
                     android:textAllCaps="false"
                     android:background="@drawable/presentation_list_button"
@@ -113,7 +113,7 @@
                     android:layout_centerVertical="true"
                     android:drawableStart="@drawable/ic_list"
                     android:drawablePadding="4dp"
-                    android:drawableTint="@color/presentation_text_secondary" />
+                    android:drawableTint="@android:color/white" />
             </RelativeLayout>
 
             <!-- Slide Info -->
@@ -128,14 +128,31 @@
                     android:orientation="vertical"
                     android:layout_alignParentStart="true">
 
-                    <TextView
-                        android:id="@+id/slide_number"
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Slide 1 / 1"
-                        android:textColor="@color/presentation_text_primary"
-                        android:textSize="28sp"
-                        android:textStyle="bold" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:id="@+id/slide_number"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Slide 1 / 1"
+                            android:textColor="@color/presentation_text_primary"
+                            android:textSize="28sp"
+                            android:textStyle="bold" />
+
+                        <ImageButton
+                            android:id="@+id/btn_edit_slide_count"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:layout_marginStart="8dp"
+                            android:src="@drawable/ic_edit"
+                            android:tint="@color/presentation_text_muted"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="Edit slide count" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/slide_title"
@@ -236,15 +253,32 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical">
 
-                        <TextView
-                            android:id="@+id/timer_remaining"
+                        <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="25:00"
-                            android:textColor="@color/presentation_text_primary"
-                            android:textSize="32sp"
-                            android:textStyle="bold"
-                            android:fontFamily="sans-serif-light" />
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:id="@+id/timer_remaining"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="25:00"
+                                android:textColor="@color/presentation_text_primary"
+                                android:textSize="32sp"
+                                android:textStyle="bold"
+                                android:fontFamily="sans-serif-light" />
+
+                            <ImageButton
+                                android:id="@+id/btn_edit_timer"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:layout_marginStart="8dp"
+                                android:src="@drawable/ic_edit"
+                                android:tint="@color/presentation_text_muted"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="Edit timer" />
+                        </LinearLayout>
 
                         <LinearLayout
                             android:layout_width="wrap_content"
@@ -270,12 +304,45 @@
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- Pace Gauge -->
-                <com.openterface.keymod.PaceGaugeView
-                    android:id="@+id/pace_gauge"
-                    android:layout_width="80dp"
-                    android:layout_height="80dp"
-                    android:layout_marginStart="16dp" />
+                <!-- Pace Gauge & Controls -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center_horizontal">
+
+                    <com.openterface.keymod.PaceGaugeView
+                        android:id="@+id/pace_gauge"
+                        android:layout_width="80dp"
+                        android:layout_height="80dp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="8dp">
+
+                        <ImageButton
+                            android:id="@+id/btn_timer_start"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:src="@drawable/ic_play"
+                            android:tint="@android:color/white"
+                            android:background="@drawable/timer_start_button"
+                            android:layout_marginEnd="8dp"
+                            android:contentDescription="Start timer" />
+
+                        <ImageButton
+                            android:id="@+id/btn_timer_reset"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:src="@drawable/ic_reset"
+                            android:tint="@color/presentation_text_primary"
+                            android:background="@drawable/presentation_action_button"
+                            android:layout_marginStart="8dp"
+                            android:contentDescription="Reset timer" />
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
 
@@ -297,91 +364,126 @@
             android:paddingStart="24dp"
             android:paddingEnd="24dp" />
 
-        <!-- Action Buttons Grid (2x2) -->
+        <!-- Action Buttons Row (Previous / Black Screen) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="12dp">
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
 
-            <Button
-                android:id="@+id/btn_previous"
+            <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="84dp"
-                android:minHeight="84dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="8dp"
-                android:text="@string/previous"
-                android:textColor="@color/presentation_text_primary"
-                android:textSize="13sp"
-                android:textAllCaps="false"
-                android:background="@drawable/presentation_action_button"
-                android:drawableTop="@drawable/caret_left_fill"
-                android:drawablePadding="4dp"
-                android:drawableTint="@color/presentation_text_secondary"
-                android:paddingTop="12dp"
-                android:paddingBottom="12dp" />
+                android:orientation="vertical">
 
-            <Button
-                android:id="@+id/btn_black_screen"
+                <Button
+                    android:id="@+id/btn_previous"
+                    android:layout_width="match_parent"
+                    android:layout_height="100dp"
+                    android:minHeight="100dp"
+                    android:text="@string/previous"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    android:textAllCaps="false"
+                    android:background="@drawable/presentation_primary_button"
+                    android:drawableEnd="@drawable/caret_left_fill"
+                    android:drawablePadding="8dp"
+                    android:drawableTint="@android:color/white"
+                    android:paddingStart="24dp"
+                    android:paddingEnd="24dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Go back to previous slide"
+                    android:textColor="@color/presentation_text_muted"
+                    android:textSize="11sp"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="84dp"
-                android:minHeight="84dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="8dp"
-                android:text="@string/black_screen"
-                android:textColor="@color/presentation_text_primary"
-                android:textSize="13sp"
-                android:textAllCaps="false"
-                android:background="@drawable/presentation_action_button"
-                android:drawableTop="@drawable/ic_black_screen"
-                android:drawablePadding="4dp"
-                android:drawableTint="@color/presentation_text_secondary"
-                android:paddingTop="12dp"
-                android:paddingBottom="12dp" />
+                android:orientation="vertical">
+
+                <Button
+                    android:id="@+id/btn_black_screen"
+                    android:layout_width="match_parent"
+                    android:layout_height="100dp"
+                    android:minHeight="100dp"
+                    android:text="@string/black_screen"
+                    android:textColor="@android:color/white"
+                    android:textSize="11sp"
+                    android:textAllCaps="false"
+                    android:background="@drawable/presentation_action_button"
+                    android:drawableTop="@drawable/ic_black_screen"
+                    android:drawablePadding="4dp"
+                    android:drawableTint="@android:color/white"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="4dp" />
+            </LinearLayout>
         </LinearLayout>
 
+        <!-- Action Buttons Row (Laser / Pointer) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
+            android:gravity="center_vertical"
             android:layout_marginBottom="16dp">
 
-            <Button
-                android:id="@+id/btn_laser"
+            <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="84dp"
-                android:minHeight="84dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="8dp"
-                android:text="@string/laser"
-                android:textColor="@color/presentation_text_primary"
-                android:textSize="13sp"
-                android:textAllCaps="false"
-                android:background="@drawable/presentation_action_button"
-                android:drawableTop="@drawable/ic_laser"
-                android:drawablePadding="4dp"
-                android:drawableTint="@color/presentation_red"
-                android:paddingTop="12dp"
-                android:paddingBottom="12dp" />
+                android:orientation="vertical">
 
-            <Button
-                android:id="@+id/btn_pointer"
+                <Button
+                    android:id="@+id/btn_laser"
+                    android:layout_width="match_parent"
+                    android:layout_height="100dp"
+                    android:minHeight="100dp"
+                    android:text="@string/laser"
+                    android:textColor="@android:color/white"
+                    android:textSize="11sp"
+                    android:textAllCaps="false"
+                    android:background="@drawable/presentation_action_button"
+                    android:drawableTop="@drawable/ic_laser"
+                    android:drawablePadding="4dp"
+                    android:drawableTint="@android:color/white"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="4dp" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="84dp"
-                android:minHeight="84dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="8dp"
-                android:text="@string/pointer"
-                android:textColor="@color/presentation_text_primary"
-                android:textSize="13sp"
-                android:textAllCaps="false"
-                android:background="@drawable/presentation_action_button"
-                android:drawableTop="@drawable/ic_pointer"
-                android:drawablePadding="4dp"
-                android:drawableTint="@color/presentation_purple"
-                android:paddingTop="12dp"
-                android:paddingBottom="12dp" />
+                android:orientation="vertical">
+
+                <Button
+                    android:id="@+id/btn_pointer"
+                    android:layout_width="match_parent"
+                    android:layout_height="100dp"
+                    android:minHeight="100dp"
+                    android:text="@string/pointer"
+                    android:textColor="@android:color/white"
+                    android:textSize="11sp"
+                    android:textAllCaps="false"
+                    android:background="@drawable/presentation_action_button"
+                    android:drawableTop="@drawable/ic_pointer"
+                    android:drawablePadding="4dp"
+                    android:drawableTint="@android:color/white"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="4dp" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- Help Text -->
@@ -398,31 +500,31 @@
                 android:layout_height="wrap_content"
                 android:text="@string/tap_center_next"
                 android:textColor="@color/presentation_text_muted"
-                android:textSize="12sp" />
+                android:textSize="10sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/swipe_prev_next"
                 android:textColor="@color/presentation_text_muted"
-                android:textSize="12sp"
-                android:layout_marginTop="2dp" />
+                android:textSize="10sp"
+                android:layout_marginTop="1dp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/long_press_laser"
                 android:textColor="@color/presentation_text_muted"
-                android:textSize="12sp"
-                android:layout_marginTop="2dp" />
+                android:textSize="10sp"
+                android:layout_marginTop="1dp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/hold_move_pointer"
                 android:textColor="@color/presentation_text_muted"
-                android:textSize="12sp"
-                android:layout_marginTop="2dp" />
+                android:textSize="10sp"
+                android:layout_marginTop="1dp" />
         </LinearLayout>
 
     </LinearLayout>

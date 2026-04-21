@@ -20,4 +20,15 @@
     <color name="key_bg_pressed">#FF6A7EA3</color>
     <color name="key_border">#FF5A5A5F</color>
     <color name="key_text">#FFFFFFFF</color>
+
+    <!-- Presentation Mode Colors (Dark) -->
+    <color name="presentation_bg">#FF16192B</color>
+    <color name="presentation_card_bg">#FF1E2236</color>
+    <color name="presentation_text_primary">#FFFFFFFF</color>
+    <color name="presentation_text_secondary">#FF9BA3C5</color>
+    <color name="presentation_text_muted">#FF5C6380</color>
+    <color name="presentation_progress_empty">#FF3A3F57</color>
+    <color name="presentation_card_pressed">#FF2A2F45</color>
+    <color name="presentation_list_button_bg">#FFE65100</color>
+    <color name="presentation_list_button_pressed">#FFBF360C</color>
 </resources>
