@@ -50,6 +50,10 @@ public class GamepadFragment extends Fragment {
     private static final String PREF_STICK_RIGHT = "gamepad_stick_right";
     private static final String PREF_BUTTON_A_KEY = "gamepad_button_a_key";
     private static final String PREF_BUTTON_B_KEY = "gamepad_button_b_key";
+    private static final String PREF_BUTTON_A_MOD = "gamepad_button_a_mod";
+    private static final String PREF_BUTTON_B_MOD = "gamepad_button_b_mod";
+    private static final String PREF_BUTTON_SIZE = "gamepad_button_size";
+    private static final String PREF_STICK_SIZE = "gamepad_stick_size";
 
     // Stick modes
     private static final String MODE_ANALOG = "analog";
@@ -65,6 +69,7 @@ public class GamepadFragment extends Fragment {
         {"X", "27"}, {"C", "6"}, {"V", "25"}, {"B", "5"},
         {"N", "17"}, {"M", "16"},
         {"Space", "44"}, {"Enter", "40"}, {"Esc", "41"}, {"Tab", "43"},
+        {"↑", "82"}, {"↓", "81"}, {"←", "80"}, {"→", "79"},
     };
 
     // Default stick key codes
@@ -88,10 +93,19 @@ public class GamepadFragment extends Fragment {
     private int stickLeftKey = DEFAULT_STICK_LEFT;
     private int stickDownKey = DEFAULT_STICK_DOWN;
     private int stickRightKey = DEFAULT_STICK_RIGHT;
+    private float stickSizeScale = 1.0f;
 
     // Button config
     private int buttonAKey = DEFAULT_BUTTON_A;
     private int buttonBKey = 41;  // default: Escape
+    private int buttonAModifiers = 0;  // HID modifier bits for button A
+    private int buttonBModifiers = 0;  // HID modifier bits for button B
+    private float buttonSizeScale = 1.0f;  // 100%
+
+    // Modifier key definitions for checkboxes (label -> HID keycode)
+    private static final String[][] MODIFIER_KEYS = {
+        {"Ctrl", "224"}, {"Shift", "225"}, {"Alt", "226"}, {"Fn", "227"},
+    };
 
     // Track currently pressed keys to avoid repeat events
     private boolean keyUpPressed = false;
@@ -141,6 +155,8 @@ public class GamepadFragment extends Fragment {
         // Pass configured keycode and labels to the gamepad view
         if (gamepadView != null) {
             gamepadView.setButtonAKeyCode(buttonAKey);
+            gamepadView.setButtonSizeScale(buttonSizeScale);
+            gamepadView.setStickSizeScale(stickSizeScale);
             updateGamepadLabels();
         }
 
@@ -241,6 +257,8 @@ public class GamepadFragment extends Fragment {
 
     /**
      * Send a keyboard report with all currently pressed keys (D-pad + button A).
+     * Modifier keys stored per-button are applied via the HID modifier byte,
+     * allowing them to be combined with regular keys.
      */
     private void sendCombinedKeyReport() {
         if (getActivity() instanceof MainActivity) {
@@ -250,28 +268,67 @@ public class GamepadFragment extends Fragment {
                 return;
             }
 
-            // Build list of all currently pressed keys
-            java.util.List<Integer> keys = new java.util.ArrayList<>();
-            if (keyUpPressed) keys.add(stickUpKey);
-            if (keyLeftPressed) keys.add(stickLeftKey);
-            if (keyDownPressed) keys.add(stickDownKey);
-            if (keyRightPressed) keys.add(stickRightKey);
-            if (buttonAPressed) keys.add(buttonAKey);
-            if (buttonBPressed) keys.add(buttonBKey);
+            // Combine modifier bits from all pressed buttons
+            int modifiers = 0;
+            if (buttonAPressed) modifiers |= buttonAModifiers;
+            if (buttonBPressed) modifiers |= buttonBModifiers;
 
-            if (keys.isEmpty()) {
+            // Build list of regular (non-modifier) keys
+            java.util.List<Integer> regularKeys = new java.util.ArrayList<>();
+            if (keyUpPressed) addKeyOrMod(regularKeys, stickUpKey);
+            if (keyLeftPressed) addKeyOrMod(regularKeys, stickLeftKey);
+            if (keyDownPressed) addKeyOrMod(regularKeys, stickDownKey);
+            if (keyRightPressed) addKeyOrMod(regularKeys, stickRightKey);
+            if (buttonAPressed) addKeyOrMod(regularKeys, buttonAKey);
+            if (buttonBPressed) addKeyOrMod(regularKeys, buttonBKey);
+
+            if (regularKeys.isEmpty() && modifiers == 0) {
                 cm.sendKeyRelease();
             } else {
-                int[] keyCodeArray = new int[keys.size()];
-                for (int i = 0; i < keys.size(); i++) {
-                    keyCodeArray[i] = keys.get(i);
+                int[] keyCodeArray = new int[regularKeys.size()];
+                for (int i = 0; i < regularKeys.size(); i++) {
+                    keyCodeArray[i] = regularKeys.get(i);
                 }
-                cm.sendKeyboardReport(0, keyCodeArray);
+                cm.sendKeyboardReport(modifiers, keyCodeArray);
             }
-            Log.d(TAG, "Combined keys: " + keys +
+            Log.d(TAG, "Combined report: modifiers=0x" + Integer.toHexString(modifiers) +
+                " keys=" + regularKeys +
                 " (U=" + keyUpPressed + " L=" + keyLeftPressed +
                 " D=" + keyDownPressed + " R=" + keyRightPressed +
                 " A=" + buttonAPressed + " B=" + buttonBPressed + ")");
+        }
+    }
+
+    /**
+     * Add a keycode to the list if it's not a modifier key.
+     */
+    private void addKeyOrMod(java.util.List<Integer> keys, int keyCode) {
+        if (!isModifierKey(keyCode)) {
+            keys.add(keyCode);
+        }
+    }
+
+    /**
+     * Check if a HID keycode is a modifier key (Ctrl/Shift/Alt/GUI).
+     */
+    private boolean isModifierKey(int keyCode) {
+        return keyCode >= 224 && keyCode <= 231;
+    }
+
+    /**
+     * Get the HID modifier bit for a modifier keycode.
+     */
+    private int modifierBit(int keyCode) {
+        switch (keyCode) {
+            case 224: return 0x01; // Left Ctrl
+            case 225: return 0x02; // Left Shift
+            case 226: return 0x04; // Left Alt
+            case 227: return 0x08; // Left GUI (Fn)
+            case 228: return 0x10; // Right Ctrl
+            case 229: return 0x20; // Right Shift
+            case 230: return 0x40; // Right Alt
+            case 231: return 0x80; // Right GUI
+            default: return 0;
         }
     }
 
@@ -326,14 +383,16 @@ public class GamepadFragment extends Fragment {
         if (componentId.startsWith("stick_")) {
             showStickConfigDialog();
         } else if (componentId.equals("button_a")) {
-            showButtonConfigDialog(buttonAKey, DEFAULT_BUTTON_A, key -> {
+            showButtonConfigDialog(buttonAKey, buttonAModifiers, DEFAULT_BUTTON_A, (key, mod) -> {
                 buttonAKey = key;
+                buttonAModifiers = mod;
                 saveButtonConfig();
                 updateGamepadLabels();
             });
         } else if (componentId.equals("button_b")) {
-            showButtonConfigDialog(buttonBKey, DEFAULT_BUTTON_B, key -> {
+            showButtonConfigDialog(buttonBKey, buttonBModifiers, DEFAULT_BUTTON_B, (key, mod) -> {
                 buttonBKey = key;
+                buttonBModifiers = mod;
                 saveButtonConfig();
             });
         }
@@ -362,6 +421,20 @@ public class GamepadFragment extends Fragment {
         }
         updateKeySectionVisibility(modeGroup, keySection);
         updateKeyLabels(keyUp, keyLeft, keyRight, keyDown);
+
+        // Stick size seekbar
+        android.widget.SeekBar sizeSeekbar = dialogView.findViewById(R.id.stick_size_seekbar);
+        sizeSeekbar.setProgress((int) (stickSizeScale * 100));
+        sizeSeekbar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                stickSizeScale = progress / 100f;
+                if (gamepadView != null) {
+                    gamepadView.setStickSizeScale(stickSizeScale);
+                }
+            }
+            @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
+        });
 
         // Mode change
         modeGroup.setOnCheckedChangeListener((group, checkedId) ->
@@ -392,9 +465,14 @@ public class GamepadFragment extends Fragment {
             stickLeftKey = DEFAULT_STICK_LEFT;
             stickDownKey = DEFAULT_STICK_DOWN;
             stickRightKey = DEFAULT_STICK_RIGHT;
+            stickSizeScale = 1.0f;
             modeGroup.check(R.id.stick_mode_key);
             updateKeySectionVisibility(modeGroup, keySection);
             updateKeyLabels(keyUp, keyLeft, keyRight, keyDown);
+            sizeSeekbar.setProgress(100);
+            if (gamepadView != null) {
+                gamepadView.setStickSizeScale(1.0f);
+            }
         });
 
         // Done
@@ -415,7 +493,7 @@ public class GamepadFragment extends Fragment {
         right.setText(keyCodeToLabel(stickRightKey));
     }
 
-    private void showButtonConfigDialog(int currentKey, int defaultKey, java.util.function.IntConsumer onSave) {
+    private void showButtonConfigDialog(int currentKey, int currentModifiers, int defaultKey, DualKeyModSelectedListener onSave) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_button_config, null);
         builder.setView(dialogView);
@@ -424,48 +502,158 @@ public class GamepadFragment extends Fragment {
         dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 
         final int[] selectedKey = { currentKey };
+        final int[] selectedModifiers = { currentModifiers };
 
         final Button keyLabel = dialogView.findViewById(R.id.button_key_label);
-        keyLabel.setText(keyCodeToLabel(currentKey));
+        updateButtonLabel(keyLabel, currentKey, currentModifiers);
 
-        keyLabel.setOnClickListener(v -> showKeyPicker(keyLabel, selectedKey[0], code -> {
-            selectedKey[0] = code;
-            keyLabel.setText(keyCodeToLabel(code));
+        // Button size seekbar
+        android.widget.SeekBar sizeSeekbar = dialogView.findViewById(R.id.button_size_seekbar);
+        sizeSeekbar.setProgress((int) (buttonSizeScale * 100));
+        sizeSeekbar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                buttonSizeScale = progress / 100f;
+                if (gamepadView != null) {
+                    gamepadView.setButtonSizeScale(buttonSizeScale);
+                }
+            }
+            @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
+        });
+
+        // Build modifier checkboxes row above the key label
+        LinearLayout modifierRow = new LinearLayout(requireContext());
+        modifierRow.setOrientation(LinearLayout.HORIZONTAL);
+        modifierRow.setGravity(android.view.Gravity.CENTER);
+        android.widget.CheckBox[] modifierChecks = new android.widget.CheckBox[MODIFIER_KEYS.length];
+        for (int i = 0; i < MODIFIER_KEYS.length; i++) {
+            android.widget.CheckBox cb = new android.widget.CheckBox(requireContext());
+            cb.setText(MODIFIER_KEYS[i][0]);
+            cb.setTextColor(0xFFFFFFFF);
+            cb.setButtonTintList(android.content.res.ColorStateList.valueOf(0xFF4CAF50));
+            int bit = modifierBit(Integer.parseInt(MODIFIER_KEYS[i][1]));
+            cb.setChecked((currentModifiers & bit) != 0);
+            cb.setOnCheckedChangeListener((v, isChecked) -> {
+                if (isChecked) {
+                    selectedModifiers[0] |= bit;
+                } else {
+                    selectedModifiers[0] &= ~bit;
+                }
+                updateButtonLabel(keyLabel, selectedKey[0], selectedModifiers[0]);
+            });
+            modifierChecks[i] = cb;
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(dp(4), 0, dp(4), dp(12));
+            modifierRow.addView(cb, lp);
+        }
+
+        // Insert modifier row before the key label
+        LinearLayout parent = (LinearLayout) keyLabel.getParent();
+        parent.addView(modifierRow, parent.indexOfChild(keyLabel));
+
+        keyLabel.setOnClickListener(v -> showKeyPickerWithModifiers(keyLabel, selectedKey[0], selectedModifiers[0], (key, mod) -> {
+            selectedKey[0] = key;
+            selectedModifiers[0] = mod;
+            updateButtonLabel(keyLabel, key, mod);
+            // Update checkbox states to match the picked combination
+            for (int i = 0; i < MODIFIER_KEYS.length; i++) {
+                int bit = modifierBit(Integer.parseInt(MODIFIER_KEYS[i][1]));
+                modifierChecks[i].setChecked((mod & bit) != 0);
+            }
         }));
 
         dialogView.findViewById(R.id.btn_reset).setOnClickListener(v -> {
             selectedKey[0] = defaultKey;
-            keyLabel.setText(keyCodeToLabel(defaultKey));
+            selectedModifiers[0] = 0;
+            updateButtonLabel(keyLabel, defaultKey, 0);
+            for (android.widget.CheckBox cb : modifierChecks) {
+                cb.setChecked(false);
+            }
         });
 
         dialogView.findViewById(R.id.btn_done).setOnClickListener(v -> {
-            onSave.accept(selectedKey[0]);
+            onSave.accept(selectedKey[0], selectedModifiers[0]);
+            saveButtonConfig();
             dialog.dismiss();
         });
 
         dialog.show();
     }
 
+    private void updateButtonLabel(Button label, int key, int modifiers) {
+        StringBuilder sb = new StringBuilder(keyCodeToLabel(key));
+        if (modifiers != 0) {
+            sb.insert(0, "+");
+            if ((modifiers & 0x01) != 0) sb.insert(0, "Ctrl");
+            if ((modifiers & 0x02) != 0) { if (sb.length() > 1) sb.insert(0, "+"); sb.insert(0, "Shift"); }
+            if ((modifiers & 0x04) != 0) { if (sb.length() > 1) sb.insert(0, "+"); sb.insert(0, "Alt"); }
+            if ((modifiers & 0x08) != 0) { if (sb.length() > 1) sb.insert(0, "+"); sb.insert(0, "Fn"); }
+        }
+        label.setText(sb.toString());
+    }
+
     private void showKeyPicker(Button displayButton, int currentKeyCode, java.util.function.IntConsumer listener) {
-        buildKeyPickerDialog(currentKeyCode, keyInfo -> {
+        buildKeyPickerDialog(currentKeyCode, 0, keyInfo -> {
             listener.accept(keyInfo.keyCode);
             displayButton.setText(keyInfo.label);
         });
     }
 
-    private void buildKeyPickerDialog(int initialKeyCode, final KeySelectedListener listener) {
+    private void showKeyPickerWithModifiers(Button displayButton, int currentKeyCode, int currentModifiers,
+                                            DualKeyModSelectedListener listener) {
+        buildKeyPickerDialog(currentKeyCode, currentModifiers, keyInfo -> {
+            listener.accept(keyInfo.keyCode, keyInfo.modifiers);
+            updateButtonLabel(displayButton, keyInfo.keyCode, keyInfo.modifiers);
+        });
+    }
+
+    private void buildKeyPickerDialog(int initialKeyCode, int initialModifiers, final KeySelectedListener listener) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("Select Key");
 
         final int[] allKeyCodes = new int[KEY_OPTIONS.length];
         final Button[] allButtons = new Button[KEY_OPTIONS.length];
         final int[] selectedKeyCode = { initialKeyCode };
+        final int[] selectedModifiers = { initialModifiers };
         final String[] selectedLabel = { keyCodeToLabel(initialKeyCode) };
 
+        LinearLayout container = new LinearLayout(requireContext());
+        container.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(16);
+        container.setPadding(pad, pad, pad, dp(8));
+
+        // Modifier checkboxes at the top
+        LinearLayout modifierRow = new LinearLayout(requireContext());
+        modifierRow.setOrientation(LinearLayout.HORIZONTAL);
+        modifierRow.setGravity(android.view.Gravity.CENTER);
+        modifierRow.setPadding(0, 0, 0, dp(12));
+        final android.widget.CheckBox[] modChecks = new android.widget.CheckBox[MODIFIER_KEYS.length];
+        for (int i = 0; i < MODIFIER_KEYS.length; i++) {
+            android.widget.CheckBox cb = new android.widget.CheckBox(requireContext());
+            cb.setText(MODIFIER_KEYS[i][0]);
+            cb.setTextColor(0xFFAAAAAA);
+            cb.setButtonTintList(android.content.res.ColorStateList.valueOf(0xFF4CAF50));
+            int bit = modifierBit(Integer.parseInt(MODIFIER_KEYS[i][1]));
+            cb.setChecked((initialModifiers & bit) != 0);
+            cb.setOnCheckedChangeListener((v, isChecked) -> {
+                if (isChecked) {
+                    selectedModifiers[0] |= bit;
+                } else {
+                    selectedModifiers[0] &= ~bit;
+                }
+            });
+            modChecks[i] = cb;
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(dp(6), 0, dp(6), 0);
+            modifierRow.addView(cb, lp);
+        }
+        container.addView(modifierRow);
+
+        // Key grid
         LinearLayout grid = new LinearLayout(requireContext());
         grid.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(16);
-        grid.setPadding(pad, pad, pad, pad);
 
         for (int i = 0; i < KEY_OPTIONS.length; i += 4) {
             LinearLayout row = new LinearLayout(requireContext());
@@ -481,7 +669,8 @@ public class GamepadFragment extends Fragment {
                 android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
                 final int keyCode = Integer.parseInt(opt[1]);
                 allKeyCodes[idx] = keyCode;
-                bg.setColor(keyCode == initialKeyCode ? 0xFF4CAF50 : 0xFF444444);
+                boolean isSelected = keyCode == initialKeyCode && selectedModifiers[0] == initialModifiers;
+                bg.setColor(isSelected ? 0xFF4CAF50 : 0xFF444444);
                 bg.setCornerRadius(dp(6));
                 btn.setBackground(bg);
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(48), 1);
@@ -504,13 +693,19 @@ public class GamepadFragment extends Fragment {
             }
             grid.addView(row);
         }
+        container.addView(grid);
 
         ScrollView scrollView = new ScrollView(requireContext());
-        scrollView.addView(grid);
+        scrollView.addView(container);
         builder.setView(scrollView);
 
         builder.setPositiveButton("OK", (d, w) -> {
-            listener.onKeySelected(new KeyInfo(selectedKeyCode[0], selectedLabel[0]));
+            // Append modifier labels to the key label for display
+            String displayLabel = selectedLabel[0];
+            if (selectedModifiers[0] != 0) {
+                displayLabel = keyCodeToLabel(selectedKeyCode[0]);
+            }
+            listener.onKeySelected(new KeyInfo(selectedKeyCode[0], displayLabel, selectedModifiers[0]));
         });
 
         AlertDialog dialog = builder.create();
@@ -535,6 +730,7 @@ public class GamepadFragment extends Fragment {
         stickLeftKey = prefs.getInt(PREF_STICK_LEFT, DEFAULT_STICK_LEFT);
         stickDownKey = prefs.getInt(PREF_STICK_DOWN, DEFAULT_STICK_DOWN);
         stickRightKey = prefs.getInt(PREF_STICK_RIGHT, DEFAULT_STICK_RIGHT);
+        stickSizeScale = prefs.getFloat(PREF_STICK_SIZE, 1.0f);
     }
 
     private void saveStickConfig() {
@@ -544,18 +740,25 @@ public class GamepadFragment extends Fragment {
             .putInt(PREF_STICK_LEFT, stickLeftKey)
             .putInt(PREF_STICK_DOWN, stickDownKey)
             .putInt(PREF_STICK_RIGHT, stickRightKey)
+            .putFloat(PREF_STICK_SIZE, stickSizeScale)
             .apply();
     }
 
     private void loadButtonConfig() {
         buttonAKey = prefs.getInt(PREF_BUTTON_A_KEY, DEFAULT_BUTTON_A);
         buttonBKey = prefs.getInt(PREF_BUTTON_B_KEY, DEFAULT_BUTTON_B);
+        buttonAModifiers = prefs.getInt(PREF_BUTTON_A_MOD, 0);
+        buttonBModifiers = prefs.getInt(PREF_BUTTON_B_MOD, 0);
+        buttonSizeScale = prefs.getFloat(PREF_BUTTON_SIZE, 1.0f);
     }
 
     private void saveButtonConfig() {
         prefs.edit()
             .putInt(PREF_BUTTON_A_KEY, buttonAKey)
             .putInt(PREF_BUTTON_B_KEY, buttonBKey)
+            .putInt(PREF_BUTTON_A_MOD, buttonAModifiers)
+            .putInt(PREF_BUTTON_B_MOD, buttonBModifiers)
+            .putFloat(PREF_BUTTON_SIZE, buttonSizeScale)
             .apply();
         updateGamepadLabels();
     }
@@ -569,10 +772,20 @@ public class GamepadFragment extends Fragment {
         labels.put("stick_down", keyCodeToLabel(stickDownKey));
         labels.put("stick_left", keyCodeToLabel(stickLeftKey));
         labels.put("stick_right", keyCodeToLabel(stickRightKey));
-        labels.put("button_a", keyCodeToLabel(buttonAKey));
-        labels.put("button_b", keyCodeToLabel(buttonBKey));
+        labels.put("button_a", buildFullLabel(buttonAKey, buttonAModifiers));
+        labels.put("button_b", buildFullLabel(buttonBKey, buttonBModifiers));
         gamepadView.setComponentDisplayLabels(labels);
         gamepadView.setButtonAKeyCode(buttonAKey);
+    }
+
+    private String buildFullLabel(int key, int modifiers) {
+        StringBuilder sb = new StringBuilder();
+        if ((modifiers & 0x02) != 0) sb.append("Shift+");
+        if ((modifiers & 0x01) != 0) sb.append("Ctrl+");
+        if ((modifiers & 0x04) != 0) sb.append("Alt+");
+        if ((modifiers & 0x08) != 0) sb.append("Fn+");
+        sb.append(keyCodeToLabel(key));
+        return sb.toString();
     }
 
     // ── Input handling ──────────────────────────────────────────────
@@ -760,12 +973,21 @@ public class GamepadFragment extends Fragment {
         void onKeysSelected(int key1, int key2);
     }
 
+    private interface DualKeyModSelectedListener {
+        void accept(int key, int modifiers);
+    }
+
     private static class KeyInfo {
         final int keyCode;
         final String label;
+        final int modifiers;
         KeyInfo(int keyCode, String label) {
+            this(keyCode, label, 0);
+        }
+        KeyInfo(int keyCode, String label, int modifiers) {
             this.keyCode = keyCode;
             this.label = label;
+            this.modifiers = modifiers;
         }
     }
 }

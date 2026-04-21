@@ -86,6 +86,10 @@ public class GamepadView extends View {
     private int buttonAKeyCode = 40; // default: HID Enter
     private boolean showTwoButtons = false;
 
+    // Button size scale (0.5 = 50%, 1.0 = 100%, 2.0 = 200%)
+    private float buttonSizeScale = 1.0f;
+    private float stickSizeScale = 1.0f;
+
     // Currently active stick directions (for highlighting labels)
     private Set<String> activeStickDirections = new java.util.HashSet<>();
 
@@ -334,22 +338,23 @@ public class GamepadView extends View {
 
     private void drawAnalogStick(Canvas canvas, float cx, float cy, float radius, String label,
                                  String upLabel, String downLabel, String leftLabel, String rightLabel) {
+        float scaledRadius = radius * stickSizeScale;
         String id = "stick_" + label.toLowerCase();
-        RectF bounds = new RectF(cx - radius, cy - radius, cx + radius, cy + radius);
+        RectF bounds = new RectF(cx - scaledRadius, cy - scaledRadius, cx + scaledRadius, cy + scaledRadius);
         componentBounds.put(id, bounds);
         // L3/R3 click is detected via minimal-movement tap in onTouchEvent — no separate bounds needed
 
         // Outer circle (housing)
         Paint outerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         outerPaint.setColor(Color.parseColor("#444444"));
-        canvas.drawCircle(cx, cy, radius, outerPaint);
+        canvas.drawCircle(cx, cy, scaledRadius, outerPaint);
 
         // Outer ring
         Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         ringPaint.setStyle(Paint.Style.STROKE);
         ringPaint.setStrokeWidth(3);
         ringPaint.setColor(Color.WHITE);
-        canvas.drawCircle(cx, cy, radius, ringPaint);
+        canvas.drawCircle(cx, cy, scaledRadius, ringPaint);
 
         // Inner circle (stick top) — offset toward where the user's thumb is
         Paint innerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -368,28 +373,27 @@ public class GamepadView extends View {
             innerPaint.setColor(Color.parseColor("#666666"));
         }
 
-        canvas.drawCircle(innerCx, innerCy, radius * 0.6f, innerPaint);
+        canvas.drawCircle(innerCx, innerCy, scaledRadius * 0.6f, innerPaint);
 
         // Inner highlight
         Paint highlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         highlightPaint.setColor(Color.parseColor("#888888"));
-        canvas.drawCircle(innerCx, innerCy, radius * 0.3f, highlightPaint);
+        canvas.drawCircle(innerCx, innerCy, scaledRadius * 0.3f, highlightPaint);
 
         // If directional labels are provided, draw them instead of center label
         if (upLabel != null) {
             Paint dirPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             dirPaint.setTextAlign(Paint.Align.CENTER);
             dirPaint.setFakeBoldText(true);
-            dirPaint.setTextSize(radius * 0.22f);
-            // Labels in the ring between inner circle (0.6r) and outer ring (r)
+            dirPaint.setTextSize(scaledRadius * 0.22f);
             dirPaint.setColor(activeStickDirections.contains(id + "_up") ? Color.parseColor("#FF9800") : Color.WHITE);
-            canvas.drawText(upLabel, cx, cy - radius * 0.65f, dirPaint);
+            canvas.drawText(upLabel, cx, cy - scaledRadius * 0.65f, dirPaint);
             dirPaint.setColor(activeStickDirections.contains(id + "_down") ? Color.parseColor("#FF9800") : Color.WHITE);
-            canvas.drawText(downLabel, cx, cy + radius * 0.75f, dirPaint);
+            canvas.drawText(downLabel, cx, cy + scaledRadius * 0.75f, dirPaint);
             dirPaint.setColor(activeStickDirections.contains(id + "_left") ? Color.parseColor("#FF9800") : Color.WHITE);
-            canvas.drawText(leftLabel, cx - radius * 0.7f, cy + radius * 0.12f, dirPaint);
+            canvas.drawText(leftLabel, cx - scaledRadius * 0.7f, cy + scaledRadius * 0.12f, dirPaint);
             dirPaint.setColor(activeStickDirections.contains(id + "_right") ? Color.parseColor("#FF9800") : Color.WHITE);
-            canvas.drawText(rightLabel, cx + radius * 0.7f, cy + radius * 0.12f, dirPaint);
+            canvas.drawText(rightLabel, cx + scaledRadius * 0.7f, cy + scaledRadius * 0.12f, dirPaint);
         } else {
             // Label (L or R)
             Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -413,8 +417,9 @@ public class GamepadView extends View {
     }
 
     private void drawButton(Canvas canvas, float cx, float cy, float radius, String label, int color, String displayLabel) {
+        float scaledRadius = radius * buttonSizeScale;
         String id = "button_" + label.toLowerCase().replace("(", "").replace(")", "");
-        RectF bounds = new RectF(cx - radius, cy - radius, cx + radius, cy + radius);
+        RectF bounds = new RectF(cx - scaledRadius, cy - scaledRadius, cx + scaledRadius, cy + scaledRadius);
         componentBounds.put(id, bounds);
 
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -426,23 +431,23 @@ public class GamepadView extends View {
             paint.setColor(color);
         }
 
-        canvas.drawCircle(cx, cy, radius, paint);
+        canvas.drawCircle(cx, cy, scaledRadius, paint);
 
         // Draw white border
         Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         borderPaint.setStyle(Paint.Style.STROKE);
         borderPaint.setStrokeWidth(3);
         borderPaint.setColor(Color.WHITE);
-        canvas.drawCircle(cx, cy, radius, borderPaint);
+        canvas.drawCircle(cx, cy, scaledRadius, borderPaint);
 
         // Draw label (use display label if provided)
         String textLabel = displayLabel != null ? displayLabel : label;
         Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         textPaint.setColor(Color.WHITE);
-        textPaint.setTextSize(radius * 0.6f);
+        textPaint.setTextSize(scaledRadius * 0.6f);
         textPaint.setTextAlign(Paint.Align.CENTER);
         textPaint.setFakeBoldText(true);
-        canvas.drawText(textLabel, cx, cy + radius * 0.3f, textPaint);
+        canvas.drawText(textLabel, cx, cy + scaledRadius * 0.3f, textPaint);
     }
 
     private int darkenColor(int color) {
@@ -863,6 +868,16 @@ public class GamepadView extends View {
 
     public void setShowTwoButtons(boolean show) {
         this.showTwoButtons = show;
+        invalidate();
+    }
+
+    public void setButtonSizeScale(float scale) {
+        this.buttonSizeScale = scale;
+        invalidate();
+    }
+
+    public void setStickSizeScale(float scale) {
+        this.stickSizeScale = scale;
         invalidate();
     }
 
