@@ -7,7 +7,8 @@ package com.openterface.keymod;
 public enum GamepadLayout {
     XBOX("Xbox", 11),      // 11 components: D-Pad, ABXY, 2 sticks, 4 shoulders, 2 center
     PLAYSTATION("PlayStation", 11),  // 11 components: D-Pad, △○×□, 2 sticks, 4 shoulders, 2 center
-    NES("NES", 6);         // 6 components: D-Pad, A/B, Select/Start, no sticks
+    NES("NES", 6),         // 6 components: D-Pad, A/B, Select/Start, no sticks
+    SIMPLE("Simple", 2);   // 2 components: D-Pad (left, big) + single button (right, big)
 
     private final String displayName;
     private final int componentCount;

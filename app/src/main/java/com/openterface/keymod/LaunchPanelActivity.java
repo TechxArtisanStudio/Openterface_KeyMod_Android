@@ -129,15 +129,16 @@ public class LaunchPanelActivity extends AppCompatActivity {
             launchModeInternal(MODE_KEYBOARD_MOUSE);
         });
 
-        showTutorialLink.setOnClickListener(v -> {
-            // Clear the tutorial flag so it will show again
-            getSharedPreferences(TutorialOverlay.PREFS_NAME, MODE_PRIVATE)
-                .edit().putBoolean(TutorialOverlay.KEY_TUTORIAL_SHOWN, false).apply();
-            finish();
-            Intent intent = new Intent(this, MainActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            startActivity(intent);
-        });
+        if (showTutorialLink != null) {
+            showTutorialLink.setOnClickListener(v -> {
+                getSharedPreferences(TutorialOverlay.PREFS_NAME, MODE_PRIVATE)
+                    .edit().putBoolean(TutorialOverlay.KEY_TUTORIAL_SHOWN, false).apply();
+                finish();
+                Intent intent = new Intent(this, MainActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(intent);
+            });
+        }
     }
 
     private void launchMode(String mode) {

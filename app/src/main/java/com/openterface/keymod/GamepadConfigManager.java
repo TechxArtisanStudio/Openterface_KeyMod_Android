@@ -137,6 +137,13 @@ public class GamepadConfigManager {
                 positions.put("select", new ComponentPosition(0.40f, 0.70f));
                 positions.put("start", new ComponentPosition(0.60f, 0.70f));
                 break;
+
+            case SIMPLE:
+                // Simple layout: analog stick left, single button far right
+                positions.put("stick_left", new ComponentPosition(0.20f, 0.5f));
+                positions.put("button_a", new ComponentPosition(0.85f, 0.5f));
+                positions.put("button_b", new ComponentPosition(0.93f, 0.4f));
+                break;
         }
 
         return positions;

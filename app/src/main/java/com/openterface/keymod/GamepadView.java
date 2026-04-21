@@ -5,13 +5,18 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.os.Handler;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+
+import com.openterface.keymod.GamepadConfigManager.ComponentPosition;
 
 /**
  * Gamepad View - Custom view for rendering and interacting with gamepad components
@@ -41,16 +46,48 @@ public class GamepadView extends View {
     private ButtonPressListener buttonPressListener;
     private AnalogStickListener analogStickListener;
 
+    // Multi-touch tracking for D-pad hold behavior
+    private Map<Integer, String> pointerComponents = new HashMap<>(); // pointerId -> componentId
+    private Set<String> dpadPressedSet = new HashSet<>(); // currently held D-pad components
+    private DpadStateListener dpadStateListener;
+    private Set<String> buttonsPressedSet = new HashSet<>(); // currently held non-D-pad buttons
+    private ButtonReleaseListener buttonReleaseListener;
+
     // Analog stick drag state
     private String  activeStickId      = null;
+    private int     activeStickPointerId = -1;  // pointerId of the finger on the stick
     private float   activeStickCenterX = 0;
     private float   activeStickCenterY = 0;
     private float   activeStickRadius  = 0;
     private float   stickOffsetX       = 0;
     private float   stickOffsetY       = 0;
 
+    // Long press detection
+    private static final long LONG_PRESS_THRESHOLD = 600; // ms
+    private static final float LONG_PRESS_MOVE_THRESHOLD = 15; // pixels
+    private Handler longPressHandler = new Handler();
+    private Runnable longPressRunnable;
+    private String longPressComponentId = null;
+    private float longPressDownX = 0;
+    private float longPressDownY = 0;
+    private boolean longPressCancelled = false;
+    private ComponentLongPressListener longPressListener;
+
     // Component bounds (for touch detection)
     private Map<String, RectF> componentBounds;
+
+    // Disabled components (visual only, no touch response)
+    private Map<String, Boolean> disabledComponents = new HashMap<>();
+
+    // Display labels for components (can differ from default hardcoded labels)
+    private Map<String, String> componentDisplayLabels = new HashMap<>();
+
+    // Configurable keycode for the main button (button_a)
+    private int buttonAKeyCode = 40; // default: HID Enter
+    private boolean showTwoButtons = false;
+
+    // Currently active stick directions (for highlighting labels)
+    private Set<String> activeStickDirections = new java.util.HashSet<>();
 
     public GamepadView(Context context) {
         super(context);
@@ -118,6 +155,9 @@ public class GamepadView extends View {
             case NES:
                 drawNESLayout(canvas);
                 break;
+            case SIMPLE:
+                drawSimpleLayout(canvas);
+                break;
         }
     }
 
@@ -125,129 +165,175 @@ public class GamepadView extends View {
         int w = getWidth();
         int h = getHeight();
 
-        // D-Pad
-        drawDpad(canvas, w * 0.15f, h * 0.5f, 80);
+        // D-Pad - 150% larger
+        drawDpad(canvas, w * 0.15f, h * 0.5f, 120);
 
-        // Left Stick
-        drawAnalogStick(canvas, w * 0.25f, h * 0.65f, 60, "L");
+        // Left Stick - 150% larger
+        drawAnalogStick(canvas, w * 0.25f, h * 0.65f, 90, "L");
 
-        // Right Stick
-        drawAnalogStick(canvas, w * 0.75f, h * 0.65f, 60, "R");
+        // Right Stick - 150% larger
+        drawAnalogStick(canvas, w * 0.75f, h * 0.65f, 90, "R");
 
-        // ABXY Buttons
-        drawButton(canvas, w * 0.85f, h * 0.55f, 35, "A", Color.parseColor("#4CAF50"));
-        drawButton(canvas, w * 0.90f, h * 0.45f, 35, "B", Color.parseColor("#F44336"));
-        drawButton(canvas, w * 0.80f, h * 0.45f, 35, "X", Color.parseColor("#2196F3"));
-        drawButton(canvas, w * 0.85f, h * 0.35f, 35, "Y", Color.parseColor("#FFC107"));
+        // ABXY Buttons - 150% larger
+        drawButton(canvas, w * 0.85f, h * 0.55f, 52.5f, "A", Color.parseColor("#4CAF50"));
+        drawButton(canvas, w * 0.90f, h * 0.45f, 52.5f, "B", Color.parseColor("#F44336"));
+        drawButton(canvas, w * 0.80f, h * 0.45f, 52.5f, "X", Color.parseColor("#2196F3"));
+        drawButton(canvas, w * 0.85f, h * 0.35f, 52.5f, "Y", Color.parseColor("#FFC107"));
 
-        // Shoulders (visual only - actual buttons at top edge)
-        drawShoulderButton(canvas, w * 0.30f, h * 0.10f, 50, 20, "LB");
-        drawShoulderButton(canvas, w * 0.70f, h * 0.10f, 50, 20, "RB");
+        // Shoulders - 150% larger
+        drawShoulderButton(canvas, w * 0.30f, h * 0.10f, 75, 30, "LB");
+        drawShoulderButton(canvas, w * 0.70f, h * 0.10f, 75, 30, "RB");
 
-        // Center buttons
-        drawButton(canvas, w * 0.40f, h * 0.40f, 25, "≡", Color.GRAY);
-        drawButton(canvas, w * 0.60f, h * 0.40f, 25, "⊞", Color.GRAY);
+        // Center buttons - 150% larger
+        drawButton(canvas, w * 0.40f, h * 0.40f, 37.5f, "≡", Color.GRAY);
+        drawButton(canvas, w * 0.60f, h * 0.40f, 37.5f, "⊞", Color.GRAY);
     }
 
     private void drawPlayStationLayout(Canvas canvas) {
         int w = getWidth();
         int h = getHeight();
 
-        // D-Pad
-        drawDpad(canvas, w * 0.15f, h * 0.5f, 80);
+        // D-Pad - 150% larger
+        drawDpad(canvas, w * 0.15f, h * 0.5f, 120);
 
-        // Left Stick
-        drawAnalogStick(canvas, w * 0.25f, h * 0.65f, 60, "L");
+        // Left Stick - 150% larger
+        drawAnalogStick(canvas, w * 0.25f, h * 0.65f, 90, "L");
 
-        // Right Stick
-        drawAnalogStick(canvas, w * 0.75f, h * 0.65f, 60, "R");
+        // Right Stick - 150% larger
+        drawAnalogStick(canvas, w * 0.75f, h * 0.65f, 90, "R");
 
-        // △○×□ Buttons
-        drawButton(canvas, w * 0.85f, h * 0.55f, 35, "×", Color.parseColor("#2196F3"));
-        drawButton(canvas, w * 0.90f, h * 0.45f, 35, "○", Color.parseColor("#F44336"));
-        drawButton(canvas, w * 0.80f, h * 0.45f, 35, "□", Color.parseColor("#9C27B0"));
-        drawButton(canvas, w * 0.85f, h * 0.35f, 35, "△", Color.parseColor("#4CAF50"));
+        // △○×□ Buttons - 150% larger
+        drawButton(canvas, w * 0.85f, h * 0.55f, 52.5f, "×", Color.parseColor("#2196F3"));
+        drawButton(canvas, w * 0.90f, h * 0.45f, 52.5f, "○", Color.parseColor("#F44336"));
+        drawButton(canvas, w * 0.80f, h * 0.45f, 52.5f, "□", Color.parseColor("#9C27B0"));
+        drawButton(canvas, w * 0.85f, h * 0.35f, 52.5f, "△", Color.parseColor("#4CAF50"));
 
-        // L1/R1
-        drawShoulderButton(canvas, w * 0.30f, h * 0.10f, 50, 20, "L1");
-        drawShoulderButton(canvas, w * 0.70f, h * 0.10f, 50, 20, "R1");
+        // L1/R1 - 150% larger
+        drawShoulderButton(canvas, w * 0.30f, h * 0.10f, 75, 30, "L1");
+        drawShoulderButton(canvas, w * 0.70f, h * 0.10f, 75, 30, "R1");
 
-        // Center buttons
-        drawButton(canvas, w * 0.40f, h * 0.40f, 25, "Select", Color.GRAY);
-        drawButton(canvas, w * 0.60f, h * 0.40f, 25, "Start", Color.GRAY);
+        // Center buttons - 150% larger
+        drawButton(canvas, w * 0.40f, h * 0.40f, 37.5f, "Select", Color.GRAY);
+        drawButton(canvas, w * 0.60f, h * 0.40f, 37.5f, "Start", Color.GRAY);
     }
 
     private void drawNESLayout(Canvas canvas) {
         int w = getWidth();
         int h = getHeight();
 
-        // D-Pad
-        drawDpad(canvas, w * 0.20f, h * 0.5f, 100);
+        // D-Pad - 150% larger
+        drawDpad(canvas, w * 0.20f, h * 0.5f, 150);
 
-        // A/B Buttons
-        drawButton(canvas, w * 0.80f, h * 0.55f, 45, "A", Color.parseColor("#F44336"));
-        drawButton(canvas, w * 0.90f, h * 0.45f, 45, "B", Color.parseColor("#F44336"));
+        // A/B Buttons - 150% larger
+        drawButton(canvas, w * 0.80f, h * 0.55f, 67.5f, "A", Color.parseColor("#F44336"));
+        drawButton(canvas, w * 0.90f, h * 0.45f, 67.5f, "B", Color.parseColor("#F44336"));
 
-        // Select/Start
-        drawButton(canvas, w * 0.40f, h * 0.70f, 30, "SELECT", Color.GRAY);
-        drawButton(canvas, w * 0.60f, h * 0.70f, 30, "START", Color.GRAY);
+        // Select/Start - 150% larger
+        drawButton(canvas, w * 0.40f, h * 0.70f, 45, "SELECT", Color.GRAY);
+        drawButton(canvas, w * 0.60f, h * 0.70f, 45, "START", Color.GRAY);
+    }
+
+    private void drawSimpleLayout(Canvas canvas) {
+        int w = getWidth();
+        int h = getHeight();
+
+        // Get configured display labels (default to "L" and "Enter")
+        String stickLabel = componentDisplayLabels.getOrDefault("stick_l", "L");
+        String stickUpLabel = componentDisplayLabels.getOrDefault("stick_up", "W");
+        String stickDownLabel = componentDisplayLabels.getOrDefault("stick_down", "S");
+        String stickLeftLabel = componentDisplayLabels.getOrDefault("stick_left", "A");
+        String stickRightLabel = componentDisplayLabels.getOrDefault("stick_right", "D");
+        String buttonLabel = componentDisplayLabels.getOrDefault("button_a", "Enter");
+        String buttonBLabel = componentDisplayLabels.getOrDefault("button_b", "Esc");
+
+        // Use saved positions with defaults
+        float stickX = getPositionX("stick_left", 0.20f) * w;
+        float stickY = getPositionY("stick_left", 0.50f) * h;
+        float buttonAX = getPositionX("button_a", 0.85f) * w;
+        float buttonAY = getPositionY("button_a", 0.50f) * h;
+        float buttonBX = getPositionX("button_b", 0.93f) * w;
+        float buttonBY = getPositionY("button_b", 0.40f) * h;
+
+        // Analog stick on the left - 150% larger
+        drawAnalogStick(canvas, stickX, stickY, 180, stickLabel,
+                stickUpLabel, stickDownLabel, stickLeftLabel, stickRightLabel);
+
+        if (showTwoButtons) {
+            // Two buttons side by side on the right
+            drawButton(canvas, buttonAX, buttonAY, 100, "A", Color.parseColor("#4CAF50"), buttonLabel);
+            drawButton(canvas, buttonBX, buttonBY, 100, "B", Color.parseColor("#F44336"), buttonBLabel);
+        } else {
+            // Single big button on the far right - 150% larger, with configured label
+            drawButton(canvas, buttonAX, buttonAY, 135, "A", Color.parseColor("#4CAF50"), buttonLabel);
+        }
     }
 
     private void drawDpad(Canvas canvas, float cx, float cy, float size) {
         float half = size / 2;
-        
-        // Create separate bounds for each D-Pad direction
-        // Up
-        RectF upBounds = new RectF(cx - half * 0.3f, cy - half, cx + half * 0.3f, cy - half * 0.5f);
-        componentBounds.put("dpad_up", upBounds);
-        
-        // Down
-        RectF downBounds = new RectF(cx - half * 0.3f, cy + half * 0.5f, cx + half * 0.3f, cy + half);
-        componentBounds.put("dpad_down", downBounds);
-        
-        // Left
-        RectF leftBounds = new RectF(cx - half, cy - half * 0.3f, cx - half * 0.5f, cy + half * 0.3f);
-        componentBounds.put("dpad_left", leftBounds);
-        
-        // Right
-        RectF rightBounds = new RectF(cx + half * 0.5f, cy - half * 0.3f, cx + half, cy + half * 0.3f);
-        componentBounds.put("dpad_right", rightBounds);
-        
-        // Center
-        RectF centerBounds = new RectF(cx - half * 0.3f, cy - half * 0.3f, cx + half * 0.3f, cy + half * 0.3f);
-        componentBounds.put("dpad_center", centerBounds);
+        float barHalf = half * 0.4f;
 
-        // Draw D-Pad cross with highlight for pressed state
-        Paint dpadPaintToUse = new Paint(dpadPaint);
-        if (pressedComponentId != null && pressedComponentId.startsWith("dpad_")) {
-            dpadPaintToUse.setColor(Color.parseColor("#FF9800")); // Orange highlight
-        }
-        
-        canvas.drawRect(cx - half * 0.4f, cy - half, cx + half * 0.4f, cy + half, dpadPaintToUse);
-        canvas.drawRect(cx - half, cy - half * 0.4f, cx + half, cy + half * 0.4f, dpadPaintToUse);
-        
-        // Draw center circle
+        // Touch bounds matching each arm
+        componentBounds.put("dpad_up",
+                new RectF(cx - barHalf, cy - half, cx + barHalf, cy));
+        componentBounds.put("dpad_down",
+                new RectF(cx - barHalf, cy, cx + barHalf, cy + half));
+        componentBounds.put("dpad_left",
+                new RectF(cx - half, cy - barHalf, cx, cy + barHalf));
+        componentBounds.put("dpad_right",
+                new RectF(cx, cy - barHalf, cx + half, cy + barHalf));
+
+        // Draw each arm separately with its own highlight
+        int normalColor = Color.parseColor("#444444");
+        int pressedColor = Color.parseColor("#FF9800");
+
+        drawDpadArm(canvas, cx, cy, "up", barHalf, half, normalColor, pressedColor);
+        drawDpadArm(canvas, cx, cy, "down", barHalf, half, normalColor, pressedColor);
+        drawDpadArm(canvas, cx, cy, "left", barHalf, half, normalColor, pressedColor);
+        drawDpadArm(canvas, cx, cy, "right", barHalf, half, normalColor, pressedColor);
+
+        // Draw center circle (no highlight, always normal)
         Paint centerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         centerPaint.setColor(Color.parseColor("#666666"));
         canvas.drawCircle(cx, cy, half * 0.2f, centerPaint);
-        
-        // Draw direction indicators
-        Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        textPaint.setColor(Color.WHITE);
-        textPaint.setTextSize(size * 0.15f);
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        
-        // Up arrow
-        canvas.drawText("▲", cx, cy - half * 0.7f, textPaint);
-        // Down arrow
-        canvas.drawText("▼", cx, cy + half * 0.8f, textPaint);
-        // Left arrow
-        canvas.drawText("◀", cx - half * 0.75f, cy + half * 0.05f, textPaint);
-        // Right arrow
-        canvas.drawText("▶", cx + half * 0.75f, cy + half * 0.05f, textPaint);
+
+        // Direction arrows
+        Paint arrowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        arrowPaint.setColor(Color.WHITE);
+        arrowPaint.setTextSize(size * 0.15f);
+        arrowPaint.setTextAlign(Paint.Align.CENTER);
+        canvas.drawText("▲", cx, cy - half * 0.7f, arrowPaint);
+        canvas.drawText("▼", cx, cy + half * 0.8f, arrowPaint);
+        canvas.drawText("◀", cx - half * 0.75f, cy + half * 0.05f, arrowPaint);
+        canvas.drawText("▶", cx + half * 0.75f, cy + half * 0.05f, arrowPaint);
+    }
+
+    private void drawDpadArm(Canvas canvas, float cx, float cy, String dir,
+                             float barHalf, float half, int normalColor, int pressedColor) {
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setColor(("dpad_" + dir).equals(pressedComponentId) ? pressedColor : normalColor);
+
+        switch (dir) {
+            case "up":
+                canvas.drawRect(cx - barHalf, cy - half, cx + barHalf, cy, paint);
+                break;
+            case "down":
+                canvas.drawRect(cx - barHalf, cy, cx + barHalf, cy + half, paint);
+                break;
+            case "left":
+                canvas.drawRect(cx - half, cy - barHalf, cx, cy + barHalf, paint);
+                break;
+            case "right":
+                canvas.drawRect(cx, cy - barHalf, cx + half, cy + barHalf, paint);
+                break;
+        }
     }
 
     private void drawAnalogStick(Canvas canvas, float cx, float cy, float radius, String label) {
+        drawAnalogStick(canvas, cx, cy, radius, label, null, null, null, null);
+    }
+
+    private void drawAnalogStick(Canvas canvas, float cx, float cy, float radius, String label,
+                                 String upLabel, String downLabel, String leftLabel, String rightLabel) {
         String id = "stick_" + label.toLowerCase();
         RectF bounds = new RectF(cx - radius, cy - radius, cx + radius, cy + radius);
         componentBounds.put(id, bounds);
@@ -257,14 +343,14 @@ public class GamepadView extends View {
         Paint outerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         outerPaint.setColor(Color.parseColor("#444444"));
         canvas.drawCircle(cx, cy, radius, outerPaint);
-        
+
         // Outer ring
         Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         ringPaint.setStyle(Paint.Style.STROKE);
         ringPaint.setStrokeWidth(3);
         ringPaint.setColor(Color.WHITE);
         canvas.drawCircle(cx, cy, radius, ringPaint);
-        
+
         // Inner circle (stick top) — offset toward where the user's thumb is
         Paint innerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         float innerCx = cx;
@@ -288,53 +374,75 @@ public class GamepadView extends View {
         Paint highlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         highlightPaint.setColor(Color.parseColor("#888888"));
         canvas.drawCircle(innerCx, innerCy, radius * 0.3f, highlightPaint);
-        
-        // Label (L or R)
-        Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        labelPaint.setColor(Color.WHITE);
-        labelPaint.setTextSize(radius * 0.5f);
-        labelPaint.setTextAlign(Paint.Align.CENTER);
-        labelPaint.setFakeBoldText(true);
-        canvas.drawText(label, cx, cy + radius * 0.3f, labelPaint);
-        
-        // L3/R3 indicator
-        Paint l3Paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        l3Paint.setColor(Color.parseColor("#AAAAAA"));
-        l3Paint.setTextSize(radius * 0.25f);
-        l3Paint.setTextAlign(Paint.Align.CENTER);
-        canvas.drawText("CLICK", cx, cy + radius * 0.6f, l3Paint);
+
+        // If directional labels are provided, draw them instead of center label
+        if (upLabel != null) {
+            Paint dirPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            dirPaint.setTextAlign(Paint.Align.CENTER);
+            dirPaint.setFakeBoldText(true);
+            dirPaint.setTextSize(radius * 0.22f);
+            // Labels in the ring between inner circle (0.6r) and outer ring (r)
+            dirPaint.setColor(activeStickDirections.contains(id + "_up") ? Color.parseColor("#FF9800") : Color.WHITE);
+            canvas.drawText(upLabel, cx, cy - radius * 0.65f, dirPaint);
+            dirPaint.setColor(activeStickDirections.contains(id + "_down") ? Color.parseColor("#FF9800") : Color.WHITE);
+            canvas.drawText(downLabel, cx, cy + radius * 0.75f, dirPaint);
+            dirPaint.setColor(activeStickDirections.contains(id + "_left") ? Color.parseColor("#FF9800") : Color.WHITE);
+            canvas.drawText(leftLabel, cx - radius * 0.7f, cy + radius * 0.12f, dirPaint);
+            dirPaint.setColor(activeStickDirections.contains(id + "_right") ? Color.parseColor("#FF9800") : Color.WHITE);
+            canvas.drawText(rightLabel, cx + radius * 0.7f, cy + radius * 0.12f, dirPaint);
+        } else {
+            // Label (L or R)
+            Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            labelPaint.setColor(Color.WHITE);
+            labelPaint.setTextSize(radius * 0.5f);
+            labelPaint.setTextAlign(Paint.Align.CENTER);
+            labelPaint.setFakeBoldText(true);
+            canvas.drawText(label, cx, cy + radius * 0.3f, labelPaint);
+
+            // L3/R3 indicator
+            Paint l3Paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            l3Paint.setColor(Color.parseColor("#AAAAAA"));
+            l3Paint.setTextSize(radius * 0.25f);
+            l3Paint.setTextAlign(Paint.Align.CENTER);
+            canvas.drawText("CLICK", cx, cy + radius * 0.6f, l3Paint);
+        }
     }
 
     private void drawButton(Canvas canvas, float cx, float cy, float radius, String label, int color) {
+        drawButton(canvas, cx, cy, radius, label, color, null);
+    }
+
+    private void drawButton(Canvas canvas, float cx, float cy, float radius, String label, int color, String displayLabel) {
         String id = "button_" + label.toLowerCase().replace("(", "").replace(")", "");
         RectF bounds = new RectF(cx - radius, cy - radius, cx + radius, cy + radius);
         componentBounds.put(id, bounds);
 
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        
+
         // Highlight if pressed
         if (id.equals(pressedComponentId)) {
             paint.setColor(darkenColor(color));
         } else {
             paint.setColor(color);
         }
-        
+
         canvas.drawCircle(cx, cy, radius, paint);
-        
+
         // Draw white border
         Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         borderPaint.setStyle(Paint.Style.STROKE);
         borderPaint.setStrokeWidth(3);
         borderPaint.setColor(Color.WHITE);
         canvas.drawCircle(cx, cy, radius, borderPaint);
-        
-        // Draw label
+
+        // Draw label (use display label if provided)
+        String textLabel = displayLabel != null ? displayLabel : label;
         Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         textPaint.setColor(Color.WHITE);
         textPaint.setTextSize(radius * 0.6f);
         textPaint.setTextAlign(Paint.Align.CENTER);
         textPaint.setFakeBoldText(true);
-        canvas.drawText(label, cx, cy + radius * 0.3f, textPaint);
+        canvas.drawText(textLabel, cx, cy + radius * 0.3f, textPaint);
     }
 
     private int darkenColor(int color) {
@@ -370,16 +478,37 @@ public class GamepadView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        float x = event.getX();
-        float y = event.getY();
+        int action = event.getActionMasked();
+        int pointerIndex = event.getActionIndex();
+        int pointerId = event.getPointerId(pointerIndex);
+        float x = event.getX(pointerIndex);
+        float y = event.getY(pointerIndex);
 
-        switch (event.getAction()) {
+        switch (action) {
             case MotionEvent.ACTION_DOWN: {
                 String componentId = getComponentAt(x, y);
-                if (componentId != null) {
-                    if (componentId.startsWith("stick_") && !isEditMode) {
-                        // Begin analog stick drag tracking
+                if (componentId != null && !isComponentDisabled(componentId)) {
+                    pointerComponents.put(pointerId, componentId);
+
+                    // Start long press timer
+                    longPressComponentId = componentId;
+                    longPressDownX = x;
+                    longPressDownY = y;
+                    longPressCancelled = false;
+                    longPressRunnable = () -> {
+                        if (longPressListener != null && longPressComponentId != null && !longPressCancelled) {
+                            longPressListener.onComponentLongPress(longPressComponentId);
+                        }
+                    };
+                    longPressHandler.postDelayed(longPressRunnable, LONG_PRESS_THRESHOLD);
+
+                    if (isDpadComponent(componentId)) {
+                        if (dpadPressedSet.add(componentId) && dpadStateListener != null) {
+                            dpadStateListener.onDpadStateChanged(getCurrentDpadKeys());
+                        }
+                    } else if (componentId.startsWith("stick_") && !isEditMode) {
                         activeStickId = componentId;
+                        activeStickPointerId = pointerId;
                         RectF stickBounds = componentBounds.get(componentId);
                         activeStickCenterX = stickBounds.centerX();
                         activeStickCenterY = stickBounds.centerY();
@@ -391,6 +520,7 @@ public class GamepadView extends View {
                         draggedComponentId = componentId;
                     } else {
                         pressedComponentId = componentId;
+                        buttonsPressedSet.add(componentId);
                         if (buttonPressListener != null) {
                             int keyCode = getKeyCodeForComponent(componentId);
                             buttonPressListener.onButtonPress(componentId, keyCode);
@@ -398,13 +528,53 @@ public class GamepadView extends View {
                         invalidate();
                     }
                 }
-                return true; // Always consume so we receive MOVE/UP
+                return true;
+            }
+
+            case MotionEvent.ACTION_POINTER_DOWN: {
+                String componentId = getComponentAt(x, y);
+                if (componentId != null && !isComponentDisabled(componentId)) {
+                    pointerComponents.put(pointerId, componentId);
+
+                    if (isDpadComponent(componentId)) {
+                        if (dpadPressedSet.add(componentId) && dpadStateListener != null) {
+                            dpadStateListener.onDpadStateChanged(getCurrentDpadKeys());
+                        }
+                    } else if (!isEditMode && buttonPressListener != null) {
+                        buttonsPressedSet.add(componentId);
+                        int keyCode = getKeyCodeForComponent(componentId);
+                        buttonPressListener.onButtonPress(componentId, keyCode);
+                    }
+                }
+                return true;
             }
 
             case MotionEvent.ACTION_MOVE: {
+                // Cancel long press only if user moved significantly
+                if (!longPressCancelled && longPressRunnable != null) {
+                    for (int i = 0; i < event.getPointerCount(); i++) {
+                        float mx = event.getX(i);
+                        float my = event.getY(i);
+                        float dx = mx - longPressDownX;
+                        float dy = my - longPressDownY;
+                        if (Math.sqrt(dx * dx + dy * dy) > LONG_PRESS_MOVE_THRESHOLD) {
+                            longPressHandler.removeCallbacks(longPressRunnable);
+                            longPressCancelled = true;
+                        }
+                    }
+                }
                 if (activeStickId != null) {
-                    float dx   = x - activeStickCenterX;
-                    float dy   = y - activeStickCenterY;
+                    // Find the pointer that's on the stick
+                    float stickX = x, stickY = y; // fallback to event pointer
+                    for (int i = 0; i < event.getPointerCount(); i++) {
+                        if (event.getPointerId(i) == activeStickPointerId) {
+                            stickX = event.getX(i);
+                            stickY = event.getY(i);
+                            break;
+                        }
+                    }
+                    float dx   = stickX - activeStickCenterX;
+                    float dy   = stickY - activeStickCenterY;
                     float dist = (float) Math.sqrt(dx * dx + dy * dy);
                     if (dist > activeStickRadius) {
                         dx = dx * activeStickRadius / dist;
@@ -432,17 +602,21 @@ public class GamepadView extends View {
 
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL: {
+                // Cancel long press
+                if (longPressHandler != null && longPressRunnable != null) {
+                    longPressHandler.removeCallbacks(longPressRunnable);
+                    longPressComponentId = null;
+                }
                 if (activeStickId != null) {
-                    // Minimal movement = treat as stick click (L3 / R3)
                     float moved = (float) Math.sqrt(
                             stickOffsetX * stickOffsetX + stickOffsetY * stickOffsetY);
                     if (moved < activeStickRadius * 0.15f && buttonPressListener != null) {
                         int keyCode = activeStickId.equals("stick_l") ? 1001 : 1002;
                         buttonPressListener.onButtonPress(activeStickId + "_click", keyCode);
                     }
-                    // Return stick to center and notify listener
                     String label = activeStickId.replace("stick_", "");
                     activeStickId = null;
+                    activeStickPointerId = -1;
                     stickOffsetX  = 0;
                     stickOffsetY  = 0;
                     invalidate();
@@ -453,18 +627,90 @@ public class GamepadView extends View {
                 if (draggedComponentId != null) {
                     draggedComponentId = null;
                 }
+
+                // Release component for this pointer
+                releasePointerComponent(pointerId);
+
+                // For ACTION_UP (last finger), clear all remaining state
+                if (action == MotionEvent.ACTION_UP) {
+                    pointerComponents.clear();
+                    dpadPressedSet.clear();
+                    buttonsPressedSet.clear();
+                    if (pressedComponentId != null) {
+                        pressedComponentId = null;
+                    }
+                }
+
                 if (pressedComponentId != null) {
                     pressedComponentId = null;
                     invalidate();
                 }
                 return true;
             }
+
+            case MotionEvent.ACTION_POINTER_UP: {
+                // Release component for the lifted pointer
+                releasePointerComponent(pointerId);
+                return true;
+            }
         }
         return true;
     }
 
+    private void releasePointerComponent(int pointerId) {
+        String releasedComponent = pointerComponents.remove(pointerId);
+        if (releasedComponent != null) {
+            if (isDpadComponent(releasedComponent)) {
+                dpadPressedSet.remove(releasedComponent);
+                if (dpadStateListener != null) {
+                    dpadStateListener.onDpadStateChanged(getCurrentDpadKeys());
+                }
+            } else if (buttonsPressedSet.remove(releasedComponent)) {
+                int keyCode = getKeyCodeForComponent(releasedComponent);
+                if (buttonReleaseListener != null) {
+                    buttonReleaseListener.onButtonRelease(releasedComponent, keyCode);
+                }
+            }
+        }
+    }
+
+    private boolean isDpadComponent(String componentId) {
+        return componentId != null && componentId.startsWith("dpad_");
+    }
+
+    /**
+     * Get the current set of pressed D-pad key codes, in a deterministic order.
+     * Returns an empty array if no D-pad directions are held.
+     */
+    private int[] getCurrentDpadKeys() {
+        // Build in deterministic order so the HID report is stable
+        String[] order = {"dpad_up", "dpad_left", "dpad_down", "dpad_right"};
+        int count = 0;
+        for (String id : order) {
+            if (dpadPressedSet.contains(id)) count++;
+        }
+        int[] keys = new int[count];
+        int idx = 0;
+        for (String id : order) {
+            if (dpadPressedSet.contains(id)) {
+                keys[idx++] = getKeyCodeForComponent(id);
+            }
+        }
+        return keys;
+    }
+
     private String getComponentAt(float x, float y) {
+        // Check D-pad in deterministic order first (they share edges at center)
+        String[] dpadOrder = {"dpad_up", "dpad_right", "dpad_down", "dpad_left"};
+        for (String id : dpadOrder) {
+            RectF bounds = componentBounds.get(id);
+            if (bounds != null && bounds.contains(x, y)) {
+                return id;
+            }
+        }
+        // Check remaining components
         for (Map.Entry<String, RectF> entry : componentBounds.entrySet()) {
+            if (entry.getKey().startsWith("dpad_")) continue;
             if (entry.getValue().contains(x, y)) {
                 return entry.getKey();
             }
@@ -481,8 +727,8 @@ public class GamepadView extends View {
             case "dpad_left":  return 80; // HID Left Arrow
             case "dpad_right": return 79; // HID Right Arrow
 
-            // Xbox face buttons (A=Enter, B=Esc, X=Backspace, Y=Application)
-            case "button_a": return 40;  // HID Return/Enter
+            // Xbox/PS/NES face buttons
+            case "button_a": return buttonAKeyCode;  // configurable, default: HID Enter
             case "button_b": return 41;  // HID Escape
             case "button_x": return 42;  // HID Backspace/Delete
             case "button_y": return 101; // HID Application (Menu)
@@ -498,9 +744,7 @@ public class GamepadView extends View {
             case "button_△":        // fall-through
             case "button_triangle": return 101; // HID Application (Menu)
 
-            // NES buttons (A/B same as Xbox)
-            case "button_a_nes": // fall-through (NES uses same button_a id)
-            case "nes_a": return 40;  // HID Return/Enter
+            // NES buttons (B = Escape)
             case "nes_b": return 41;  // HID Escape
 
             // Shoulder buttons → F1-F4 (HID: F1=0x3A=58 … F4=0x3D=61)
@@ -529,7 +773,47 @@ public class GamepadView extends View {
         invalidate();
     }
 
+    /**
+     * Get component X position, or return default if not found.
+     */
+    private float getPositionX(String componentId, float defaultX) {
+        ComponentPosition pos = componentPositions.get(componentId);
+        return pos != null ? pos.x : defaultX;
+    }
+
+    private float getPositionY(String componentId, float defaultY) {
+        ComponentPosition pos = componentPositions.get(componentId);
+        return pos != null ? pos.y : defaultY;
+    }
+
+    /**
+     * Get current component positions (for saving).
+     */
+    public Map<String, ComponentPosition> getPositions() {
+        return componentPositions;
+    }
+
+    /**
+     * Listener notified when edit mode is exited (so positions can be saved).
+     */
+    public interface EditModeExitListener {
+        void onEditModeExit(Map<String, ComponentPosition> positions);
+    }
+
+    public void setEditModeExitListener(EditModeExitListener listener) {
+        this.editModeExitListener = listener;
+    }
+
+    public void savePositions() {
+        configManager.saveLayoutPositions(currentLayout, componentPositions);
+    }
+
+    private EditModeExitListener editModeExitListener;
+
     public void setEditMode(boolean editMode) {
+        if (!editMode && editModeExitListener != null) {
+            editModeExitListener.onEditModeExit(componentPositions);
+        }
         isEditMode = editMode;
         invalidate();
     }
@@ -540,6 +824,92 @@ public class GamepadView extends View {
 
     public void setAnalogStickListener(AnalogStickListener listener) {
         this.analogStickListener = listener;
+    }
+
+    public void setComponentLongPressListener(ComponentLongPressListener listener) {
+        this.longPressListener = listener;
+    }
+
+    public void setDpadStateListener(DpadStateListener listener) {
+        this.dpadStateListener = listener;
+    }
+
+    public void setButtonReleaseListener(ButtonReleaseListener listener) {
+        this.buttonReleaseListener = listener;
+    }
+
+    public void setComponentDisabled(String componentId, boolean disabled) {
+        disabledComponents.put(componentId, disabled);
+        invalidate();
+    }
+
+    public boolean isComponentDisabled(String componentId) {
+        return Boolean.TRUE.equals(disabledComponents.get(componentId));
+    }
+
+    public void setComponentDisplayLabel(String componentId, String label) {
+        componentDisplayLabels.put(componentId, label);
+        invalidate();
+    }
+
+    public void setComponentDisplayLabels(Map<String, String> labels) {
+        componentDisplayLabels.putAll(labels);
+        invalidate();
+    }
+
+    public void setButtonAKeyCode(int keyCode) {
+        this.buttonAKeyCode = keyCode;
+    }
+
+    public void setShowTwoButtons(boolean show) {
+        this.showTwoButtons = show;
+        invalidate();
+    }
+
+    public void setActiveStickDirections(String stickLabel, Set<String> directions) {
+        String stickId = "stick_" + stickLabel.toLowerCase();
+        // Remove old directions for this stick
+        activeStickDirections.removeIf(d -> d.startsWith(stickId + "_"));
+        // Add new directions
+        for (String dir : directions) {
+            activeStickDirections.add(stickId + "_" + dir);
+        }
+        invalidate();
+    }
+
+    public void clearStickDirections(String stickLabel) {
+        String stickId = "stick_" + stickLabel.toLowerCase();
+        activeStickDirections.removeIf(d -> d.startsWith(stickId + "_"));
+        invalidate();
+    }
+
+    private void drawDisabledButton(Canvas canvas, float cx, float cy, float radius, String label) {
+        String id = "button_" + label.toLowerCase().replace("(", "").replace(")", "");
+        RectF bounds = new RectF(cx - radius, cy - radius, cx + radius, cy + radius);
+        componentBounds.put(id, bounds);
+
+        // Disabled appearance: dimmed gray with reduced alpha
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setAlpha(100);
+        paint.setColor(Color.GRAY);
+        canvas.drawCircle(cx, cy, radius, paint);
+
+        // Dashed white border
+        Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        borderPaint.setStyle(Paint.Style.STROKE);
+        borderPaint.setStrokeWidth(2);
+        borderPaint.setColor(Color.WHITE);
+        borderPaint.setAlpha(80);
+        canvas.drawCircle(cx, cy, radius, borderPaint);
+
+        // Dimmed label
+        Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        textPaint.setColor(Color.WHITE);
+        textPaint.setTextSize(radius * 0.45f);
+        textPaint.setTextAlign(Paint.Align.CENTER);
+        textPaint.setAlpha(100);
+        textPaint.setFakeBoldText(true);
+        canvas.drawText(label, cx, cy + radius * 0.2f, textPaint);
     }
 
     public Map<String, GamepadConfigManager.ComponentPosition> getComponentPositions() {
@@ -553,5 +923,21 @@ public class GamepadView extends View {
 
     public interface AnalogStickListener {
         void onAnalogStickMoved(String stickId, float x, float y);
+    }
+
+    public interface ComponentLongPressListener {
+        void onComponentLongPress(String componentId);
+    }
+
+    public interface DpadStateListener {
+        /**
+         * Called whenever D-pad touch state changes.
+         * @param keyCodes HID key codes for currently held D-pad directions (empty = all released)
+         */
+        void onDpadStateChanged(int[] keyCodes);
+    }
+
+    public interface ButtonReleaseListener {
+        void onButtonRelease(String buttonId, int keyCode);
     }
 }

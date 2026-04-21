@@ -20,13 +20,13 @@ public class HIDSender {
     /**
      * Send keyboard event via USB or Bluetooth
      */
-    public static void sendKeyEvent(UsbSerialPort usbPort, BluetoothService bluetoothService, 
+    public static void sendKeyEvent(UsbSerialPort usbPort, BluetoothService bluetoothService,
                                     int modifiers, int keyCode) {
         if (keyCode == 0) {
             Log.i(TAG, "KEY_SEND_IGNORED keyCode=0 modifiers=" + modifiers);
             return;
         }
-        
+
         byte[] data = buildKeyboardPacket(modifiers, keyCode);
         Log.i(TAG, "KEY_SEND keyCode=" + keyCode
             + " key=" + describeKeyCode(keyCode)
@@ -37,6 +37,23 @@ public class HIDSender {
             + ",cmd=" + ((modifiers & 0x08) != 0)
             + "] packet=" + byteArrayToHexString(data));
         sendPacket(usbPort, bluetoothService, data, "Keyboard");
+    }
+
+    /**
+     * Send a full keyboard HID report with up to 6 simultaneous keys.
+     * @param modifiers Modifier keys
+     * @param keyCodes Key codes to press (0–6 keys, extras ignored)
+     */
+    public static void sendKeyboardReport(UsbSerialPort usbPort, BluetoothService bluetoothService,
+                                          int modifiers, int[] keyCodes) {
+        byte[] data = buildKeyboardPacketMulti(modifiers, keyCodes);
+        boolean isRelease = keyCodes == null || keyCodes.length == 0
+                         || (keyCodes.length == 1 && keyCodes[0] == 0);
+        Log.i(TAG, "KEY_REPORT keys=" + java.util.Arrays.toString(keyCodes)
+            + " modifiers=" + modifiers
+            + " release=" + isRelease
+            + " packet=" + byteArrayToHexString(data));
+        sendPacket(usbPort, bluetoothService, data, isRelease ? "Key Release" : "Keyboard");
     }
 
     /**
@@ -126,6 +143,24 @@ public class HIDSender {
         data[10] = 0;              // Key slot 4
         data[11] = 0;              // Key slot 5
         data[12] = 0;              // Key slot 6
+        data[13] = calculateChecksum(data);
+        return data;
+    }
+
+    /**
+     * Build keyboard HID packet with multiple simultaneous keys.
+     * Fills up to 6 key slots; extras are silently ignored.
+     */
+    private static byte[] buildKeyboardPacketMulti(int modifiers, int[] keyCodes) {
+        byte[] data = new byte[14];
+        System.arraycopy(KBD_HEADER, 0, data, 0, 5);
+        data[5] = (byte) modifiers;
+        data[6] = 0; // Reserved
+        if (keyCodes != null) {
+            for (int i = 0; i < Math.min(keyCodes.length, 6); i++) {
+                data[7 + i] = (byte) keyCodes[i];
+            }
+        }
         data[13] = calculateChecksum(data);
         return data;
     }

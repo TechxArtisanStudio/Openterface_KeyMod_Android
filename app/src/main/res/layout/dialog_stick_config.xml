@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true"
+    android:background="#2D2D2D">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Stick Configuration"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Mode Selection -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Mode"
+            android:textSize="14sp"
+            android:textColor="#AAAAAA"
+            android:layout_marginBottom="8dp" />
+
+        <RadioGroup
+            android:id="@+id/stick_mode_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="20dp">
+
+            <RadioButton
+                android:id="@+id/stick_mode_analog"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Analog (Mouse)"
+                android:textColor="#FFFFFF"
+                android:buttonTint="#4CAF50" />
+
+            <RadioButton
+                android:id="@+id/stick_mode_key"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Key Mapping"
+                android:textColor="#FFFFFF"
+                android:buttonTint="#4CAF50" />
+        </RadioGroup>
+
+        <!-- D-Pad Key Mapping Section -->
+        <LinearLayout
+            android:id="@+id/key_mapping_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Direction Keys (tap to change)"
+                android:textSize="14sp"
+                android:textColor="#AAAAAA"
+                android:layout_marginBottom="12dp" />
+
+            <!-- D-Pad Cross Layout -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="20dp">
+
+                <!-- Row 1: empty, up, empty -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:layout_width="64dp"
+                        android:layout_height="48dp"
+                        android:layout_margin="4dp" />
+
+                    <Button
+                        android:id="@+id/key_up"
+                        android:layout_width="64dp"
+                        android:layout_height="48dp"
+                        android:layout_margin="4dp"
+                        android:background="@drawable/function_button_background"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+
+                    <View
+                        android:layout_width="64dp"
+                        android:layout_height="48dp"
+                        android:layout_margin="4dp" />
+                </LinearLayout>
+
+                <!-- Row 2: left, center, right -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/key_left"
+                        android:layout_width="64dp"
+                        android:layout_height="48dp"
+                        android:layout_margin="4dp"
+                        android:background="@drawable/function_button_background"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+
+                    <View
+                        android:layout_width="64dp"
+                        android:layout_height="48dp"
+                        android:layout_margin="4dp"
+                        android:background="@drawable/function_button_background" />
+
+                    <Button
+                        android:id="@+id/key_right"
+                        android:layout_width="64dp"
+                        android:layout_height="48dp"
+                        android:layout_margin="4dp"
+                        android:background="@drawable/function_button_background"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <!-- Row 3: empty, down, empty -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:layout_width="64dp"
+                        android:layout_height="48dp"
+                        android:layout_margin="4dp" />
+
+                    <Button
+                        android:id="@+id/key_down"
+                        android:layout_width="64dp"
+                        android:layout_height="48dp"
+                        android:layout_margin="4dp"
+                        android:background="@drawable/function_button_background"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+
+                    <View
+                        android:layout_width="64dp"
+                        android:layout_height="48dp"
+                        android:layout_margin="4dp" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end">
+
+            <Button
+                android:id="@+id/stick_reset_btn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Reset"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/function_button_background"
+                android:layout_marginEnd="12dp" />
+
+            <Button
+                android:id="@+id/stick_done_btn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Done"
+                android:textColor="#FFFFFF"
+                android:background="#4CAF50" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

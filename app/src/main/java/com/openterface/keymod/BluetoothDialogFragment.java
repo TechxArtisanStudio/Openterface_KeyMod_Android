@@ -37,7 +37,9 @@ import com.polidea.rxandroidble2.RxBleDevice;
 import com.polidea.rxandroidble2.scan.ScanSettings;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import io.reactivex.disposables.Disposable;
@@ -133,12 +135,14 @@ public class BluetoothDialogFragment extends DialogFragment {
         String title;
         RxBleDevice bleDevice;
         String lastConnectedTime;
+        int rssi; // RSSI in dBm, 0 means unknown
 
         DeviceItem(int type, String title, RxBleDevice bleDevice, String lastConnectedTime) {
             this.type = type;
             this.title = title;
             this.bleDevice = bleDevice;
             this.lastConnectedTime = lastConnectedTime;
+            this.rssi = 0;
         }
     }
 
@@ -178,7 +182,16 @@ public class BluetoothDialogFragment extends DialogFragment {
                 nameView.setText(deviceName);
                 addressView.setText(deviceAddress);
 
-                if (item.lastConnectedTime != null) {
+                if (item.rssi != 0) {
+                    String distance = rssiToEstimatedDistance(item.rssi);
+                    String signalStrength = item.rssi >= -50 ? "Excellent" : item.rssi >= -70 ? "Good" : "Weak";
+                    if (item.lastConnectedTime != null) {
+                        lastConnectedView.setText("Last connected: " + item.lastConnectedTime + " | " + item.rssi + " dBm (" + distance + ")");
+                    } else {
+                        lastConnectedView.setText(signalStrength + " · " + item.rssi + " dBm · ~" + distance);
+                    }
+                    lastConnectedView.setVisibility(View.VISIBLE);
+                } else if (item.lastConnectedTime != null) {
                     lastConnectedView.setText("Last connected: " + item.lastConnectedTime);
                     lastConnectedView.setVisibility(View.VISIBLE);
                 } else {
@@ -340,6 +353,49 @@ public class BluetoothDialogFragment extends DialogFragment {
                     showToast("Please select an openterface or KVM device");
                 }
             }
+        });
+
+        devicesListView.setOnItemLongClickListener((parent, v, position, id) -> {
+            DeviceItem item = devicesList.get(position);
+            if (item.type == DeviceItem.TYPE_DEVICE) {
+                RxBleDevice device = item.bleDevice;
+                String deviceName = sanitizeDeviceName(device.getName());
+                String deviceAddress = device.getMacAddress();
+
+                // Only allow forgetting paired devices
+                boolean isPaired = false;
+                for (RxBleDevice paired : pairedDevices) {
+                    if (paired.getMacAddress().equals(deviceAddress)) {
+                        isPaired = true;
+                        break;
+                    }
+                }
+                if (!isPaired) {
+                    showToast("Device is not paired, nothing to forget");
+                    return false;
+                }
+
+                // Disconnect if currently connected to this device
+                if (isServiceBound && bluetoothService.isConnected() &&
+                        bluetoothService.getConnectedDevice() != null &&
+                        bluetoothService.getConnectedDevice().getMacAddress().equals(deviceAddress)) {
+                    bluetoothService.disconnect();
+                }
+
+                new AlertDialog.Builder(requireContext())
+                        .setTitle("Forget Device")
+                        .setMessage("Forget \"" + deviceName + "\" (" + deviceAddress + ")?\n\nIt will no longer appear in the paired list.")
+                        .setPositiveButton("Forget", (dialog, which) -> {
+                            removePairedDevice(device);
+                            updateDeviceList();
+                            showToast("Device forgotten: " + deviceName);
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+
+                return true;
+            }
+            return false;
         });
 
         closeButton.setOnClickListener(v -> dismiss());
@@ -529,15 +585,22 @@ public class BluetoothDialogFragment extends DialogFragment {
                                 Log.d(TAG, LOG_PREFIX + "Device matches Openterface KM pattern: " + deviceName);
 
                                 synchronized (scanLock) {
-                                    for (DeviceItem item : devicesList) {
-                                        if (item.bleDevice != null && item.bleDevice.getMacAddress().equals(deviceAddress)) {
-                                            Log.d(TAG, LOG_PREFIX + "Device already in list, skipping: " + deviceName);
-                                            return;
+                                    boolean foundInList = false;
+                                    for (DeviceItem existingItem : devicesList) {
+                                        if (existingItem.bleDevice != null && existingItem.bleDevice.getMacAddress().equals(deviceAddress)) {
+                                            existingItem.rssi = scanResult.getRssi();
+                                            foundInList = true;
+                                            break;
                                         }
                                     }
 
-                                    String lastTime = formatLastConnected(getLastConnected(deviceAddress));
-                                    devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device, lastTime));
+                                    if (!foundInList) {
+                                        String lastTime = formatLastConnected(getLastConnected(deviceAddress));
+                                        int deviceRssi = scanResult.getRssi();
+                                        devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device, lastTime));
+                                        devicesList.get(devicesList.size() - 1).rssi = deviceRssi;
+                                    }
+
                                     mainHandler.post(() -> {
                                         devicesAdapter.notifyDataSetChanged();
                                         showToast("Found: " + deviceName);
@@ -573,6 +636,22 @@ public class BluetoothDialogFragment extends DialogFragment {
         }
     }
 
+    private String rssiToEstimatedDistance(int rssi) {
+        if (rssi == 0) return "?";
+        // RSSI to distance using path loss model: d = 10^((txPower - rssi) / (10 * n))
+        // txPower at 1m ≈ -59 dBm, path loss exponent n = 2.0
+        double txPower = -59.0;
+        double n = 2.0;
+        double distance = Math.pow(10.0, (txPower - rssi) / (10.0 * n));
+        if (distance < 1.0) {
+            return (int) (distance * 100) + " cm";
+        } else if (distance < 10.0) {
+            return String.format(java.util.Locale.getDefault(), "%.1f m", distance);
+        } else {
+            return String.format(java.util.Locale.getDefault(), "%.0f m", distance);
+        }
+    }
+
     private void showToast(String message) {
         if (isAdded() && getContext() != null) {
             mainHandler.post(() -> Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show());
@@ -601,6 +680,24 @@ public class BluetoothDialogFragment extends DialogFragment {
 
         prefs.edit().putStringSet(KEY_PAIRED_DEVICES, pairedDeviceSet).apply();
         Log.d(TAG, LOG_PREFIX + "Saved paired device: " + deviceEntry);
+    }
+
+    private void removePairedDevice(RxBleDevice device) {
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String mac = device.getMacAddress();
+
+        // Remove from SharedPreferences
+        Set<String> pairedDeviceSet = new HashSet<>(prefs.getStringSet(KEY_PAIRED_DEVICES, new HashSet<>()));
+        pairedDeviceSet.removeIf(entry -> entry.startsWith(mac + ";"));
+        prefs.edit().putStringSet(KEY_PAIRED_DEVICES, pairedDeviceSet).apply();
+
+        // Remove from in-memory list
+        pairedDevices.removeIf(d -> d.getMacAddress().equals(mac));
+
+        // Clear last-connected time
+        prefs.edit().remove(KEY_LAST_CONNECTED + "_" + mac).apply();
+
+        Log.d(TAG, LOG_PREFIX + "Removed paired device: " + mac);
     }
 
     private void saveLastConnected(String macAddress) {

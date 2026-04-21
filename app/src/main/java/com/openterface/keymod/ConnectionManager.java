@@ -451,6 +451,27 @@ public class ConnectionManager {
     }
 
     /**
+     * Send a full HID keyboard report with multiple simultaneous keys.
+     * @param modifiers Modifier byte
+     * @param keyCodes Key codes to include (up to 6; empty = release all)
+     */
+    public void sendKeyboardReport(int modifiers, int[] keyCodes) {
+        if (!isConnected()) {
+            Log.w(TAG, "Cannot send keyboard report: not connected");
+            return;
+        }
+        BluetoothService service = bluetoothService;
+        if (currentConnectionType == ConnectionType.BLUETOOTH && service == null) {
+            service = getBluetoothService();
+            if (service == null) {
+                Log.e(TAG, "ERROR: Bluetooth type selected but bluetoothService is NULL!");
+                return;
+            }
+        }
+        HIDSender.sendKeyboardReport(usbPort, service, modifiers, keyCodes);
+    }
+
+    /**
      * Send a raw HID keyboard report with the given modifier byte and key code.
      * Unlike sendKeyEvent(), this does NOT skip keyCode=0, allowing pure modifier
      * press/release packets needed for macOS Unicode hex input (Option + hex digits).
