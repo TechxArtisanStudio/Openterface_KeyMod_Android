@@ -72,141 +72,6 @@
             </LinearLayout>
         </RelativeLayout>
 
-        <!-- Presentation Card -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/presentation_card_bg"
-            android:padding="16dp"
-            android:layout_marginBottom="12dp">
-
-            <!-- Card Header -->
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/slide_progress_label"
-                    android:textColor="@color/presentation_text_muted"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:letterSpacing="0.1"
-                    android:layout_alignParentStart="true"
-                    android:layout_centerVertical="true" />
-
-                <Button
-                    android:id="@+id/btn_list"
-                    android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    android:text="@string/list"
-                    android:textColor="@android:color/white"
-                    android:textSize="12sp"
-                    android:textAllCaps="false"
-                    android:background="@drawable/presentation_list_button"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
-                    android:layout_alignParentEnd="true"
-                    android:layout_centerVertical="true"
-                    android:drawableStart="@drawable/ic_list"
-                    android:drawablePadding="4dp"
-                    android:drawableTint="@android:color/white" />
-            </RelativeLayout>
-
-            <!-- Slide Info -->
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp">
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:layout_alignParentStart="true">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <TextView
-                            android:id="@+id/slide_number"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Slide 1 / 1"
-                            android:textColor="@color/presentation_text_primary"
-                            android:textSize="28sp"
-                            android:textStyle="bold" />
-
-                        <ImageButton
-                            android:id="@+id/btn_edit_slide_count"
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:layout_marginStart="8dp"
-                            android:src="@drawable/ic_edit"
-                            android:tint="@color/presentation_text_muted"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:contentDescription="Edit slide count" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/slide_title"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Presentation"
-                        android:textColor="@color/presentation_text_secondary"
-                        android:textSize="18sp"
-                        android:layout_marginTop="2dp" />
-                </LinearLayout>
-            </RelativeLayout>
-
-            <!-- Slide Progress Dots -->
-            <LinearLayout
-                android:id="@+id/slide_progress_dots"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:layout_marginBottom="8dp" />
-
-            <!-- Percentage Labels -->
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0%"
-                    android:textColor="@color/presentation_text_muted"
-                    android:textSize="11sp"
-                    android:layout_alignParentStart="true" />
-
-                <TextView
-                    android:id="@+id/slide_percentage"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0%"
-                    android:textColor="@color/presentation_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:layout_centerHorizontal="true" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="100%"
-                    android:textColor="@color/presentation_text_muted"
-                    android:textSize="11sp"
-                    android:layout_alignParentEnd="true" />
-            </RelativeLayout>
-        </LinearLayout>
-
         <!-- Timer & Pace Card -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -249,8 +114,9 @@
                         android:layout_marginEnd="12dp" />
 
                     <LinearLayout
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
+                        android:layout_weight="1"
                         android:orientation="vertical">
 
                         <LinearLayout
@@ -302,55 +168,35 @@
                                 android:textSize="14sp" />
                         </LinearLayout>
                     </LinearLayout>
-                </LinearLayout>
 
-                <!-- Pace Gauge & Controls -->
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center_horizontal">
+                    <ImageButton
+                        android:id="@+id/btn_timer_start"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:layout_marginStart="16dp"
+                        android:src="@drawable/ic_play"
+                        android:tint="@android:color/white"
+                        android:background="@drawable/timer_start_button"
+                        android:contentDescription="Start timer" />
 
-                    <com.openterface.keymod.PaceGaugeView
-                        android:id="@+id/pace_gauge"
-                        android:layout_width="80dp"
-                        android:layout_height="80dp" />
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginTop="8dp">
-
-                        <ImageButton
-                            android:id="@+id/btn_timer_start"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:src="@drawable/ic_play"
-                            android:tint="@android:color/white"
-                            android:background="@drawable/timer_start_button"
-                            android:layout_marginEnd="8dp"
-                            android:contentDescription="Start timer" />
-
-                        <ImageButton
-                            android:id="@+id/btn_timer_reset"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:src="@drawable/ic_reset"
-                            android:tint="@color/presentation_text_primary"
-                            android:background="@drawable/presentation_action_button"
-                            android:layout_marginStart="8dp"
-                            android:contentDescription="Reset timer" />
-                    </LinearLayout>
+                    <ImageButton
+                        android:id="@+id/btn_timer_reset"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:layout_marginStart="8dp"
+                        android:src="@drawable/ic_reset"
+                        android:tint="@color/presentation_text_primary"
+                        android:background="@drawable/presentation_action_button"
+                        android:contentDescription="Reset timer" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
 
-        <!-- NEXT Button (Large Blue) -->
+        <!-- NEXT Button (Large Dark Orange) -->
         <Button
             android:id="@+id/btn_next"
             android:layout_width="match_parent"
-            android:layout_height="80dp"
+            android:layout_height="160dp"
             android:text="@string/next"
             android:textColor="@android:color/white"
             android:textSize="20sp"
@@ -382,7 +228,7 @@
                 <Button
                     android:id="@+id/btn_previous"
                     android:layout_width="match_parent"
-                    android:layout_height="100dp"
+                    android:layout_height="200dp"
                     android:minHeight="100dp"
                     android:text="@string/previous"
                     android:textColor="@android:color/white"
@@ -414,7 +260,7 @@
                 <Button
                     android:id="@+id/btn_black_screen"
                     android:layout_width="match_parent"
-                    android:layout_height="100dp"
+                    android:layout_height="200dp"
                     android:minHeight="100dp"
                     android:text="@string/black_screen"
                     android:textColor="@android:color/white"
@@ -447,7 +293,7 @@
                 <Button
                     android:id="@+id/btn_laser"
                     android:layout_width="match_parent"
-                    android:layout_height="100dp"
+                    android:layout_height="200dp"
                     android:minHeight="100dp"
                     android:text="@string/laser"
                     android:textColor="@android:color/white"
@@ -471,7 +317,7 @@
                 <Button
                     android:id="@+id/btn_pointer"
                     android:layout_width="match_parent"
-                    android:layout_height="100dp"
+                    android:layout_height="200dp"
                     android:minHeight="100dp"
                     android:text="@string/pointer"
                     android:textColor="@android:color/white"
@@ -528,4 +374,5 @@
         </LinearLayout>
 
     </LinearLayout>
+
 </ScrollView>

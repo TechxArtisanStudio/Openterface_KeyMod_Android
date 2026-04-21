@@ -54,8 +54,8 @@
     <color name="presentation_text_primary">#FF212121</color>
     <color name="presentation_text_secondary">#FF757575</color>
     <color name="presentation_text_muted">#FFBDBDBD</color>
-    <color name="presentation_primary">#FF2B6AF9</color>
-    <color name="presentation_primary_pressed">#FF1E4FC7</color>
+    <color name="presentation_primary">#FFF57C00</color>
+    <color name="presentation_primary_pressed">#FFE65100</color>
     <color name="presentation_green">#FF34D399</color>
     <color name="presentation_red">#FFEF4444</color>
     <color name="presentation_purple">#FFA855F7</color>

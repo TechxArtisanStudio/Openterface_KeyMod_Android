@@ -227,8 +227,8 @@
     <string name="next">NEXT</string>
     <string name="previous">PREVIOUS</string>
     <string name="black_screen">BLACK SCREEN\nToggle blank screen</string>
-    <string name="laser">LASER\nLaser pointer</string>
-    <string name="pointer">POINTER\nMotion control</string>
+    <string name="laser">SWITCH APP\nCommand+Tab</string>
+    <string name="pointer">TOUCHPAD\nMouse control</string>
     <string name="tap_center_next">Tap center: Next</string>
     <string name="swipe_prev_next">Swipe left/right: Prev/Next</string>
     <string name="long_press_laser">Long press: Laser</string>

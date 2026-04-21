@@ -11,4 +11,10 @@
         <item name="android:background">@drawable/key_background</item>
         <item name="android:textAllCaps">false</item>
     </style>
+
+    <!-- Presentation Mode Button Theme - Dark Orange -->
+    <style name="Theme.KeyMod.Presentation" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/presentation_primary</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+    </style>
 </resources>
