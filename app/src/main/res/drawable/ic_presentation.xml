@@ -1,0 +1,29 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="40dp"
+    android:height="40dp"
+    android:viewportWidth="40"
+    android:viewportHeight="40">
+    <!-- Projection screen -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M6,8 L34,8 L34,28 L6,28 Z"/>
+    <!-- Screen content hint - horizontal lines -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M10,12 h12 v2 h-12 z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M10,17 h16 v2 h-16 z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M10,22 h8 v2 h-8 z"/>
+    <!-- Stand -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M18,28 h4 v4 h-4 z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M14,32 h12 v2 h-12 z"/>
+</vector>

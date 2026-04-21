@@ -217,4 +217,22 @@
     <string name="mouse_mode">Mouse Only</string>
     <string name="composite_mode">Keyboard + Mouse</string>
     <string name="mode_info">Select your preferred input mode</string>
+
+    <!-- Presentation Mode Strings -->
+    <string name="presentation_mode">Presentation</string>
+    <string name="slide_progress_label">PRESENTATION</string>
+    <string name="timer_pace_label">TIMER &amp; PACE</string>
+    <string name="remaining">remaining</string>
+    <string name="pace_ok">OK</string>
+    <string name="next">NEXT</string>
+    <string name="previous">PREVIOUS</string>
+    <string name="black_screen">BLACK SCREEN</string>
+    <string name="laser">LASER</string>
+    <string name="pointer">POINTER</string>
+    <string name="tap_center_next">Tap center: Next</string>
+    <string name="swipe_prev_next">Swipe left/right: Prev/Next</string>
+    <string name="long_press_laser">Long press: Laser</string>
+    <string name="hold_move_pointer">Hold &amp; move: Pointer</string>
+    <string name="list">List</string>
+    <string name="of">/</string>
 </resources>

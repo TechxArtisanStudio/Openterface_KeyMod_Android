@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Mouse cursor pointer shape -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,8 L16,36 L22,30 L28,40 L32,38 L26,28 L34,28 Z"/>
+</vector>

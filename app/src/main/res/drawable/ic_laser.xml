@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Outer circle -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M24,4a20,20 0,1,0 0,40 a20,20 0,1,0 0,-40z"/>
+    <!-- Inner circle -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M24,12a12,12 0,1,0 0,24 a12,12 0,1,0 0,-24z"/>
+    <!-- Crosshair horizontal -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M18,23h12v2h-12z"/>
+    <!-- Crosshair vertical -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M23,18h2v12h-2z"/>
+    <!-- Center dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M22,22h4v4h-4z"/>
+</vector>

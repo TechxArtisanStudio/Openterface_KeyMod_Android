@@ -40,7 +40,7 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:columnCount="2"
-        android:rowCount="3"
+        android:rowCount="4"
         android:padding="16dp"
         android:alignmentMode="alignMargins">
 
@@ -286,6 +286,48 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Gamepad"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/card_text_color"
+                    android:gravity="center"
+                    android:layout_marginTop="12dp" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Presentation Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/presentation_card"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_columnWeight="1"
+            android:layout_rowWeight="1"
+            android:layout_margin="8dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/card_background_selector">
+
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/ic_presentation"
+                    android:contentDescription="Presentation"
+                    android:tint="@color/card_icon_tint" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Presentation"
                     android:textSize="13sp"
                     android:textStyle="bold"
                     android:textColor="@color/card_text_color"

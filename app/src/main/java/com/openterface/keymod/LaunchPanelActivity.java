@@ -29,6 +29,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
     public static final String MODE_SHORTCUTS = "shortcuts";
     public static final String MODE_MACROS = "macros";
     public static final String MODE_VOICE = "voice";
+    public static final String MODE_PRESENTATION = "presentation";
 
     private CheckBox rememberChoiceCheckBox;
     private Button startButton;
@@ -44,6 +45,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
     private CardView shortcutsCard;
     private CardView macrosCard;
     private CardView voiceCard;
+    private CardView presentationCard;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,6 +82,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
         shortcutsCard = findViewById(R.id.shortcuts_card);
         macrosCard = findViewById(R.id.macros_card);
         voiceCard = findViewById(R.id.voice_card);
+        presentationCard = findViewById(R.id.presentation_card);
     }
 
     private void updateCardSelections() {
@@ -89,6 +92,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
         shortcutsCard.setSelected(selectedMode.equals(MODE_SHORTCUTS));
         macrosCard.setSelected(selectedMode.equals(MODE_MACROS));
         voiceCard.setSelected(selectedMode.equals(MODE_VOICE));
+        presentationCard.setSelected(selectedMode.equals(MODE_PRESENTATION));
     }
 
     private void setupClickListeners() {
@@ -119,6 +123,11 @@ public class LaunchPanelActivity extends AppCompatActivity {
 
         voiceCard.setOnClickListener(v -> {
             selectedMode = MODE_VOICE;
+            updateCardSelections();
+        });
+
+        presentationCard.setOnClickListener(v -> {
+            selectedMode = MODE_PRESENTATION;
             updateCardSelections();
         });
 
@@ -183,6 +192,8 @@ public class LaunchPanelActivity extends AppCompatActivity {
                 return "Macros";
             case MODE_VOICE:
                 return "Voice Input";
+            case MODE_PRESENTATION:
+                return "Presentation";
             default:
                 return "Keyboard & Mouse";
         }

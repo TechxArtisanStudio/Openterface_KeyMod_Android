@@ -48,6 +48,22 @@
     <color name="voice_input_field_background">#FFFFFFFF</color>
     <color name="voice_input_instruction_background">#FFBBDEFB</color>
 
+    <!-- Presentation Mode Colors -->
+    <color name="presentation_bg">#FF16192B</color>
+    <color name="presentation_card_bg">#FF1E2236</color>
+    <color name="presentation_text_primary">#FFFFFFFF</color>
+    <color name="presentation_text_secondary">#FF9BA3C5</color>
+    <color name="presentation_text_muted">#FF5C6380</color>
+    <color name="presentation_primary">#FF2B6AF9</color>
+    <color name="presentation_primary_pressed">#FF1E4FC7</color>
+    <color name="presentation_green">#FF34D399</color>
+    <color name="presentation_red">#FFEF4444</color>
+    <color name="presentation_purple">#FFA855F7</color>
+    <color name="presentation_progress_filled">#FF3B82F6</color>
+    <color name="presentation_progress_empty">#FF3A3F57</color>
+
+    <!-- Presentation Mode Colors -->
+
     <!-- Keyboard Colors (Light) -->
     <color name="key_bg_normal">#FFFFFFFF</color>
     <color name="key_bg_function">#FFE9E9EC</color>

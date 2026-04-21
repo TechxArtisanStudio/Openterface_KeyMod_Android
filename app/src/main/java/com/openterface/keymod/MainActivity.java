@@ -41,6 +41,7 @@ import com.openterface.fragment.KeyboardFragment;
 import com.openterface.fragment.MacrosFragment;
 import com.openterface.fragment.MouseFragment;
 import com.openterface.fragment.NumpadFragment;
+import com.openterface.fragment.PresentationFragment;
 import com.openterface.fragment.ShortcutFragment;
 import com.openterface.fragment.ShortcutHubFragment;
 import com.openterface.fragment.VoiceInputFragment;
@@ -83,6 +84,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private LinearLayout navShortcuts;
     private LinearLayout navMacros;
     private LinearLayout navVoice;
+    private LinearLayout navPresentation;
     private ImageButton navOsMacosButton;
     private ImageButton navOsWindowsButton;
     private ImageButton navOsLinuxButton;
@@ -336,6 +338,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         navShortcuts = findViewById(R.id.nav_shortcuts);
         navMacros = findViewById(R.id.nav_macros);
         navVoice = findViewById(R.id.nav_voice);
+        navPresentation = findViewById(R.id.nav_presentation);
         navOsMacosButton = findViewById(R.id.nav_os_macos_button);
         navOsWindowsButton = findViewById(R.id.nav_os_windows_button);
         navOsLinuxButton = findViewById(R.id.nav_os_linux_button);
@@ -603,6 +606,14 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 drawerLayout.closeDrawer(android.view.Gravity.START);
             });
         }
+        if (navPresentation != null) {
+            navPresentation.setOnClickListener(v -> {
+                currentNavMode = LaunchPanelActivity.MODE_PRESENTATION;
+                updateNavSelection();
+                showPresentationFragment();
+                drawerLayout.closeDrawer(android.view.Gravity.START);
+            });
+        }
 
         // Target OS buttons in sidebar
         if (navOsMacosButton != null) {
@@ -739,6 +750,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (navShortcuts != null) navShortcuts.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_SHORTCUTS));
         if (navMacros != null) navMacros.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_MACROS));
         if (navVoice != null) navVoice.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_VOICE));
+        if (navPresentation != null) navPresentation.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_PRESENTATION));
     }
 
     private void updateNavOsButtonState() {
@@ -822,6 +834,13 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         transaction.commit();
     }
 
+    private void showPresentationFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, new PresentationFragment());
+        transaction.commit();
+    }
+
     /**
      * Handle launch mode from LaunchPanelActivity
      */
@@ -846,6 +865,9 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 break;
             case LaunchPanelActivity.MODE_VOICE:
                 showVoiceInputFragment();
+                break;
+            case LaunchPanelActivity.MODE_PRESENTATION:
+                showPresentationFragment();
                 break;
             default:
                 showCompositeFragment();

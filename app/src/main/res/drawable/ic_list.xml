@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="20dp"
+    android:height="20dp"
+    android:viewportWidth="20"
+    android:viewportHeight="20">
+    <!-- Hamburger/list icon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M3,5 h14 v2 h-14 z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M3,9 h14 v2 h-14 z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M3,13 h14 v2 h-14 z"/>
+</vector>
