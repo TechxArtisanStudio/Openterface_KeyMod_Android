@@ -13,6 +13,7 @@
         android:minWidth="320dp">
 
         <TextView
+            android:id="@+id/dialog_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Button Configuration"
@@ -31,13 +32,14 @@
 
         <Button
             android:id="@+id/button_key_label"
-            android:layout_width="100dp"
+            android:layout_width="160dp"
             android:layout_height="56dp"
             android:layout_gravity="center_horizontal"
             android:layout_marginBottom="24dp"
             android:background="@drawable/function_button_background"
             android:textColor="#FFFFFF"
-            android:textSize="20sp" />
+            android:textSize="16sp"
+            android:singleLine="false" />
 
         <TextView
             android:layout_width="wrap_content"

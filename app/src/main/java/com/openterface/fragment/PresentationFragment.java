@@ -1,10 +1,12 @@
 package com.openterface.fragment;
 
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.view.ContextThemeWrapper;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -21,18 +23,24 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
-import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.RadioGroup;
+import android.widget.RadioButton;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.LinearSnapHelper;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.openterface.keymod.ConnectionManager;
 import com.openterface.keymod.MainActivity;
 import com.openterface.keymod.R;
+import com.openterface.keymod.TouchPadView;
 
 import java.util.concurrent.TimeUnit;
 
@@ -49,36 +57,96 @@ public class PresentationFragment extends Fragment {
     private static final String PREF_TIMER_REMAINING = "presentation_timer_remaining";
     private static final String PREF_TIMER_RUNNING = "presentation_timer_running";
     private static final String PREF_BLACK_SCREEN = "presentation_black_screen";
+    private static final String PREF_TIMER_MODE = "presentation_timer_mode";
+    private static final String PREF_TOOL_INDEX = "presentation_tool_index";
 
     private static final int DEFAULT_TIMER_DURATION = 25 * 60; // 25 minutes in seconds
+
+    public static final int TIMER_MODE_COUNTDOWN = 0;
+    public static final int TIMER_MODE_COUNTUP = 1;
 
     // HID key codes
     private static final int KEY_RIGHT_ARROW = 79;
     private static final int KEY_LEFT_ARROW = 80;
     private static final int KEY_B = 5; // For black screen toggle
     private static final int KEY_TAB = 43;
+    private static final int KEY_ESCAPE = 41;
+    private static final int KEY_P = 19;
+    private static final int KEY_L = 15;
+    private static final int KEY_RETURN = 40;
+    private static final int KEY_F5 = 68;
     private static final int KEY_COMMAND = 227; // Left GUI/Cmd key
+
+    // Presentation tools and their key mappings
+    enum PresentationTool {
+        KEYNOTE("Keynote",
+                0x04 | 0x08, KEY_P,    // Opt+Cmd+P
+                KEY_ESCAPE,
+                "⌥⌘P / ESC"),
+        POWERPOINT("PowerPoint",
+                0x02 | 0x08, KEY_RETURN, // Cmd+Shift+Enter (macOS)
+                KEY_ESCAPE,
+                "⇧⌘↵ / ESC"),
+        GOOGLE_SLIDES("Google Slides",
+                0x08, KEY_RETURN,        // Cmd+Enter
+                KEY_ESCAPE,
+                "⌘↵ / ESC"),
+        WORD("Word",
+                0, 0,                    // No play key
+                KEY_ESCAPE,
+                "F5 / ESC"),
+        ADOBE_READER("Adobe Reader",
+                0x08, KEY_L,             // Cmd+L (toggle fullscreen)
+                KEY_ESCAPE,
+                "⌘L / ESC");
+
+        final String name;
+        final int playModifier;
+        final int playKey;
+        final int stopKey;
+        final String shortcutHint;
+
+        PresentationTool(String name, int playModifier, int playKey, int stopKey, String shortcutHint) {
+            this.name = name;
+            this.playModifier = playModifier;
+            this.playKey = playKey;
+            this.stopKey = stopKey;
+            this.shortcutHint = shortcutHint;
+        }
+    }
 
     // UI Views
     private TextView timerRemaining;
+    private TextView timerLabel;
     private TextView timerTotal;
     private Button btnNext;
     private Button btnPrevious;
+    private Button btnPlay;
     private Button btnBlackScreen;
     private Button btnLaser;
     private Button btnPointer;
+    private TextView hintPlay;
     private ImageButton btnEditTimer;
     private ImageButton btnTimerStart;
     private ImageButton btnTimerReset;
-    private View settingsButton;
-    private TextView connectionStatus;
-    private TextView batteryLevel;
+
+    // Tool switcher views
+    private RecyclerView toolCarousel;
+    private LinearSnapHelper toolSnapHelper;
+    private ToolCarouselAdapter toolAdapter;
+    private boolean isProgrammaticScroll = false;
 
     // State
     private int timerDuration = DEFAULT_TIMER_DURATION; // in seconds
     private int timerRemainingSec = timerDuration;
+    private int timerMode = TIMER_MODE_COUNTDOWN; // 0=countdown, 1=countup
     private boolean timerRunning = false;
     private boolean blackScreenActive = false;
+    private boolean appSwitcherActive = false; // Cmd held, app switcher is open
+    private boolean playActive = false; // Presentation play toggled
+
+    // Tool state
+    private PresentationTool currentTool = PresentationTool.KEYNOTE;
 
     // Timer
     private Handler timerHandler;
@@ -91,18 +159,13 @@ public class PresentationFragment extends Fragment {
     // Gesture detector for swipe support
     private GestureDetector gestureDetector;
 
-    // Touchpad tracking
-    private float lastPointerX = 0;
-    private float lastPointerY = 0;
-    private boolean isPointerMoving = false;
-
     // Root view for gesture handling
     private View rootView;
 
     private SharedPreferences prefs;
 
     // Touchpad dialog
-    private AlertDialog touchpadDialog;
+    private Dialog touchpadDialog;
     private View touchpadView;
 
     @Nullable
@@ -140,34 +203,68 @@ public class PresentationFragment extends Fragment {
 
     private void initViews(View view) {
         timerRemaining = view.findViewById(R.id.timer_remaining);
+        timerLabel = view.findViewById(R.id.timer_label);
         timerTotal = view.findViewById(R.id.timer_total);
         btnNext = view.findViewById(R.id.btn_next);
         btnPrevious = view.findViewById(R.id.btn_previous);
+        btnPlay = view.findViewById(R.id.btn_play);
         btnBlackScreen = view.findViewById(R.id.btn_black_screen);
         btnLaser = view.findViewById(R.id.btn_laser);
         btnPointer = view.findViewById(R.id.btn_pointer);
+        hintPlay = view.findViewById(R.id.hint_play);
         btnEditTimer = view.findViewById(R.id.btn_edit_timer);
         btnTimerStart = view.findViewById(R.id.btn_timer_start);
         btnTimerReset = view.findViewById(R.id.btn_timer_reset);
-        settingsButton = view.findViewById(R.id.settings_button);
-        connectionStatus = view.findViewById(R.id.connection_status);
-        batteryLevel = view.findViewById(R.id.battery_level);
 
-        // Update connection status
-        if (getActivity() instanceof MainActivity) {
-            ConnectionManager cm = ((MainActivity) getActivity()).getConnectionManager();
-            if (cm != null && cm.isConnected()) {
-                connectionStatus.setText("Connected");
-            } else {
-                connectionStatus.setText("Disconnected");
+        toolCarousel = view.findViewById(R.id.tool_carousel);
+        LinearLayoutManager layoutManager = new LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false);
+        toolCarousel.setLayoutManager(layoutManager);
+
+        toolAdapter = new ToolCarouselAdapter(PresentationTool.values(), this::selectTool);
+        toolCarousel.setAdapter(toolAdapter);
+
+        // SnapHelper to center the selected item
+        toolSnapHelper = new LinearSnapHelper();
+        toolSnapHelper.attachToRecyclerView(toolCarousel);
+
+        // Scroll to initial position
+        isProgrammaticScroll = true;
+        int startPos = toolAdapter.positionForTool(currentTool.ordinal());
+        toolCarousel.post(() -> {
+            toolCarousel.scrollToPosition(startPos);
+            isProgrammaticScroll = false;
+        });
+
+        // Update currentTool when user scrolls to a different tool
+        toolCarousel.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                if (isProgrammaticScroll) return;
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    View snapView = toolSnapHelper.findSnapView(layoutManager);
+                    if (snapView != null) {
+                        int position = layoutManager.getPosition(snapView);
+                        int toolIdx = position % PresentationTool.values().length;
+                        if (toolIdx != currentTool.ordinal()) {
+                            currentTool = PresentationTool.values()[toolIdx];
+                            saveState();
+                            updateToolHint();
+                            toolAdapter.notifyDataSetChanged();
+                        }
+                    }
+                }
             }
-        }
+        });
 
-        // Set timer total text
+        // Set timer label and total text based on mode
+        updateToolHint();
+        updateTimerLabel();
         timerTotal.setText(" of " + formatTime(timerDuration));
     }
 
     private void setupListeners() {
+        // No separate listeners needed — tool selection handled by carousel snap + item clicks
+
         // Next button - send right arrow
         btnNext.setOnClickListener(v -> {
             vibrate();
@@ -180,16 +277,46 @@ public class PresentationFragment extends Fragment {
             sendLeftArrowKey();
         });
 
+        // Play button - Opt+Cmd+P for Keynote play, ESC to stop
+        btnPlay.setOnClickListener(v -> {
+            vibrate();
+            togglePlay();
+        });
+
         // Black screen toggle
         btnBlackScreen.setOnClickListener(v -> {
             vibrate();
             toggleBlackScreen();
         });
 
-        // Laser pointer - Command+Tab to switch applications
-        btnLaser.setOnClickListener(v -> {
-            vibrate();
-            sendCommandTab();
+        // App switcher button (Cmd+Tab) — supports stateful macOS app switcher:
+        //   1st tap  → Cmd down + Tab down + Tab up  (opens switcher, Cmd held)
+        //   next taps → Tab down + Tab up              (cycles apps, Cmd still held)
+        //   double tap → release all                    (confirms selection)
+        GestureDetector switcherGesture = new GestureDetector(requireContext(),
+                new GestureDetector.SimpleOnGestureListener() {
+                    @Override
+                    public boolean onSingleTapConfirmed(MotionEvent e) {
+                        if (appSwitcherActive) {
+                            cycleAppSwitcher();
+                        } else {
+                            openAppSwitcher();
+                        }
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onDoubleTap(MotionEvent e) {
+                        if (appSwitcherActive) {
+                            closeAppSwitcher();
+                        }
+                        return true;
+                    }
+                });
+
+        btnLaser.setOnTouchListener((v, event) -> {
+            switcherGesture.onTouchEvent(event);
+            return true;
         });
 
         // Pointer mode - open touchpad dialog
@@ -222,14 +349,6 @@ public class PresentationFragment extends Fragment {
         });
 
         updateTimerButton();
-
-        // Settings button
-        if (settingsButton != null) {
-            settingsButton.setOnClickListener(v -> {
-                // Could open presentation settings dialog
-                Toast.makeText(requireContext(), "Presentation settings coming soon", Toast.LENGTH_SHORT).show();
-            });
-        }
     }
 
     private void setupGestureDetector(View view) {
@@ -279,6 +398,23 @@ public class PresentationFragment extends Fragment {
 
     // ── Slide Navigation (simplified) ─────────────────────────────────
 
+    private void sendKeyHID(int keyCode) {
+        if (getActivity() instanceof MainActivity) {
+            ConnectionManager cm = ((MainActivity) getActivity()).getConnectionManager();
+            if (cm != null && cm.isConnected()) {
+                cm.sendKeyEvent(0, keyCode);
+                timerHandler.postDelayed(() -> {
+                    if (getActivity() instanceof MainActivity) {
+                        ConnectionManager c = ((MainActivity) getActivity()).getConnectionManager();
+                        if (c != null && c.isConnected()) {
+                            c.sendKeyRelease();
+                        }
+                    }
+                }, 100);
+            }
+        }
+    }
+
     private void sendRightArrowKey() {
         if (getActivity() instanceof MainActivity) {
             ConnectionManager cm = ((MainActivity) getActivity()).getConnectionManager();
@@ -319,37 +455,85 @@ public class PresentationFragment extends Fragment {
         }
     }
 
-    // ── Application Switcher (Command+Tab) ────────────────────────────
+    // ── Application Switcher (Cmd+Tab state machine) ─────────────────
 
-    private void sendCommandTab() {
+    private int getAppSwitcherModifier() {
         if (getActivity() instanceof MainActivity) {
-            ConnectionManager cm = ((MainActivity) getActivity()).getConnectionManager();
-            if (cm != null && cm.isConnected()) {
-                // Press Command key
-                cm.sendKeyEvent(KEY_COMMAND, 0);
-                timerHandler.postDelayed(() -> {
-                    if (getActivity() instanceof MainActivity) {
-                        ConnectionManager c = ((MainActivity) getActivity()).getConnectionManager();
-                        if (c != null && c.isConnected()) {
-                            // Press Tab key
-                            c.sendKeyEvent(KEY_COMMAND, KEY_TAB);
-                            timerHandler.postDelayed(() -> {
-                                if (getActivity() instanceof MainActivity) {
-                                    ConnectionManager conn = ((MainActivity) getActivity()).getConnectionManager();
-                                    if (conn != null && conn.isConnected()) {
-                                        // Release all keys
-                                        conn.sendKeyRelease();
-                                    }
-                                }
-                            }, 100);
-                        }
-                    }
-                }, 100);
-                Log.d(TAG, "Sent Command+Tab");
-            } else {
-                Log.w(TAG, "Not connected - cannot send Command+Tab");
+            String os = ((MainActivity) getActivity()).getTargetOs();
+            if ("windows".equals(os) || "linux".equals(os)) {
+                return 0x04; // Alt modifier bitmask
             }
         }
+        return 0x08; // Cmd modifier bitmask (macOS default)
+    }
+
+    private void openAppSwitcher() {
+        vibrate();
+        ConnectionManager cm = getConnectionManager();
+        if (cm != null && cm.isConnected()) {
+            // If presentation is playing, stop it first
+            if (playActive) {
+                togglePlay();
+                timerHandler.postDelayed(() -> openAppSwitcher(), 300);
+                return;
+            }
+            int mod = getAppSwitcherModifier();
+            // Press Cmd + Tab
+            cm.sendKeyEvent(mod, KEY_TAB);
+            // Release Tab after short delay (Cmd stays held)
+            timerHandler.postDelayed(() -> {
+                ConnectionManager c = getConnectionManager();
+                if (c != null && c.isConnected()) {
+                    c.sendRawHIDReport(mod, 0);
+                }
+            }, 100);
+            appSwitcherActive = true;
+            btnLaser.setTextColor(Color.parseColor("#34D399")); // green = active
+            Log.d(TAG, "App switcher opened (modifier=" + mod + " held)");
+            // Safety timeout: auto-release after 10s of inactivity
+            timerHandler.postDelayed(() -> {
+                if (appSwitcherActive) {
+                    closeAppSwitcher();
+                    Log.d(TAG, "App switcher auto-released (timeout)");
+                }
+            }, 3000);
+        }
+    }
+
+    private void cycleAppSwitcher() {
+        vibrate();
+        ConnectionManager cm = getConnectionManager();
+        if (cm != null && cm.isConnected()) {
+            int mod = getAppSwitcherModifier();
+            // Press Tab (modifier already held from previous step)
+            cm.sendKeyEvent(mod, KEY_TAB);
+            // Release Tab after short delay (Cmd stays held)
+            timerHandler.postDelayed(() -> {
+                ConnectionManager c = getConnectionManager();
+                if (c != null && c.isConnected()) {
+                    c.sendRawHIDReport(mod, 0);
+                }
+            }, 100);
+            Log.d(TAG, "App switcher cycled");
+        }
+    }
+
+    private void closeAppSwitcher() {
+        vibrate();
+        ConnectionManager cm = getConnectionManager();
+        if (cm != null && cm.isConnected()) {
+            cm.sendKeyRelease();
+            appSwitcherActive = false;
+            btnLaser.setTextColor(Color.parseColor("#FFFFFFFF")); // white = inactive
+            Log.d(TAG, "App switcher closed (all released)");
+        }
+    }
+
+    private ConnectionManager getConnectionManager() {
+        if (getActivity() instanceof MainActivity) {
+            return ((MainActivity) getActivity()).getConnectionManager();
+        }
+        return null;
     }
 
     // ── Touchpad Dialog ───────────────────────────────────────────────
@@ -360,62 +544,218 @@ public class PresentationFragment extends Fragment {
             return;
         }
 
-        // Create touchpad view
         touchpadView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_touchpad, null);
-        View touchSurface = touchpadView.findViewById(R.id.touch_surface);
+        TouchPadView touchSurface = touchpadView.findViewById(R.id.touch_surface);
 
-        // Set up touch handling
-        touchSurface.setOnTouchListener((v, event) -> {
-            if (getActivity() instanceof MainActivity) {
-                ConnectionManager cm = ((MainActivity) getActivity()).getConnectionManager();
-                if (cm == null || !cm.isConnected()) return false;
-
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        lastPointerX = event.getX();
-                        lastPointerY = event.getY();
-                        isPointerMoving = true;
-                        return true;
-
-                    case MotionEvent.ACTION_MOVE:
-                        if (isPointerMoving) {
-                            float deltaX = (event.getX() - lastPointerX) * 0.8f;
-                            float deltaY = (event.getY() - lastPointerY) * 0.8f;
-
-                            // Clamp to -127 to 127
-                            int dx = (int) Math.max(-127, Math.min(127, deltaX));
-                            int dy = (int) Math.max(-127, Math.min(127, deltaY));
-
-                            if (dx != 0 || dy != 0) {
-                                cm.sendMouseMovement(dx, dy, 0);
-                            }
-
-                            lastPointerX = event.getX();
-                            lastPointerY = event.getY();
-                        }
-                        return true;
-
-                    case MotionEvent.ACTION_UP:
-                        isPointerMoving = false;
-                        return true;
+        touchSurface.setOnTouchPadListener(new TouchPadView.OnTouchPadListener() {
+            @Override
+            public void onTouchMove(float x, float y, float lastX, float lastY) {
+                if (getActivity() instanceof MainActivity) {
+                    ConnectionManager cm = ((MainActivity) getActivity()).getConnectionManager();
+                    if (cm == null || !cm.isConnected()) return;
+                    float dx = x - lastX;
+                    float dy = y - lastY;
+                    int clampedDx = (int) Math.max(-127, Math.min(127, dx));
+                    int clampedDy = (int) Math.max(-127, Math.min(127, dy));
+                    if (clampedDx != 0 || clampedDy != 0) {
+                        cm.sendMouseMovement(clampedDx, clampedDy, 0);
+                    }
                 }
             }
-            return false;
+
+            @Override
+            public void onTouchClick() {
+                sendMouseClick(1);
+            }
+
+            @Override
+            public void onTouchDoubleClick() {
+                sendMouseClick(1);
+                timerHandler.postDelayed(() -> sendMouseClick(1), 150);
+            }
+
+            @Override
+            public void onTouchRightClick() {
+                sendMouseClick(2);
+            }
         });
 
-        // Build dialog
-        touchpadDialog = new AlertDialog.Builder(requireContext())
-                .setView(touchpadView)
-                .setNegativeButton("Close", (dialog, which) -> {
-                    dialog.dismiss();
-                    touchpadDialog = null;
-                })
-                .create();
+        Dialog dialog = new Dialog(requireContext());
+        dialog.setContentView(touchpadView);
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
 
-        touchpadDialog.show();
+        android.widget.Button btnClose = touchpadView.findViewById(R.id.btn_touchpad_close);
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        dialog.setOnDismissListener(d -> {
+            sendKeyHID(6); // 'C' to hide pointer
+            touchpadDialog = null;
+        });
+        touchpadDialog = dialog;
+        dialog.show();
+
+        // Send 'C' to show pointer cursor in presentation software
+        sendKeyHID(6); // HID code for 'C'
+        Log.d(TAG, "Touchpad dialog shown, pointer enabled");
+    }
+
+    private void sendMouseClick(int buttons) {
+        if (getActivity() instanceof MainActivity) {
+            ConnectionManager cm = ((MainActivity) getActivity()).getConnectionManager();
+            if (cm == null || !cm.isConnected()) return;
+            cm.sendMouseMovement(0, 0, buttons);
+            timerHandler.postDelayed(() -> {
+                if (getActivity() instanceof MainActivity) {
+                    ConnectionManager c = ((MainActivity) getActivity()).getConnectionManager();
+                    if (c != null && c.isConnected()) {
+                        c.sendMouseMovement(0, 0, 0);
+                    }
+                }
+            }, 100);
+        }
     }
 
     // ── Black Screen ─────────────────────────────────────────────────
+
+    private void togglePlay() {
+        playActive = !playActive;
+        updatePlayButton();
+
+        if (getActivity() instanceof MainActivity) {
+            ConnectionManager cm = ((MainActivity) getActivity()).getConnectionManager();
+            if (cm != null && cm.isConnected()) {
+                if (playActive) {
+                    int mod = currentTool.playModifier;
+                    int key = currentTool.playKey;
+                    if (key != 0) {
+                        cm.sendKeyEvent(mod, key);
+                        timerHandler.postDelayed(() -> {
+                            ConnectionManager c = getConnectionManager();
+                            if (c != null && c.isConnected()) c.sendKeyRelease();
+                        }, 100);
+                    }
+                    Log.d(TAG, "Play: " + currentTool.name + " keys sent");
+                } else {
+                    cm.sendKeyEvent(0, currentTool.stopKey);
+                    timerHandler.postDelayed(() -> {
+                        ConnectionManager c = getConnectionManager();
+                        if (c != null && c.isConnected()) c.sendKeyRelease();
+                    }, 100);
+                    Log.d(TAG, "Stop: " + currentTool.stopKey + " sent");
+                }
+            }
+        }
+    }
+
+    private void updatePlayButton() {
+        if (playActive) {
+            btnPlay.setText(R.string.stop);
+            btnPlay.setBackgroundColor(Color.parseColor("#000000"));
+            btnPlay.setTextColor(Color.parseColor("#FFFFFFFF"));
+            btnPlay.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_toolbar_stop, 0);
+            btnPlay.getCompoundDrawables()[2].setTint(Color.parseColor("#FFFFFFFF"));
+        } else {
+            btnPlay.setText(R.string.play);
+            btnPlay.setBackgroundResource(R.drawable.presentation_primary_button);
+            btnPlay.setTextColor(Color.parseColor("#FFFFFFFF"));
+            btnPlay.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_play, 0);
+            btnPlay.getCompoundDrawables()[2].setTint(Color.parseColor("#FFFFFFFF"));
+        }
+    }
+
+    private void selectTool(PresentationTool tool) {
+        vibrate();
+        currentTool = tool;
+        saveState();
+        updateToolHint();
+        toolAdapter.notifyDataSetChanged();
+        scrollToCurrentTool();
+    }
+
+    private void updateToolHint() {
+        if (hintPlay != null) {
+            hintPlay.setText(currentTool.shortcutHint);
+        }
+    }
+
+    private void scrollToCurrentTool() {
+        isProgrammaticScroll = true;
+        toolCarousel.post(() -> {
+            int target = toolAdapter.positionForTool(currentTool.ordinal());
+            toolCarousel.scrollToPosition(target);
+            // Use LinearSmoothScroller for center snap
+            LinearLayoutManager lm = (LinearLayoutManager) toolCarousel.getLayoutManager();
+            if (lm != null) {
+                lm.smoothScrollToPosition(toolCarousel, new RecyclerView.State(), target);
+            }
+            toolCarousel.postDelayed(() -> isProgrammaticScroll = false, 500);
+        });
+    }
+
+    /**
+     * Infinite carousel adapter. Uses a large virtual range so scrolling
+     * wraps seamlessly via modular indexing.
+     */
+    private class ToolCarouselAdapter extends RecyclerView.Adapter<ToolCarouselAdapter.ViewHolder> {
+        private static final int VIRTUAL_REPEAT = 10000;
+        private final PresentationTool[] tools;
+        private final java.util.function.Consumer<PresentationTool> onSelect;
+
+        ToolCarouselAdapter(PresentationTool[] tools, java.util.function.Consumer<PresentationTool> onSelect) {
+            this.tools = tools;
+            this.onSelect = onSelect;
+        }
+
+        int positionForTool(int toolOrdinal) {
+            // Start near the middle of the virtual range, aligned to tool index
+            return (VIRTUAL_REPEAT / 2) * tools.length + toolOrdinal;
+        }
+
+        @NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            TextView tv = new TextView(requireContext());
+            tv.setGravity(android.view.Gravity.CENTER);
+            tv.setPadding(32, 8, 32, 8);
+            tv.setAllCaps(false);
+            tv.setBackgroundResource(android.R.color.transparent);
+            tv.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            return new ViewHolder(tv);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            PresentationTool tool = tools[position % tools.length];
+            TextView tv = (TextView) holder.itemView;
+            tv.setText(tool.name);
+            boolean selected = (tool == currentTool);
+            tv.setTextSize(selected ? 20 : 16);
+            tv.setTypeface(null, selected ? Typeface.BOLD : Typeface.NORMAL);
+            int colorRes = selected ? R.color.presentation_text_primary : R.color.presentation_text_muted;
+            tv.setTextColor(ContextCompat.getColor(requireContext(), colorRes));
+        }
+
+        @Override
+        public int getItemCount() {
+            return tools.length * VIRTUAL_REPEAT;
+        }
+
+        class ViewHolder extends RecyclerView.ViewHolder {
+            ViewHolder(View itemView) {
+                super(itemView);
+                itemView.setOnClickListener(v -> {
+                    int pos = getBindingAdapterPosition();
+                    if (pos != RecyclerView.NO_POSITION) {
+                        onSelect.accept(tools[pos % tools.length]);
+                    }
+                });
+            }
+        }
+    }
 
     private void toggleBlackScreen() {
         blackScreenActive = !blackScreenActive;
@@ -442,13 +782,15 @@ public class PresentationFragment extends Fragment {
 
     private void updateBlackScreenButton() {
         if (blackScreenActive) {
-            btnBlackScreen.setTextColor(Color.parseColor("#34D399"));
-            btnBlackScreen.setCompoundDrawablesRelativeWithIntrinsicBounds(0, R.drawable.ic_black_screen, 0, 0);
-            // Tint the icon green
-            btnBlackScreen.getCompoundDrawables()[1].setTint(Color.parseColor("#34D399"));
-        } else {
+            btnBlackScreen.setBackgroundColor(Color.parseColor("#000000"));
             btnBlackScreen.setTextColor(Color.parseColor("#FFFFFFFF"));
-            btnBlackScreen.getCompoundDrawables()[1].setTint(Color.parseColor("#FF9BA3C5"));
+            btnBlackScreen.setCompoundDrawablesRelativeWithIntrinsicBounds(0, R.drawable.ic_black_screen, 0, 0);
+            btnBlackScreen.getCompoundDrawables()[1].setTint(Color.parseColor("#FFFFFFFF"));
+        } else {
+            btnBlackScreen.setBackgroundResource(R.drawable.presentation_action_button);
+            btnBlackScreen.setTextColor(Color.parseColor("#FFFFFFFF"));
+            btnBlackScreen.setCompoundDrawablesRelativeWithIntrinsicBounds(0, R.drawable.ic_black_screen, 0, 0);
+            btnBlackScreen.getCompoundDrawables()[1].setTint(Color.parseColor("#FFFFFFFF"));
         }
     }
 
@@ -459,25 +801,41 @@ public class PresentationFragment extends Fragment {
     // ── Timer ────────────────────────────────────────────────────────
 
     private void showEditTimerDialog() {
-        EditText editText = new EditText(requireContext());
+        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_edit_timer, null);
+        EditText editText = dialogView.findViewById(R.id.edit_timer_minutes);
+        RadioGroup radioGroup = dialogView.findViewById(R.id.radio_timer_mode);
+
         int currentMinutes = timerDuration / 60;
         editText.setText(String.valueOf(currentMinutes));
         editText.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         editText.setHint("Minutes");
 
+        // Set current mode
+        radioGroup.check(timerMode == TIMER_MODE_COUNTDOWN
+                ? R.id.radio_countdown : R.id.radio_countup);
+
         new AlertDialog.Builder(requireContext())
-                .setTitle("Timer Duration (minutes)")
-                .setView(editText)
+                .setTitle("Timer Settings")
+                .setView(dialogView)
                 .setPositiveButton("OK", (dialog, which) -> {
                     String input = editText.getText().toString().trim();
                     if (!input.isEmpty()) {
                         int newMinutes = Integer.parseInt(input);
                         if (newMinutes > 0) {
                             timerDuration = newMinutes * 60;
-                            timerRemainingSec = timerDuration;
+                            int selectedMode = radioGroup.getCheckedRadioButtonId() == R.id.radio_countdown
+                                    ? TIMER_MODE_COUNTDOWN : TIMER_MODE_COUNTUP;
+                            timerMode = selectedMode;
+
+                            if (timerMode == TIMER_MODE_COUNTDOWN) {
+                                timerRemainingSec = timerDuration;
+                            } else {
+                                timerRemainingSec = 0;
+                            }
                             timerRunning = false;
                             timerHandler.removeCallbacks(timerRunnable);
                             updateTimerDisplay();
+                            updateTimerLabel();
                             timerTotal.setText(" of " + formatTime(timerDuration));
                             updateTimerButton();
                             saveState();
@@ -498,18 +856,26 @@ public class PresentationFragment extends Fragment {
         timerRunnable = new Runnable() {
             @Override
             public void run() {
-                if (timerRemainingSec > 0 && timerRunning) {
-                    timerRemainingSec--;
-                    updateTimerDisplay();
-                    timerHandler.postDelayed(this, TimeUnit.SECONDS.toMillis(1));
-                } else if (timerRemainingSec <= 0) {
-                    timerRunning = false;
-                    timerRemainingSec = 0;
-                    updateTimerDisplay();
-                    saveState();
-                    // Alert user that time is up
-                    if (vibrator != null && vibrator.hasVibrator()) {
-                        vibrator.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE));
+                if (timerRunning) {
+                    if (timerMode == TIMER_MODE_COUNTDOWN) {
+                        if (timerRemainingSec > 0) {
+                            timerRemainingSec--;
+                            updateTimerDisplay();
+                            timerHandler.postDelayed(this, TimeUnit.SECONDS.toMillis(1));
+                        } else {
+                            timerRunning = false;
+                            timerRemainingSec = 0;
+                            updateTimerDisplay();
+                            saveState();
+                            if (vibrator != null && vibrator.hasVibrator()) {
+                                vibrator.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE));
+                            }
+                        }
+                    } else {
+                        // Countup mode
+                        timerRemainingSec++;
+                        updateTimerDisplay();
+                        timerHandler.postDelayed(this, TimeUnit.SECONDS.toMillis(1));
                     }
                 }
             }
@@ -529,7 +895,7 @@ public class PresentationFragment extends Fragment {
 
     private void resetTimer() {
         stopTimer();
-        timerRemainingSec = timerDuration;
+        timerRemainingSec = timerMode == TIMER_MODE_COUNTDOWN ? timerDuration : 0;
         updateTimerDisplay();
         updateTimerButton();
         saveState();
@@ -537,6 +903,17 @@ public class PresentationFragment extends Fragment {
 
     private void updateTimerDisplay() {
         timerRemaining.setText(formatTime(timerRemainingSec));
+    }
+
+    private void updateTimerLabel() {
+        if (timerMode == TIMER_MODE_COUNTDOWN) {
+            timerLabel.setText(R.string.remaining);
+            timerTotal.setVisibility(View.VISIBLE);
+            timerTotal.setText(" of " + formatTime(timerDuration));
+        } else {
+            timerLabel.setText(R.string.elapsed);
+            timerTotal.setVisibility(View.GONE);
+        }
     }
 
     private String formatTime(int seconds) {
@@ -560,16 +937,21 @@ public class PresentationFragment extends Fragment {
     private void loadState() {
         timerDuration = prefs.getInt(PREF_TIMER_DURATION, DEFAULT_TIMER_DURATION);
         timerRemainingSec = prefs.getInt(PREF_TIMER_REMAINING, DEFAULT_TIMER_DURATION);
+        timerMode = prefs.getInt(PREF_TIMER_MODE, TIMER_MODE_COUNTDOWN);
         timerRunning = prefs.getBoolean(PREF_TIMER_RUNNING, false);
         blackScreenActive = prefs.getBoolean(PREF_BLACK_SCREEN, false);
+        int toolIdx = prefs.getInt(PREF_TOOL_INDEX, 0);
+        currentTool = PresentationTool.values()[toolIdx % PresentationTool.values().length];
     }
 
     private void saveState() {
         prefs.edit()
             .putInt(PREF_TIMER_DURATION, timerDuration)
             .putInt(PREF_TIMER_REMAINING, timerRemainingSec)
+            .putInt(PREF_TIMER_MODE, timerMode)
             .putBoolean(PREF_TIMER_RUNNING, timerRunning)
             .putBoolean(PREF_BLACK_SCREEN, blackScreenActive)
+            .putInt(PREF_TOOL_INDEX, currentTool.ordinal())
             .apply();
     }
 
@@ -589,6 +971,15 @@ public class PresentationFragment extends Fragment {
     public void onPause() {
         super.onPause();
         saveState();
+        // Clean up app switcher state if navigating away
+        if (appSwitcherActive) {
+            ConnectionManager cm = getConnectionManager();
+            if (cm != null && cm.isConnected()) {
+                cm.sendKeyRelease();
+            }
+            appSwitcherActive = false;
+            btnLaser.setTextColor(Color.parseColor("#FFFFFFFF"));
+        }
     }
 
     @Override

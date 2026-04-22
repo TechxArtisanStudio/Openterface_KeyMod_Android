@@ -444,7 +444,9 @@ public class GamepadView extends View {
         String textLabel = displayLabel != null ? displayLabel : label;
         Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         textPaint.setColor(Color.WHITE);
-        textPaint.setTextSize(scaledRadius * 0.6f);
+        // Scale text size based on label length to fit within button
+        float textScale = textLabel.length() > 6 ? 0.4f : textLabel.length() > 4 ? 0.5f : 0.6f;
+        textPaint.setTextSize(scaledRadius * textScale);
         textPaint.setTextAlign(Paint.Align.CENTER);
         textPaint.setFakeBoldText(true);
         canvas.drawText(textLabel, cx, cy + scaledRadius * 0.3f, textPaint);

@@ -221,18 +221,17 @@
     <!-- Presentation Mode Strings -->
     <string name="presentation_mode">Presentation</string>
     <string name="slide_progress_label">PRESENTATION</string>
-    <string name="timer_pace_label">TIMER &amp; PACE</string>
+    <string name="timer_pace_label">TIMER</string>
     <string name="remaining">remaining</string>
+    <string name="elapsed">elapsed</string>
     <string name="pace_ok">OK</string>
     <string name="next">NEXT</string>
-    <string name="previous">PREVIOUS</string>
-    <string name="black_screen">BLACK SCREEN\nToggle blank screen</string>
-    <string name="laser">SWITCH APP\nCommand+Tab</string>
-    <string name="pointer">TOUCHPAD\nMouse control</string>
-    <string name="tap_center_next">Tap center: Next</string>
-    <string name="swipe_prev_next">Swipe left/right: Prev/Next</string>
-    <string name="long_press_laser">Long press: Laser</string>
-    <string name="hold_move_pointer">Hold &amp; move: Pointer</string>
+    <string name="previous">PREV</string>
+    <string name="black_screen">BLACK SCREEN</string>
+    <string name="play">PLAY</string>
+    <string name="stop">STOP</string>
+    <string name="laser">SWITCH APP</string>
+    <string name="pointer">TOUCHPAD</string>
     <string name="list">List</string>
     <string name="of">/</string>
     <string name="timer_start">Start</string>

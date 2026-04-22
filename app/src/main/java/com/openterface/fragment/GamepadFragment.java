@@ -97,10 +97,10 @@ public class GamepadFragment extends Fragment {
 
     // Button config
     private int buttonAKey = DEFAULT_BUTTON_A;
-    private int buttonBKey = 41;  // default: Escape
-    private int buttonAModifiers = 0;  // HID modifier bits for button A
-    private int buttonBModifiers = 0;  // HID modifier bits for button B
-    private float buttonSizeScale = 1.0f;  // 100%
+    private int buttonBKey = 41;
+    private int buttonAModifiers = 0;
+    private int buttonBModifiers = 0;
+    private float buttonSizeScale = 1.0f;
 
     // Modifier key definitions for checkboxes (label -> HID keycode)
     private static final String[][] MODIFIER_KEYS = {
@@ -189,9 +189,10 @@ public class GamepadFragment extends Fragment {
                 sendMouseClick(2, true);
                 gamepadView.postDelayed(() -> sendMouseClick(2, false), 100);
             } else {
-                // Track button press and send combined report with D-pad keys
-                buttonAPressed = true;
-                if (twoButtonMode) {
+                // Track only the pressed button
+                if (buttonId.equals("button_a")) {
+                    buttonAPressed = true;
+                } else if (buttonId.equals("button_b")) {
                     buttonBPressed = true;
                 }
                 sendCombinedKeyReport();
@@ -206,9 +207,10 @@ public class GamepadFragment extends Fragment {
         gamepadView.setButtonReleaseListener((buttonId, keyCode) -> {
             if (keyCode == 1001 || keyCode == 1002) return;
             Log.d(TAG, "Button released: " + buttonId);
-            // Track button release and send combined report with remaining keys
-            buttonAPressed = false;
-            if (twoButtonMode) {
+            // Track only the released button
+            if (buttonId.equals("button_a")) {
+                buttonAPressed = false;
+            } else if (buttonId.equals("button_b")) {
                 buttonBPressed = false;
             }
             sendCombinedKeyReport();
@@ -341,10 +343,10 @@ public class GamepadFragment extends Fragment {
             componentName = "Stick";
             hasKeyMapping = true;
         } else if (componentId.equals("button_a")) {
-            componentName = "Button A";
+            componentName = "Button 1 (A)";
             hasKeyMapping = true;
         } else if (componentId.equals("button_b")) {
-            componentName = "Button B";
+            componentName = "Button 2 (B)";
             hasKeyMapping = true;
         } else {
             componentName = componentId;
@@ -383,14 +385,14 @@ public class GamepadFragment extends Fragment {
         if (componentId.startsWith("stick_")) {
             showStickConfigDialog();
         } else if (componentId.equals("button_a")) {
-            showButtonConfigDialog(buttonAKey, buttonAModifiers, DEFAULT_BUTTON_A, (key, mod) -> {
+            showButtonConfigDialog("Button A", buttonAKey, buttonAModifiers, DEFAULT_BUTTON_A, (key, mod) -> {
                 buttonAKey = key;
                 buttonAModifiers = mod;
                 saveButtonConfig();
                 updateGamepadLabels();
             });
         } else if (componentId.equals("button_b")) {
-            showButtonConfigDialog(buttonBKey, buttonBModifiers, DEFAULT_BUTTON_B, (key, mod) -> {
+            showButtonConfigDialog("Button B", buttonBKey, buttonBModifiers, DEFAULT_BUTTON_B, (key, mod) -> {
                 buttonBKey = key;
                 buttonBModifiers = mod;
                 saveButtonConfig();
@@ -493,13 +495,16 @@ public class GamepadFragment extends Fragment {
         right.setText(keyCodeToLabel(stickRightKey));
     }
 
-    private void showButtonConfigDialog(int currentKey, int currentModifiers, int defaultKey, DualKeyModSelectedListener onSave) {
+    private void showButtonConfigDialog(String buttonName, int currentKey, int currentModifiers, int defaultKey, DualKeyModSelectedListener onSave) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_button_config, null);
         builder.setView(dialogView);
 
         final AlertDialog dialog = builder.create();
         dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+
+        TextView dialogTitle = dialogView.findViewById(R.id.dialog_title);
+        dialogTitle.setText(buttonName + " Configuration");
 
         final int[] selectedKey = { currentKey };
         final int[] selectedModifiers = { currentModifiers };
@@ -651,6 +656,110 @@ public class GamepadFragment extends Fragment {
         }
         container.addView(modifierRow);
 
+        // Number section: two rows (normal 1-9 and numpad Num1-Num9)
+        TextView numLabel = new TextView(requireContext());
+        numLabel.setText("Number");
+        numLabel.setTextColor(0xFFAAAAAA);
+        numLabel.setTextSize(12);
+        LinearLayout.LayoutParams numLabelLp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        numLabelLp.setMargins(0, dp(4), 0, dp(4));
+        container.addView(numLabel, numLabelLp);
+
+        // HID keycodes: normal digits 1-9 = 30-38, numpad 1-9 = 89-97
+        final int[] normalNumCodes = {30, 31, 32, 33, 34, 35, 36, 37, 38};
+        final int[] numpadNumCodes = {89, 90, 91, 92, 93, 94, 95, 96, 97};
+
+        LinearLayout normalRow = new LinearLayout(requireContext());
+        normalRow.setOrientation(LinearLayout.HORIZONTAL);
+        normalRow.setGravity(android.view.Gravity.CENTER);
+        normalRow.setPadding(0, 0, 0, dp(4));
+
+        LinearLayout numpadRow = new LinearLayout(requireContext());
+        numpadRow.setOrientation(LinearLayout.HORIZONTAL);
+        numpadRow.setGravity(android.view.Gravity.CENTER);
+        numpadRow.setPadding(0, 0, 0, dp(12));
+
+        Button[] normalNumBtns = new Button[9];
+        Button[] numpadNumBtns = new Button[9];
+
+        // Determine if initial key is a number
+        int initialNumIdx = -1;
+        boolean initialIsNumpad = false;
+        if (initialKeyCode >= 30 && initialKeyCode <= 38) {
+            initialNumIdx = initialKeyCode - 30;
+            initialIsNumpad = false;
+        } else if (initialKeyCode >= 89 && initialKeyCode <= 97) {
+            initialNumIdx = initialKeyCode - 89;
+            initialIsNumpad = true;
+        }
+
+        for (int n = 0; n < 9; n++) {
+            final int num = n + 1;
+            final int normalCode = normalNumCodes[n];
+            final int numpadCode = numpadNumCodes[n];
+
+            // Normal number button
+            Button normalBtn = new Button(requireContext());
+            normalBtn.setText(String.valueOf(num));
+            normalBtn.setTextColor(0xFFFFFFFF);
+            android.graphics.drawable.GradientDrawable normalBg = new android.graphics.drawable.GradientDrawable();
+            normalBg.setColor((initialNumIdx == n && !initialIsNumpad) ? 0xFF4CAF50 : 0xFF444444);
+            normalBg.setCornerRadius(dp(6));
+            normalBtn.setBackground(normalBg);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(40), 1);
+            lp.setMargins(dp(4), 0, dp(2), 0);
+            normalBtn.setLayoutParams(lp);
+            normalBtn.setPadding(0, 0, 0, 0);
+            normalBtn.setTextSize(14);
+            normalNumBtns[n] = normalBtn;
+
+            // Numpad number button
+            Button numpadBtn = new Button(requireContext());
+            numpadBtn.setText("Num" + (n + 1));
+            numpadBtn.setTextColor(0xFFFFFFFF);
+            android.graphics.drawable.GradientDrawable numpadBg = new android.graphics.drawable.GradientDrawable();
+            numpadBg.setColor((initialNumIdx == n && initialIsNumpad) ? 0xFF4CAF50 : 0xFF444444);
+            numpadBg.setCornerRadius(dp(6));
+            numpadBg.setStroke((initialNumIdx == n && initialIsNumpad) ? dp(2) : 0,
+                (initialNumIdx == n && initialIsNumpad) ? 0xFF81C784 : 0x00000000);
+            numpadBtn.setBackground(numpadBg);
+            LinearLayout.LayoutParams numpadLp = new LinearLayout.LayoutParams(0, dp(40), 1);
+            numpadLp.setMargins(dp(4), 0, dp(2), 0);
+            numpadBtn.setLayoutParams(numpadLp);
+            numpadBtn.setPadding(0, 0, 0, 0);
+            numpadBtn.setTextSize(14);
+            numpadNumBtns[n] = numpadBtn;
+
+            normalBtn.setOnClickListener(v -> {
+                selectedKeyCode[0] = normalCode;
+                selectedLabel[0] = String.valueOf(num);
+                updateNumButtons(normalNumBtns, numpadNumBtns, num, true);
+                // Deselect all character key buttons
+                for (int k = 0; k < allButtons.length; k++) {
+                    if (allButtons[k] == null) continue;
+                    ((android.graphics.drawable.GradientDrawable) allButtons[k].getBackground())
+                        .setColor(0xFF444444);
+                }
+            });
+            numpadBtn.setOnClickListener(v -> {
+                selectedKeyCode[0] = numpadCode;
+                selectedLabel[0] = "Num" + num;
+                updateNumButtons(normalNumBtns, numpadNumBtns, num, false);
+                // Deselect all character key buttons
+                for (int k = 0; k < allButtons.length; k++) {
+                    if (allButtons[k] == null) continue;
+                    ((android.graphics.drawable.GradientDrawable) allButtons[k].getBackground())
+                        .setColor(0xFF444444);
+                }
+            });
+
+            normalRow.addView(normalBtn);
+            numpadRow.addView(numpadBtn);
+        }
+        container.addView(normalRow);
+        container.addView(numpadRow);
+
         // Key grid
         LinearLayout grid = new LinearLayout(requireContext());
         grid.setOrientation(LinearLayout.VERTICAL);
@@ -688,6 +797,19 @@ public class GamepadFragment extends Fragment {
                             (android.graphics.drawable.GradientDrawable) allButtons[k].getBackground();
                         b.setColor(allKeyCodes[k] == keyCode ? 0xFF4CAF50 : 0xFF444444);
                     }
+                    // Deselect all number buttons
+                    for (int k = 0; k < normalNumBtns.length; k++) {
+                        android.graphics.drawable.GradientDrawable nb =
+                            (android.graphics.drawable.GradientDrawable) normalNumBtns[k].getBackground();
+                        nb.setColor(0xFF444444);
+                        nb.setStroke(0, 0x00000000);
+                    }
+                    for (int k = 0; k < numpadNumBtns.length; k++) {
+                        android.graphics.drawable.GradientDrawable nb =
+                            (android.graphics.drawable.GradientDrawable) numpadNumBtns[k].getBackground();
+                        nb.setColor(0xFF444444);
+                        nb.setStroke(0, 0x00000000);
+                    }
                 });
                 row.addView(btn);
             }
@@ -715,6 +837,23 @@ public class GamepadFragment extends Fragment {
 
     private int dp(int dp) {
         return (int) (dp * requireContext().getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private void updateNumButtons(Button[] normalBtns, Button[] numpadBtns, int num, boolean isNormal) {
+        for (int i = 0; i < normalBtns.length; i++) {
+            boolean isSelected = (i + 1) == num && isNormal;
+            android.graphics.drawable.GradientDrawable bg =
+                (android.graphics.drawable.GradientDrawable) normalBtns[i].getBackground();
+            bg.setColor(isSelected ? 0xFF4CAF50 : 0xFF444444);
+            bg.setStroke(0, 0x00000000);
+        }
+        for (int i = 0; i < numpadBtns.length; i++) {
+            boolean isSelected = (i + 1) == num && !isNormal;
+            android.graphics.drawable.GradientDrawable bg =
+                (android.graphics.drawable.GradientDrawable) numpadBtns[i].getBackground();
+            bg.setColor(isSelected ? 0xFF4CAF50 : 0xFF444444);
+            bg.setStroke(isSelected ? dp(2) : 0, isSelected ? 0xFF81C784 : 0x00000000);
+        }
     }
 
     private void updateKeySectionVisibility(RadioGroup modeGroup, LinearLayout keySection) {
@@ -962,6 +1101,10 @@ public class GamepadFragment extends Fragment {
         for (String[] opt : KEY_OPTIONS) {
             if (Integer.parseInt(opt[1]) == keyCode) return opt[0];
         }
+        // Normal digits 1-9 (HID 30-38)
+        if (keyCode >= 30 && keyCode <= 38) return String.valueOf(keyCode - 29);
+        // Numpad digits 1-9 (HID 89-97)
+        if (keyCode >= 89 && keyCode <= 97) return "Num" + (keyCode - 88);
         return String.valueOf(keyCode);
     }
 

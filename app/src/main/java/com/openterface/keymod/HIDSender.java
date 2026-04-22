@@ -15,7 +15,7 @@ public class HIDSender {
     private static final String TAG = "HIDSender";
     // CH9329 UART protocol headers
     private static final byte[] KBD_HEADER   = {(byte)0x57, (byte)0xAB, 0x00, 0x02, 0x08}; // keyboard CMD
-    private static final byte[] MOUSE_HEADER = {(byte)0x57, (byte)0xAB, 0x00, 0x04, 0x05}; // mouse CMD
+    private static final byte[] MOUSE_HEADER = {(byte)0x57, (byte)0xAB, 0x00, 0x05, 0x05}; // mouse REL CMD
 
     /**
      * Send keyboard event via USB or Bluetooth

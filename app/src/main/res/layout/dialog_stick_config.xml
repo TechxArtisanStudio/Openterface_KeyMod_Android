@@ -85,22 +85,22 @@
                     android:orientation="horizontal">
 
                     <View
-                        android:layout_width="64dp"
-                        android:layout_height="48dp"
+                        android:layout_width="80dp"
+                        android:layout_height="56dp"
                         android:layout_margin="4dp" />
 
                     <Button
                         android:id="@+id/key_up"
-                        android:layout_width="64dp"
-                        android:layout_height="48dp"
+                        android:layout_width="80dp"
+                        android:layout_height="56dp"
                         android:layout_margin="4dp"
                         android:background="@drawable/function_button_background"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp" />
+                        android:textSize="14sp" />
 
                     <View
-                        android:layout_width="64dp"
-                        android:layout_height="48dp"
+                        android:layout_width="80dp"
+                        android:layout_height="56dp"
                         android:layout_margin="4dp" />
                 </LinearLayout>
 
@@ -112,27 +112,27 @@
 
                     <Button
                         android:id="@+id/key_left"
-                        android:layout_width="64dp"
-                        android:layout_height="48dp"
+                        android:layout_width="80dp"
+                        android:layout_height="56dp"
                         android:layout_margin="4dp"
                         android:background="@drawable/function_button_background"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp" />
+                        android:textSize="14sp" />
 
                     <View
-                        android:layout_width="64dp"
-                        android:layout_height="48dp"
+                        android:layout_width="80dp"
+                        android:layout_height="56dp"
                         android:layout_margin="4dp"
                         android:background="@drawable/function_button_background" />
 
                     <Button
                         android:id="@+id/key_right"
-                        android:layout_width="64dp"
-                        android:layout_height="48dp"
+                        android:layout_width="80dp"
+                        android:layout_height="56dp"
                         android:layout_margin="4dp"
                         android:background="@drawable/function_button_background"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp" />
+                        android:textSize="14sp" />
                 </LinearLayout>
 
                 <!-- Row 3: empty, down, empty -->
@@ -142,22 +142,22 @@
                     android:orientation="horizontal">
 
                     <View
-                        android:layout_width="64dp"
-                        android:layout_height="48dp"
+                        android:layout_width="80dp"
+                        android:layout_height="56dp"
                         android:layout_margin="4dp" />
 
                     <Button
                         android:id="@+id/key_down"
-                        android:layout_width="64dp"
-                        android:layout_height="48dp"
+                        android:layout_width="80dp"
+                        android:layout_height="56dp"
                         android:layout_margin="4dp"
                         android:background="@drawable/function_button_background"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp" />
+                        android:textSize="14sp" />
 
                     <View
-                        android:layout_width="64dp"
-                        android:layout_height="48dp"
+                        android:layout_width="80dp"
+                        android:layout_height="56dp"
                         android:layout_margin="4dp" />
                 </LinearLayout>
             </LinearLayout>

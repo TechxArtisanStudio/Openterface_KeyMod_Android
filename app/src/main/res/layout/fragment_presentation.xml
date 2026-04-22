@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
     android:background="@color/presentation_bg">
 
-    <LinearLayout
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_above="@+id/tool_carousel"
+        android:fillViewport="true">
+
+        <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
@@ -14,64 +19,6 @@
         android:paddingTop="12dp"
         android:paddingBottom="24dp">
 
-        <!-- Top Status Bar -->
-        <RelativeLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp">
-
-            <!-- Connected status -->
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_alignParentStart="true"
-                android:layout_centerVertical="true">
-
-                <View
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:background="@drawable/status_dot_connected"
-                    android:layout_marginEnd="6dp" />
-
-                <TextView
-                    android:id="@+id/connection_status"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Connected"
-                    android:textColor="@color/presentation_text_primary"
-                    android:textSize="14sp" />
-            </LinearLayout>
-
-            <!-- Battery and Settings (right side) -->
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true">
-
-                <TextView
-                    android:id="@+id/battery_level"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="80%"
-                    android:textColor="@color/presentation_text_primary"
-                    android:textSize="14sp"
-                    android:layout_marginEnd="8dp" />
-
-                <ImageView
-                    android:id="@+id/settings_button"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:src="@drawable/ic_settings"
-                    android:tint="@color/presentation_text_primary"
-                    android:contentDescription="Settings" />
-            </LinearLayout>
-        </RelativeLayout>
-
         <!-- Timer & Pace Card -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -79,6 +26,7 @@
             android:orientation="vertical"
             android:background="@drawable/presentation_card_bg"
             android:padding="16dp"
+            android:layout_marginTop="12dp"
             android:layout_marginBottom="16dp">
 
             <TextView
@@ -153,6 +101,7 @@
                             android:gravity="center_vertical">
 
                             <TextView
+                                android:id="@+id/timer_label"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/remaining"
@@ -192,25 +141,80 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- NEXT Button (Large Dark Orange) -->
-        <Button
-            android:id="@+id/btn_next"
+        <!-- NEXT / Previous Side by Side -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="160dp"
-            android:text="@string/next"
-            android:textColor="@android:color/white"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textAllCaps="false"
-            android:background="@drawable/presentation_primary_button"
-            android:layout_marginBottom="12dp"
-            android:drawableEnd="@drawable/caret_right_fill"
-            android:drawablePadding="8dp"
-            android:drawableTint="@android:color/white"
-            android:paddingStart="24dp"
-            android:paddingEnd="24dp" />
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="12dp">
 
-        <!-- Action Buttons Row (Previous / Black Screen) -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <Button
+                    android:id="@+id/btn_previous"
+                    android:layout_width="match_parent"
+                    android:layout_height="160dp"
+                    android:text="@string/previous"
+                    android:textColor="@android:color/white"
+                    android:textSize="22sp"
+                    android:textAllCaps="false"
+                    android:background="@drawable/presentation_primary_button"
+                    android:drawableEnd="@drawable/caret_left_fill"
+                    android:drawablePadding="8dp"
+                    android:drawableTint="@android:color/white"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
+
+                <TextView
+                    android:id="@+id/hint_previous"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="← Left Arrow"
+                    android:textColor="@color/presentation_text_muted"
+                    android:textSize="11sp"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2"
+                android:layout_marginStart="8dp"
+                android:orientation="vertical">
+
+                <Button
+                    android:id="@+id/btn_next"
+                    android:layout_width="match_parent"
+                    android:layout_height="160dp"
+                    android:text="@string/next"
+                    android:textColor="@android:color/white"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    android:textAllCaps="false"
+                    android:background="@drawable/presentation_primary_button"
+                    android:drawableEnd="@drawable/caret_right_fill"
+                    android:drawablePadding="8dp"
+                    android:drawableTint="@android:color/white"
+                    android:paddingStart="24dp"
+                    android:paddingEnd="24dp" />
+
+                <TextView
+                    android:id="@+id/hint_next"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="→ Right Arrow"
+                    android:textColor="@color/presentation_text_muted"
+                    android:textSize="11sp"
+                    android:gravity="center" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Action Buttons Row (Play / Black Screen) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -226,25 +230,26 @@
                 android:orientation="vertical">
 
                 <Button
-                    android:id="@+id/btn_previous"
+                    android:id="@+id/btn_play"
                     android:layout_width="match_parent"
                     android:layout_height="200dp"
                     android:minHeight="100dp"
-                    android:text="@string/previous"
+                    android:text="@string/play"
                     android:textColor="@android:color/white"
-                    android:textSize="16sp"
+                    android:textSize="22sp"
                     android:textAllCaps="false"
                     android:background="@drawable/presentation_primary_button"
-                    android:drawableEnd="@drawable/caret_left_fill"
+                    android:drawableEnd="@drawable/ic_play"
                     android:drawablePadding="8dp"
                     android:drawableTint="@android:color/white"
                     android:paddingStart="24dp"
                     android:paddingEnd="24dp" />
 
                 <TextView
+                    android:id="@+id/hint_play"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Go back to previous slide"
+                    android:text="⌥⌘P / ESC"
                     android:textColor="@color/presentation_text_muted"
                     android:textSize="11sp"
                     android:gravity="center" />
@@ -264,7 +269,7 @@
                     android:minHeight="100dp"
                     android:text="@string/black_screen"
                     android:textColor="@android:color/white"
-                    android:textSize="11sp"
+                    android:textSize="16sp"
                     android:textAllCaps="false"
                     android:background="@drawable/presentation_action_button"
                     android:drawableTop="@drawable/ic_black_screen"
@@ -272,6 +277,15 @@
                     android:drawableTint="@android:color/white"
                     android:paddingTop="8dp"
                     android:paddingBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/hint_black_screen"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="B"
+                    android:textColor="@color/presentation_text_muted"
+                    android:textSize="11sp"
+                    android:gravity="center" />
             </LinearLayout>
         </LinearLayout>
 
@@ -297,7 +311,7 @@
                     android:minHeight="100dp"
                     android:text="@string/laser"
                     android:textColor="@android:color/white"
-                    android:textSize="11sp"
+                    android:textSize="16sp"
                     android:textAllCaps="false"
                     android:background="@drawable/presentation_action_button"
                     android:drawableTop="@drawable/ic_laser"
@@ -305,6 +319,15 @@
                     android:drawableTint="@android:color/white"
                     android:paddingTop="8dp"
                     android:paddingBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/hint_laser"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="⌘Tab (tap/cycle/double-tap)"
+                    android:textColor="@color/presentation_text_muted"
+                    android:textSize="11sp"
+                    android:gravity="center" />
             </LinearLayout>
 
             <LinearLayout
@@ -321,7 +344,7 @@
                     android:minHeight="100dp"
                     android:text="@string/pointer"
                     android:textColor="@android:color/white"
-                    android:textSize="11sp"
+                    android:textSize="16sp"
                     android:textAllCaps="false"
                     android:background="@drawable/presentation_action_button"
                     android:drawableTop="@drawable/ic_pointer"
@@ -329,50 +352,31 @@
                     android:drawableTint="@android:color/white"
                     android:paddingTop="8dp"
                     android:paddingBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/hint_pointer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Mouse move / click / right-click"
+                    android:textColor="@color/presentation_text_muted"
+                    android:textSize="11sp"
+                    android:gravity="center" />
             </LinearLayout>
-        </LinearLayout>
-
-        <!-- Help Text -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center_horizontal"
-            android:paddingStart="24dp"
-            android:paddingEnd="24dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/tap_center_next"
-                android:textColor="@color/presentation_text_muted"
-                android:textSize="10sp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/swipe_prev_next"
-                android:textColor="@color/presentation_text_muted"
-                android:textSize="10sp"
-                android:layout_marginTop="1dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/long_press_laser"
-                android:textColor="@color/presentation_text_muted"
-                android:textSize="10sp"
-                android:layout_marginTop="1dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/hold_move_pointer"
-                android:textColor="@color/presentation_text_muted"
-                android:textSize="10sp"
-                android:layout_marginTop="1dp" />
         </LinearLayout>
 
     </LinearLayout>
 
-</ScrollView>
+    </ScrollView>
+
+    <!-- Presentation Tool Carousel (Fixed at Bottom) -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/tool_carousel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:clipToPadding="false"
+        android:paddingTop="8dp"
+        android:paddingBottom="12dp"
+        android:background="@color/presentation_bg" />
+
+</RelativeLayout>

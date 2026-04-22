@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <EditText
+        android:id="@+id/edit_timer_minutes"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Minutes"
+        android:inputType="number"
+        android:padding="12dp" />
+
+    <RadioGroup
+        android:id="@+id/radio_timer_mode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
+
+        <RadioButton
+            android:id="@+id/radio_countdown"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Countdown" />
+
+        <RadioButton
+            android:id="@+id/radio_countup"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Count Up" />
+    </RadioGroup>
+</LinearLayout>

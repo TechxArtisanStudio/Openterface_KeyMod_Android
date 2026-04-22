@@ -3,19 +3,35 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="16dp"
+    android:background="@drawable/presentation_card_bg">
 
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Touchpad"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:textColor="@color/presentation_text_primary"
-        android:gravity="center"
-        android:layout_marginBottom="12dp" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="12dp">
 
-    <View
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Touchpad"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/presentation_text_primary"
+            android:gravity="center" />
+
+        <Button
+            android:id="@+id/btn_touchpad_close"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Close"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <com.openterface.keymod.TouchPadView
         android:id="@+id/touch_surface"
         android:layout_width="match_parent"
         android:layout_height="200dp"
@@ -25,7 +41,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Swipe to move cursor"
+        android:text="Swipe to move · Tap to click · 2-finger right-click"
         android:textColor="@color/presentation_text_muted"
         android:textSize="12sp"
         android:gravity="center" />
