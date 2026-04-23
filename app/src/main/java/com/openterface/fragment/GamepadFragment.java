@@ -54,6 +54,10 @@ public class GamepadFragment extends Fragment {
     private static final String PREF_BUTTON_B_MOD = "gamepad_button_b_mod";
     private static final String PREF_BUTTON_SIZE = "gamepad_button_size";
     private static final String PREF_STICK_SIZE = "gamepad_stick_size";
+    private static final String PREF_BG_IMAGE = "gamepad_bg_image";
+    private static final String PREF_BG_SCALE = "gamepad_bg_scale";
+    private static final String PREF_BG_OFFSET_X = "gamepad_bg_offset_x";
+    private static final String PREF_BG_OFFSET_Y = "gamepad_bg_offset_y";
 
     // Stick modes
     private static final String MODE_ANALOG = "analog";
@@ -133,6 +137,8 @@ public class GamepadFragment extends Fragment {
         currentLayout = GamepadLayout.SIMPLE;
         gamepadView.setLayout(currentLayout);
 
+        loadBackground();
+
         // Button mode toggle
         ToggleButton buttonModeToggle = view.findViewById(R.id.button_mode_toggle);
         buttonModeToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -143,12 +149,22 @@ public class GamepadFragment extends Fragment {
             Log.d(TAG, "Button mode: " + (twoButtonMode ? "2 buttons (A+B)" : "1 button (A)"));
         });
 
+        // Edit mode toggle (controls whether long-press triggers config menu)
+        ToggleButton editModeToggle = view.findViewById(R.id.edit_mode_toggle);
+        editModeToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (gamepadView != null) {
+                gamepadView.setLongPressEnabled(isChecked);
+            }
+            Log.d(TAG, "Edit mode: " + (isChecked ? "enabled" : "disabled"));
+        });
+
         // Done button for edit mode
         Button editDoneBtn = view.findViewById(R.id.edit_done_btn);
         editDoneBtn.setOnClickListener(v -> {
             gamepadView.setEditMode(false);
             editDoneBtn.setVisibility(View.GONE);
-            buttonModeToggle.setVisibility(View.VISIBLE);
+            View toggleRow = getView().findViewById(R.id.toggle_row);
+            if (toggleRow != null) toggleRow.setVisibility(View.VISIBLE);
             Log.d(TAG, "Exited edit mode");
         });
 
@@ -248,6 +264,12 @@ public class GamepadFragment extends Fragment {
         gamepadView.setComponentLongPressListener(componentId -> {
             Log.d(TAG, "Long press on: " + componentId);
             showLongPressMenu(componentId);
+        });
+
+        // Long press on empty area (in edit mode) to change background
+        gamepadView.setEmptyAreaLongPressListener(() -> {
+            Log.d(TAG, "Long press on empty area");
+            showBackgroundPicker();
         });
 
         // Save positions when exiting edit mode
@@ -370,10 +392,10 @@ public class GamepadFragment extends Fragment {
     private void enterMoveMode(String componentId) {
         if (gamepadView != null) {
             gamepadView.setEditMode(true);
-            // Hide the toggle, show the done button
-            View toggle = getView().findViewById(R.id.button_mode_toggle);
+            // Hide the toggle row, show the done button
+            View toggleRow = getView().findViewById(R.id.toggle_row);
             View doneBtn = getView().findViewById(R.id.edit_done_btn);
-            if (toggle != null) toggle.setVisibility(View.GONE);
+            if (toggleRow != null) toggleRow.setVisibility(View.GONE);
             if (doneBtn != null) doneBtn.setVisibility(View.VISIBLE);
             gamepadView.invalidate();
             Toast.makeText(requireContext(), "Drag components to reposition, tap Done when finished",
@@ -1107,6 +1129,114 @@ public class GamepadFragment extends Fragment {
         if (keyCode >= 89 && keyCode <= 97) return "Num" + (keyCode - 88);
         return String.valueOf(keyCode);
     }
+
+    // ── Background Image ────────────────────────────────────────────
+
+    private static final int PICK_BG_IMAGE = 1001;
+    private String currentBgPath = null;
+
+    private void loadBackground() {
+        currentBgPath = prefs.getString(PREF_BG_IMAGE, null);
+        if (currentBgPath != null) {
+            java.io.File file = new java.io.File(requireContext().getFilesDir(), currentBgPath);
+            if (file.exists()) {
+                android.graphics.Bitmap bm = android.graphics.BitmapFactory.decodeFile(file.getAbsolutePath());
+                if (bm != null && gamepadView != null) {
+                    gamepadView.setBackgroundBitmap(bm);
+                    // Restore viewport
+                    float scale = prefs.getFloat(PREF_BG_SCALE, 1.0f);
+                    float offsetX = prefs.getFloat(PREF_BG_OFFSET_X, 0f);
+                    float offsetY = prefs.getFloat(PREF_BG_OFFSET_Y, 0f);
+                    gamepadView.setBackgroundViewport(scale, offsetX, offsetY);
+                }
+            }
+        }
+        if (gamepadView != null) {
+            gamepadView.setBackgroundChangedCallback(() -> {
+                android.graphics.Bitmap bm = gamepadView.getBackgroundBitmap();
+                if (bm != null) {
+                    // Save bitmap to files dir
+                    try {
+                        java.io.File dir = requireContext().getFilesDir();
+                        java.io.File file = new java.io.File(dir, "gamepad_bg.png");
+                        java.io.FileOutputStream out = new java.io.FileOutputStream(file);
+                        bm.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+                        out.flush();
+                        out.close();
+                        prefs.edit().putString(PREF_BG_IMAGE, "gamepad_bg.png").apply();
+                        currentBgPath = "gamepad_bg.png";
+                    } catch (java.io.IOException e) {
+                        Log.e(TAG, "Failed to save background image", e);
+                    }
+                } else {
+                    prefs.edit().remove(PREF_BG_IMAGE).apply();
+                    prefs.edit().remove(PREF_BG_SCALE).apply();
+                    prefs.edit().remove(PREF_BG_OFFSET_X).apply();
+                    prefs.edit().remove(PREF_BG_OFFSET_Y).apply();
+                    currentBgPath = null;
+                }
+            });
+            gamepadView.setBackgroundViewportCallback(() -> {
+                prefs.edit()
+                    .putFloat(PREF_BG_SCALE, gamepadView.getBackgroundScale())
+                    .putFloat(PREF_BG_OFFSET_X, gamepadView.getBackgroundOffsetX())
+                    .putFloat(PREF_BG_OFFSET_Y, gamepadView.getBackgroundOffsetY())
+                    .apply();
+            });
+        }
+    }
+
+    private void saveBackground() {
+        // Triggered by the callback
+    }
+
+    private void showBackgroundPicker() {
+        String[] options = {"Pick from Gallery", "Remove Background"};
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(requireContext());
+        builder.setTitle("Background Image");
+        builder.setItems(options, (dialog, which) -> {
+            if (which == 0) {
+                // Open image picker
+                android.content.Intent intent = new android.content.Intent(
+                    android.content.Intent.ACTION_PICK,
+                    android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+                intent.setType("image/*");
+                startActivityForResult(intent, PICK_BG_IMAGE);
+            } else {
+                // Remove background
+                gamepadView.setBackgroundBitmap(null);
+                if (currentBgPath != null) {
+                    java.io.File file = new java.io.File(requireContext().getFilesDir(), currentBgPath);
+                    if (file.exists()) file.delete();
+                    prefs.edit().remove(PREF_BG_IMAGE).apply();
+                    currentBgPath = null;
+                }
+            }
+        });
+        builder.show();
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, @Nullable android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_BG_IMAGE && resultCode == android.app.Activity.RESULT_OK && data != null) {
+            android.net.Uri imageUri = data.getData();
+            if (imageUri != null) {
+                try {
+                    android.graphics.Bitmap bm = android.provider.MediaStore.Images.Media.getBitmap(
+                        requireContext().getContentResolver(), imageUri);
+                    if (bm != null && gamepadView != null) {
+                        gamepadView.setBackgroundBitmap(bm);
+                    }
+                } catch (java.io.IOException e) {
+                    Log.e(TAG, "Failed to load background image", e);
+                    Toast.makeText(requireContext(), "Failed to load image", Toast.LENGTH_SHORT).show();
+                }
+            }
+        }
+    }
+
+    // ── Interfaces ──────────────────────────────────────────────────
 
     private interface KeySelectedListener {
         void onKeySelected(KeyInfo keyInfo);

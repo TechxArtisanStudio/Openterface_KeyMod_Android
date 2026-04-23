@@ -72,6 +72,7 @@ public class GamepadView extends View {
     private float longPressDownY = 0;
     private boolean longPressCancelled = false;
     private ComponentLongPressListener longPressListener;
+    private EmptyAreaLongPressListener emptyAreaLongPressListener;
 
     // Component bounds (for touch detection)
     private Map<String, RectF> componentBounds;
@@ -85,6 +86,7 @@ public class GamepadView extends View {
     // Configurable keycode for the main button (button_a)
     private int buttonAKeyCode = 40; // default: HID Enter
     private boolean showTwoButtons = false;
+    private boolean longPressEnabled = true;
 
     // Button size scale (0.5 = 50%, 1.0 = 100%, 2.0 = 200%)
     private float buttonSizeScale = 1.0f;
@@ -92,6 +94,25 @@ public class GamepadView extends View {
 
     // Currently active stick directions (for highlighting labels)
     private Set<String> activeStickDirections = new java.util.HashSet<>();
+
+    // Background image
+    private android.graphics.Bitmap backgroundBitmap = null;
+    private Runnable onBackgroundChanged;
+
+    // Background viewport (pan and zoom)
+    private float bgScale = 1.0f;
+    private float bgOffsetX = 0f;
+    private float bgOffsetY = 0f;
+    private float bgInitialScale = 1.0f;
+
+    // Two-finger background manipulation
+    private boolean isManipulatingBg = false;
+    private float bgLastDistance = -1f;
+    private float bgLastCenterX = 0f;
+    private float bgLastCenterY = 0f;
+    private float bgStartOffsetX = 0f;
+    private float bgStartOffsetY = 0f;
+    private float bgStartScale = 1.0f;
 
     public GamepadView(Context context) {
         super(context);
@@ -139,11 +160,36 @@ public class GamepadView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        // Draw background
-        canvas.drawRect(0, 0, getWidth(), getHeight(), bgPaint);
+        // Draw background image if set, otherwise solid color
+        if (backgroundBitmap != null) {
+            drawBackgroundWithPanZoom(canvas);
+        } else {
+            canvas.drawRect(0, 0, getWidth(), getHeight(), bgPaint);
+        }
 
         // Draw components based on layout
         drawComponents(canvas);
+    }
+
+    private void drawBackgroundWithPanZoom(Canvas canvas) {
+        canvas.save();
+        int bw = backgroundBitmap.getWidth();
+        int bh = backgroundBitmap.getHeight();
+        int vw = getWidth();
+        int vh = getHeight();
+
+        // Compute initial fit scale (center-crop to fill screen while maintaining aspect ratio)
+        float fitScale = Math.max((float) vw / bw, (float) vh / bh);
+        bgInitialScale = fitScale;
+
+        // Apply current transform: pan then scale, centered on viewport
+        float cx = vw / 2f + bgOffsetX;
+        float cy = vh / 2f + bgOffsetY;
+        canvas.translate(cx, cy);
+        canvas.scale(bgScale, bgScale);
+        canvas.translate(-bw / 2f, -bh / 2f);
+        canvas.drawBitmap(backgroundBitmap, 0, 0, null);
+        canvas.restore();
     }
 
     private void drawComponents(Canvas canvas) {
@@ -497,17 +543,19 @@ public class GamepadView extends View {
                 if (componentId != null && !isComponentDisabled(componentId)) {
                     pointerComponents.put(pointerId, componentId);
 
-                    // Start long press timer
-                    longPressComponentId = componentId;
-                    longPressDownX = x;
-                    longPressDownY = y;
-                    longPressCancelled = false;
-                    longPressRunnable = () -> {
-                        if (longPressListener != null && longPressComponentId != null && !longPressCancelled) {
-                            longPressListener.onComponentLongPress(longPressComponentId);
-                        }
-                    };
-                    longPressHandler.postDelayed(longPressRunnable, LONG_PRESS_THRESHOLD);
+                    // Start long press timer only when enabled
+                    if (longPressEnabled) {
+                        longPressComponentId = componentId;
+                        longPressDownX = x;
+                        longPressDownY = y;
+                        longPressCancelled = false;
+                        longPressRunnable = () -> {
+                            if (longPressListener != null && longPressComponentId != null && !longPressCancelled) {
+                                longPressListener.onComponentLongPress(longPressComponentId);
+                            }
+                        };
+                        longPressHandler.postDelayed(longPressRunnable, LONG_PRESS_THRESHOLD);
+                    }
 
                     if (isDpadComponent(componentId)) {
                         if (dpadPressedSet.add(componentId) && dpadStateListener != null) {
@@ -534,6 +582,18 @@ public class GamepadView extends View {
                         }
                         invalidate();
                     }
+                } else if (longPressEnabled) {
+                    // Long press on empty area when edit mode is enabled
+                    longPressDownX = x;
+                    longPressDownY = y;
+                    longPressCancelled = false;
+                    Runnable emptyAreaRunnable = () -> {
+                        if (!longPressCancelled && emptyAreaLongPressListener != null) {
+                            emptyAreaLongPressListener.onEmptyAreaLongPress();
+                        }
+                    };
+                    longPressRunnable = emptyAreaRunnable;
+                    longPressHandler.postDelayed(emptyAreaRunnable, LONG_PRESS_THRESHOLD);
                 }
                 return true;
             }
@@ -551,6 +611,23 @@ public class GamepadView extends View {
                         buttonsPressedSet.add(componentId);
                         int keyCode = getKeyCodeForComponent(componentId);
                         buttonPressListener.onButtonPress(componentId, keyCode);
+                    }
+                } else if (event.getPointerCount() >= 2 && backgroundBitmap != null) {
+                    // Start two-finger background manipulation if this pointer is on empty area
+                    int otherIdx = pointerIndex == 0 ? 1 : 0;
+                    float ox = event.getX(otherIdx);
+                    float oy = event.getY(otherIdx);
+                    String otherComponent = getComponentAt(ox, oy);
+                    if (otherComponent == null) {
+                        isManipulatingBg = true;
+                        float dx = x - ox;
+                        float dy = y - oy;
+                        bgLastDistance = (float) Math.sqrt(dx * dx + dy * dy);
+                        bgLastCenterX = (x + ox) / 2f;
+                        bgLastCenterY = (y + oy) / 2f;
+                        bgStartOffsetX = bgOffsetX;
+                        bgStartOffsetY = bgOffsetY;
+                        bgStartScale = bgScale;
                     }
                 }
                 return true;
@@ -570,7 +647,39 @@ public class GamepadView extends View {
                         }
                     }
                 }
-                if (activeStickId != null) {
+                if (isManipulatingBg && event.getPointerCount() >= 2) {
+                    // Two-finger pinch-to-zoom and pan on background
+                    float x0 = event.getX(0), y0 = event.getY(0);
+                    float x1 = event.getX(1), y1 = event.getY(1);
+                    float dist = (float) Math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
+                    float cx = (x0 + x1) / 2f;
+                    float cy = (y0 + y1) / 2f;
+
+                    // Zoom: scale relative to initial fit scale
+                    if (bgLastDistance > 0) {
+                        bgScale = Math.max(0.1f, bgStartScale * dist / bgLastDistance);
+                    }
+
+                    // Pan: offset change in display pixel coords
+                    int vw = getWidth();
+                    int vh = getHeight();
+                    int bw = backgroundBitmap.getWidth();
+                    int bh = backgroundBitmap.getHeight();
+                    float s = bgInitialScale * bgScale;
+                    float dx = (cx - bgLastCenterX) / (s != 0 ? s : 1f);
+                    float dy = (cy - bgLastCenterY) / (s != 0 ? s : 1f);
+                    bgOffsetX = bgStartOffsetX + dx;
+                    bgOffsetY = bgStartOffsetY + dy;
+
+                    bgLastCenterX = cx;
+                    bgLastCenterY = cy;
+                    bgLastDistance = dist;
+                    bgStartOffsetX = bgOffsetX;
+                    bgStartOffsetY = bgOffsetY;
+                    bgStartScale = bgScale;
+                    invalidate();
+                    notifyBackgroundViewportChanged();
+                } else if (activeStickId != null) {
                     // Find the pointer that's on the stick
                     float stickX = x, stickY = y; // fallback to event pointer
                     for (int i = 0; i < event.getPointerCount(); i++) {
@@ -609,6 +718,10 @@ public class GamepadView extends View {
 
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL: {
+                if (isManipulatingBg) {
+                    isManipulatingBg = false;
+                    bgLastDistance = -1f;
+                }
                 // Cancel long press
                 if (longPressHandler != null && longPressRunnable != null) {
                     longPressHandler.removeCallbacks(longPressRunnable);
@@ -656,6 +769,10 @@ public class GamepadView extends View {
             }
 
             case MotionEvent.ACTION_POINTER_UP: {
+                if (isManipulatingBg) {
+                    isManipulatingBg = false;
+                    bgLastDistance = -1f;
+                }
                 // Release component for the lifted pointer
                 releasePointerComponent(pointerId);
                 return true;
@@ -845,6 +962,10 @@ public class GamepadView extends View {
         this.buttonReleaseListener = listener;
     }
 
+    public void setEmptyAreaLongPressListener(EmptyAreaLongPressListener listener) {
+        this.emptyAreaLongPressListener = listener;
+    }
+
     public void setComponentDisabled(String componentId, boolean disabled) {
         disabledComponents.put(componentId, disabled);
         invalidate();
@@ -873,6 +994,14 @@ public class GamepadView extends View {
         invalidate();
     }
 
+    public void setLongPressEnabled(boolean enabled) {
+        this.longPressEnabled = enabled;
+        // Cancel any pending long press when disabling
+        if (!enabled && longPressHandler != null && longPressRunnable != null) {
+            longPressHandler.removeCallbacks(longPressRunnable);
+        }
+    }
+
     public void setButtonSizeScale(float scale) {
         this.buttonSizeScale = scale;
         invalidate();
@@ -881,6 +1010,54 @@ public class GamepadView extends View {
     public void setStickSizeScale(float scale) {
         this.stickSizeScale = scale;
         invalidate();
+    }
+
+    public void setBackgroundBitmap(android.graphics.Bitmap bitmap) {
+        this.backgroundBitmap = bitmap;
+        if (bitmap != null) {
+            // Reset viewport to center-fit
+            bgScale = 1.0f;
+            bgOffsetX = 0f;
+            bgOffsetY = 0f;
+        }
+        invalidate();
+        if (onBackgroundChanged != null) onBackgroundChanged.run();
+    }
+
+    public void resetBackgroundViewport() {
+        bgScale = 1.0f;
+        bgOffsetX = 0f;
+        bgOffsetY = 0f;
+        invalidate();
+    }
+
+    public android.graphics.Bitmap getBackgroundBitmap() {
+        return backgroundBitmap;
+    }
+
+    public void setBackgroundChangedCallback(Runnable callback) {
+        this.onBackgroundChanged = callback;
+    }
+
+    public void setBackgroundViewportCallback(Runnable callback) {
+        this.onBackgroundViewportChanged = callback;
+    }
+
+    public float getBackgroundScale() { return bgScale; }
+    public float getBackgroundOffsetX() { return bgOffsetX; }
+    public float getBackgroundOffsetY() { return bgOffsetY; }
+
+    public void setBackgroundViewport(float scale, float offsetX, float offsetY) {
+        this.bgScale = scale;
+        this.bgOffsetX = offsetX;
+        this.bgOffsetY = offsetY;
+        invalidate();
+    }
+
+    private Runnable onBackgroundViewportChanged;
+
+    void notifyBackgroundViewportChanged() {
+        if (onBackgroundViewportChanged != null) onBackgroundViewportChanged.run();
     }
 
     public void setActiveStickDirections(String stickLabel, Set<String> directions) {
@@ -956,5 +1133,9 @@ public class GamepadView extends View {
 
     public interface ButtonReleaseListener {
         void onButtonRelease(String buttonId, int keyCode);
+    }
+
+    public interface EmptyAreaLongPressListener {
+        void onEmptyAreaLongPress();
     }
 }
