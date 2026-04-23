@@ -45,6 +45,7 @@ import com.openterface.fragment.PresentationFragment;
 import com.openterface.fragment.ShortcutFragment;
 import com.openterface.fragment.ShortcutHubFragment;
 import com.openterface.fragment.VoiceInputFragment;
+import com.openterface.keymod.BuildConfig;
 import com.openterface.serial.UsbDeviceManager;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
@@ -343,6 +344,12 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         navOsWindowsButton = findViewById(R.id.nav_os_windows_button);
         navOsLinuxButton = findViewById(R.id.nav_os_linux_button);
         updateNavOsButtonState();
+
+        // Display app version in sidebar footer
+        TextView versionText = findViewById(R.id.version_text);
+        if (versionText != null) {
+            versionText.setText(String.format("v%s (%d)", BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
+        }
         
         // Initialize old buttons (kept for backward compatibility, but hidden - may be null)
         // These are in hidden layout, won't be found

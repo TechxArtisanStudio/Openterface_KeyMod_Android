@@ -377,12 +377,26 @@
         android:padding="@dimen/sidebar_item_padding"
         android:layout_marginStart="8dp"
         android:layout_marginEnd="8dp"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="4dp"
         android:background="?attr/selectableItemBackground"
         android:gravity="start|center_vertical"
         android:drawableStart="@drawable/ic_settings"
         android:drawablePadding="@dimen/spacing_small"
         style="?android:attr/borderlessButtonStyle" />
+
+    <!-- Version Info -->
+    <TextView
+        android:id="@+id/version_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="v1.0"
+        android:textSize="11sp"
+        android:textColor="@color/text_secondary"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="16dp"
+        android:gravity="center" />
 
 </LinearLayout>
 
