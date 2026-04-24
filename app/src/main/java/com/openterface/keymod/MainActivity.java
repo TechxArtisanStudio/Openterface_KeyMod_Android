@@ -17,6 +17,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -27,6 +28,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -88,14 +90,12 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private LinearLayout navMacros;
     private LinearLayout navVoice;
     private LinearLayout navPresentation;
-    private ImageButton navOsMacosButton;
-    private ImageButton navOsWindowsButton;
-    private ImageButton navOsLinuxButton;
+    private ImageButton targetOsHeaderButton;
 
     /** Global target OS preference key */
     private static final String PREF_TARGET_OS = "target_os";
 
-    /** Callback notified when target OS changes in the sidebar */
+    /** Callback notified when target OS changes */
     public interface OnTargetOsChangeListener {
         void onTargetOsChanged(String targetOs);
     }
@@ -115,6 +115,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         for (OnTargetOsChangeListener listener : osChangeListeners) {
             listener.onTargetOsChanged(os);
         }
+        updateTargetOsHeaderIcon();
     }
     
     // Old button bar components (now hidden but kept for backward compatibility)
@@ -225,6 +226,11 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         setupConnectionStateListener();
         
         initializeUIComponents();
+        if (connectionManager != null) {
+            updateConnectionButton(
+                    connectionManager.getCurrentConnectionType(),
+                    connectionManager.getCurrentConnectionState());
+        }
 
         rxBleClient = RxBleClient.create(this);
         Intent intent = new Intent(this, BluetoothService.class);
@@ -374,10 +380,12 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         navMacros = findViewById(R.id.nav_macros);
         navVoice = findViewById(R.id.nav_voice);
         navPresentation = findViewById(R.id.nav_presentation);
-        navOsMacosButton = findViewById(R.id.nav_os_macos_button);
-        navOsWindowsButton = findViewById(R.id.nav_os_windows_button);
-        navOsLinuxButton = findViewById(R.id.nav_os_linux_button);
-        updateNavOsButtonState();
+
+        targetOsHeaderButton = findViewById(R.id.target_os_header_button);
+        if (targetOsHeaderButton != null) {
+            targetOsHeaderButton.setOnClickListener(v -> showTargetOsPickerDialog());
+            updateTargetOsHeaderIcon();
+        }
 
         // Display app version in sidebar footer
         TextView versionText = findViewById(R.id.version_text);
@@ -512,26 +520,39 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         }, 1000); // 1 second delay
     }
     
+    /** Same tint as the header Bluetooth icon for a given connection state. */
+    private int headerConnectionClusterTint(ConnectionManager.ConnectionState state) {
+        switch (state) {
+            case CONNECTED:
+                return ContextCompat.getColor(this, R.color.connected);
+            case CONNECTING:
+                return ContextCompat.getColor(this, R.color.connecting);
+            default:
+                return ContextCompat.getColor(this, R.color.header_connection_idle);
+        }
+    }
+
     private void updateConnectionButton(ConnectionManager.ConnectionType type, ConnectionManager.ConnectionState state) {
         if (connectionButton == null) return;
 
+        int tint = headerConnectionClusterTint(state);
+        connectionButton.setImageResource(R.drawable.ic_bluetooth);
+        connectionButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+        if (targetOsHeaderButton != null) {
+            targetOsHeaderButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+        }
+
         switch (state) {
             case CONNECTED:
-                connectionButton.setImageResource(R.drawable.ic_bluetooth);
-                connectionButton.setColorFilter(0xFF4CAF50);
                 if (signalBars != null) {
                     signalBars.setVisibility(View.VISIBLE);
-                    signalBars.setColorFilter(0xFF4CAF50);
+                    signalBars.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
                 }
                 break;
             case CONNECTING:
-                connectionButton.setImageResource(R.drawable.ic_bluetooth);
-                connectionButton.setColorFilter(0xFFFF9800);
                 if (signalBars != null) signalBars.setVisibility(View.GONE);
                 break;
             case DISCONNECTED:
-                connectionButton.setImageResource(R.drawable.ic_bluetooth);
-                connectionButton.setColorFilter(0xFF9E9E9E);
                 if (signalBars != null) signalBars.setVisibility(View.GONE);
                 break;
         }
@@ -656,26 +677,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             });
         }
 
-        // Target OS buttons in sidebar
-        if (navOsMacosButton != null) {
-            navOsMacosButton.setOnClickListener(v -> {
-                setTargetOs("macos");
-                updateNavOsButtonState();
-            });
-        }
-        if (navOsWindowsButton != null) {
-            navOsWindowsButton.setOnClickListener(v -> {
-                setTargetOs("windows");
-                updateNavOsButtonState();
-            });
-        }
-        if (navOsLinuxButton != null) {
-            navOsLinuxButton.setOnClickListener(v -> {
-                setTargetOs("linux");
-                updateNavOsButtonState();
-            });
-        }
-
         // LaunchPad button - returns to LaunchPanelActivity
         View chooseModeButton = findViewById(R.id.choose_mode_button);
         if (chooseModeButton != null) {
@@ -794,22 +795,52 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (navPresentation != null) navPresentation.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_PRESENTATION));
     }
 
-    private void updateNavOsButtonState() {
+    private void updateTargetOsHeaderIcon() {
+        if (targetOsHeaderButton == null) return;
         String targetOs = getTargetOs();
-        int activeColor = getThemeColor(com.google.android.material.R.attr.colorPrimary);
-        int inactiveColor = getColor(R.color.text_secondary);
-        if (navOsMacosButton != null) {
-            navOsMacosButton.setImageTintList(
-                android.content.res.ColorStateList.valueOf("macos".equals(targetOs) ? activeColor : inactiveColor));
+        int iconRes;
+        int nameRes;
+        if ("windows".equals(targetOs)) {
+            iconRes = R.drawable.ic_os_windows;
+            nameRes = R.string.target_os_windows;
+        } else if ("linux".equals(targetOs)) {
+            iconRes = R.drawable.ic_os_linux;
+            nameRes = R.string.target_os_linux;
+        } else {
+            iconRes = R.drawable.ic_os_macos;
+            nameRes = R.string.target_os_macos;
         }
-        if (navOsWindowsButton != null) {
-            navOsWindowsButton.setImageTintList(
-                android.content.res.ColorStateList.valueOf("windows".equals(targetOs) ? activeColor : inactiveColor));
+        targetOsHeaderButton.setImageResource(iconRes);
+        targetOsHeaderButton.setContentDescription(
+                getString(R.string.target_os_header_cd_selected, getString(nameRes)));
+        if (connectionManager != null) {
+            int tint = headerConnectionClusterTint(connectionManager.getCurrentConnectionState());
+            targetOsHeaderButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
         }
-        if (navOsLinuxButton != null) {
-            navOsLinuxButton.setImageTintList(
-                android.content.res.ColorStateList.valueOf("linux".equals(targetOs) ? activeColor : inactiveColor));
-        }
+    }
+
+    private void showTargetOsPickerDialog() {
+        View content = LayoutInflater.from(this).inflate(R.layout.dialog_target_os_picker, null);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.target_os_picker_title)
+                .setView(content)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+
+        content.findViewById(R.id.picker_os_macos).setOnClickListener(v -> {
+            setTargetOs("macos");
+            dialog.dismiss();
+        });
+        content.findViewById(R.id.picker_os_windows).setOnClickListener(v -> {
+            setTargetOs("windows");
+            dialog.dismiss();
+        });
+        content.findViewById(R.id.picker_os_linux).setOnClickListener(v -> {
+            setTargetOs("linux");
+            dialog.dismiss();
+        });
+
+        dialog.show();
     }
 
     private int getThemeColor(int attrId) {
@@ -1100,9 +1131,16 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 public int delayMs() { return 400; }
             },
             new TutorialOverlay.Step() {
-                public int[] targetViewIds() { return new int[]{R.id.target_os_section}; }
-                public String description() { return "Select the target OS (macOS, Windows, or Linux) for correct key mappings."; }
+                public int[] targetViewIds() { return new int[]{R.id.target_os_header_button}; }
+                public String description() { return "Tap the target OS icon in the header to choose macOS, Windows, or Linux for correct key mappings."; }
                 public String buttonText() { return "Next"; }
+                public void onShow(android.content.Context context) {
+                    androidx.drawerlayout.widget.DrawerLayout drawer = ((android.app.Activity) context).findViewById(R.id.drawer_layout);
+                    if (drawer != null && drawer.isDrawerOpen(android.view.Gravity.START)) {
+                        drawer.closeDrawer(android.view.Gravity.START);
+                    }
+                }
+                public int delayMs() { return 400; }
             },
             new TutorialOverlay.Step() {
                 public int[] targetViewIds() { return new int[]{R.id.keyboard_view, R.id.keyboard_view_left}; }

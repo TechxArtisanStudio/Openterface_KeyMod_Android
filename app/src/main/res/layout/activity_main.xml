@@ -39,12 +39,13 @@
                 android:padding="@dimen/button_icon_padding"
                 android:tint="@color/text_primary"/>
 
-            <!-- App Title (Next to menu button) -->
+            <!-- App Title (between menu and header end cluster) -->
             <TextView
                 android:id="@+id/app_title"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_toEndOf="@id/menu_button"
+                android:layout_toStartOf="@id/header_end_cluster"
                 android:layout_centerVertical="true"
                 android:text="@string/app_name"
                 android:textSize="@dimen/header_title_size"
@@ -52,41 +53,63 @@
                 android:textColor="@color/text_primary"
                 android:paddingStart="@dimen/spacing_small"
                 android:paddingEnd="@dimen/spacing_small"
-                android:fontFamily="sans-serif-medium"/>
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:ellipsize="end"/>
 
-            <!-- Connection Status Container (Right side) -->
+            <!-- Target OS + connection (right side) -->
             <LinearLayout
-                android:id="@+id/connection_container"
+                android:id="@+id/header_end_cluster"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:minWidth="@dimen/header_icon_size"
-                android:minHeight="@dimen/header_icon_size"
-                android:padding="4dp">
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-                <ImageView
-                    android:id="@+id/connection_button"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:src="@drawable/ic_bluetooth"
-                    android:tint="@color/text_secondary"
-                    android:contentDescription="@string/connection"/>
+                <ImageButton
+                    android:id="@+id/target_os_header_button"
+                    android:layout_width="@dimen/header_icon_size"
+                    android:layout_height="@dimen/header_icon_size"
+                    android:layout_marginEnd="@dimen/spacing_tiny"
+                    android:src="@drawable/ic_os_macos"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/target_os_header_cd"
+                    android:padding="@dimen/button_icon_padding"
+                    android:tint="@color/text_secondary"/>
 
-                <ImageView
-                    android:id="@+id/signal_bars"
-                    android:layout_width="24dp"
-                    android:layout_height="12dp"
-                    android:layout_marginTop="1dp"
-                    android:src="@drawable/ic_signal_bars"
-                    android:tint="@color/primary"
-                    android:visibility="gone"
-                    android:contentDescription="Signal strength"/>
+                <LinearLayout
+                    android:id="@+id/connection_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:minWidth="@dimen/header_icon_size"
+                    android:minHeight="@dimen/header_icon_size"
+                    android:padding="4dp">
+
+                    <ImageView
+                        android:id="@+id/connection_button"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_bluetooth"
+                        android:tint="@color/text_secondary"
+                        android:contentDescription="@string/connection"/>
+
+                    <ImageView
+                        android:id="@+id/signal_bars"
+                        android:layout_width="24dp"
+                        android:layout_height="12dp"
+                        android:layout_marginTop="1dp"
+                        android:src="@drawable/ic_signal_bars"
+                        android:tint="@color/primary"
+                        android:visibility="gone"
+                        android:contentDescription="Signal strength"/>
+
+                </LinearLayout>
 
             </LinearLayout>
 

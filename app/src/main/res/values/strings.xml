@@ -259,4 +259,11 @@
     <string name="timer_mode_countdown">Countdown</string>
     <string name="timer_mode_countup">Count Up</string>
     <string name="timer_settings_gesture_hint">Tip: Double-tap the timer card to reset time.</string>
+
+    <string name="target_os_picker_title">Target OS</string>
+    <string name="target_os_header_cd">Target operating system</string>
+    <string name="target_os_header_cd_selected">Target OS: %1$s</string>
+    <string name="target_os_macos">macOS</string>
+    <string name="target_os_windows">Windows</string>
+    <string name="target_os_linux">Linux</string>
 </resources>

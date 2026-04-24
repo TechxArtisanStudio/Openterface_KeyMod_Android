@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center"
+    android:paddingStart="@dimen/spacing_medium"
+    android:paddingEnd="@dimen/spacing_medium"
+    android:paddingTop="@dimen/spacing_small"
+    android:paddingBottom="@dimen/spacing_medium">
+
+    <ImageButton
+        android:id="@+id/picker_os_macos"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_marginEnd="@dimen/spacing_small"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/target_os_macos"
+        android:padding="@dimen/spacing_small"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_os_macos"
+        android:tint="@color/text_primary" />
+
+    <ImageButton
+        android:id="@+id/picker_os_windows"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_marginEnd="@dimen/spacing_small"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/target_os_windows"
+        android:padding="@dimen/spacing_small"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_os_windows"
+        android:tint="@color/text_primary" />
+
+    <ImageButton
+        android:id="@+id/picker_os_linux"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/target_os_linux"
+        android:padding="@dimen/spacing_small"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_os_linux"
+        android:tint="@color/text_primary" />
+
+</LinearLayout>
