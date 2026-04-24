@@ -233,6 +233,11 @@
     <string name="hide_screen">HIDE SCREEN</string>
     <string name="show_screen">SHOW SCREEN</string>
     <string name="play">PLAY</string>
+    <string name="first_slide">FIRST SLIDE</string>
+    <string name="first_slide_multiline">FIRST\nSLIDE</string>
+    <string name="last_slide">LAST SLIDE</string>
+    <string name="hide_screen_multiline">HIDE\nSCREEN</string>
+    <string name="show_screen_multiline">SHOW\nSCREEN</string>
     <string name="stop">STOP</string>
     <string name="laser">SWITCH APP</string>
     <string name="pointer">TOUCHPAD</string>

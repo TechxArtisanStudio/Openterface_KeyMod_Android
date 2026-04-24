@@ -74,6 +74,8 @@ public class PresentationFragment extends Fragment {
     private static final int KEY_P = 19;
     private static final int KEY_L = 15;
     private static final int KEY_RETURN = 40;
+    private static final int KEY_HOME = 74;
+    private static final int KEY_END = 77;
     private static final int KEY_F5 = 68;
     private static final int KEY_COMMAND = 227; // Left GUI/Cmd key
 
@@ -268,11 +270,21 @@ public class PresentationFragment extends Fragment {
             vibrate();
             sendRightArrowKey();
         });
+        btnNext.setOnLongClickListener(v -> {
+            vibrate();
+            sendKeyHID(KEY_END);
+            return true;
+        });
 
         // Previous button - send left arrow
         btnPrevious.setOnClickListener(v -> {
             vibrate();
             sendLeftArrowKey();
+        });
+        btnPrevious.setOnLongClickListener(v -> {
+            vibrate();
+            sendKeyHID(KEY_HOME);
+            return true;
         });
 
         // Play button - Opt+Cmd+P for Keynote play, ESC to stop
@@ -655,7 +667,7 @@ public class PresentationFragment extends Fragment {
         int textPrimary = ContextCompat.getColor(requireContext(), R.color.presentation_button_content);
         if (playActive) {
             btnPlay.setText(R.string.stop);
-            btnPlay.setBackgroundColor(Color.parseColor("#000000"));
+            btnPlay.setBackgroundResource(R.drawable.presentation_active_dark_button);
             btnPlay.setTextColor(textPrimary);
             btnPlay.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
         } else {
@@ -783,14 +795,14 @@ public class PresentationFragment extends Fragment {
     private void updateBlackScreenButton() {
         int textPrimary = ContextCompat.getColor(requireContext(), R.color.presentation_button_content);
         if (blackScreenActive) {
-            btnBlackScreen.setBackgroundColor(Color.parseColor("#000000"));
+            btnBlackScreen.setBackgroundResource(R.drawable.presentation_active_dark_button);
             btnBlackScreen.setTextColor(textPrimary);
-            btnBlackScreen.setText(R.string.show_screen);
+            btnBlackScreen.setText(R.string.show_screen_multiline);
             btnBlackScreen.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
         } else {
             btnBlackScreen.setBackgroundResource(R.drawable.presentation_action_button);
             btnBlackScreen.setTextColor(textPrimary);
-            btnBlackScreen.setText(R.string.hide_screen);
+            btnBlackScreen.setText(R.string.hide_screen_multiline);
             btnBlackScreen.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
         }
     }

@@ -140,7 +140,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_weight="2"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:layout_marginBottom="8dp">
@@ -180,10 +180,10 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="← Left Arrow"
+                    android:text="← Left Arrow / Home\nFirst Slide"
                     android:textColor="@color/presentation_text_muted"
                     android:textSize="10sp"
-                    android:maxLines="1"
+                    android:maxLines="2"
                     android:ellipsize="end"
                     android:gravity="center" />
             </LinearLayout>
@@ -223,10 +223,10 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="→ Right Arrow"
+                    android:text="→ Right Arrow / End\nLast Slide"
                     android:textColor="@color/presentation_text_muted"
                     android:textSize="10sp"
-                    android:maxLines="1"
+                    android:maxLines="2"
                     android:ellipsize="end"
                     android:gravity="center" />
             </LinearLayout>
@@ -256,16 +256,17 @@
                     android:minHeight="0dp"
                     android:text="@string/play"
                     android:textColor="@color/presentation_button_content"
-                    android:textSize="22sp"
+                    android:textSize="16sp"
                     android:textAllCaps="false"
-                    android:maxLines="1"
+                    android:maxLines="2"
                     android:autoSizeTextType="uniform"
-                    android:autoSizeMinTextSize="14sp"
-                    android:autoSizeMaxTextSize="22sp"
+                    android:autoSizeMinTextSize="10sp"
+                    android:autoSizeMaxTextSize="16sp"
                     android:autoSizeStepGranularity="1sp"
                     android:background="@drawable/presentation_primary_button"
-                    android:paddingStart="24dp"
-                    android:paddingEnd="24dp" />
+                    android:gravity="center"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp" />
 
                 <TextView
                     android:id="@+id/hint_play"
@@ -293,18 +294,19 @@
                     android:layout_height="0dp"
                     android:layout_weight="1"
                     android:minHeight="0dp"
-                    android:text="@string/hide_screen"
+                    android:text="@string/hide_screen_multiline"
                     android:textColor="@color/presentation_button_content"
-                    android:textSize="16sp"
+                    android:textSize="14sp"
                     android:textAllCaps="false"
-                    android:maxLines="1"
+                    android:maxLines="2"
                     android:autoSizeTextType="uniform"
                     android:autoSizeMinTextSize="10sp"
-                    android:autoSizeMaxTextSize="16sp"
+                    android:autoSizeMaxTextSize="14sp"
                     android:autoSizeStepGranularity="1sp"
                     android:background="@drawable/presentation_action_button"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="4dp" />
+                    android:gravity="center"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp" />
 
                 <TextView
                     android:id="@+id/hint_black_screen"
