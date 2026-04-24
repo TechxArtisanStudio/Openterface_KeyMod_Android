@@ -58,6 +58,7 @@ public class PresentationFragment extends Fragment {
     private static final String PREF_TIMER_RUNNING = "presentation_timer_running";
     private static final String PREF_BLACK_SCREEN = "presentation_black_screen";
     private static final String PREF_TIMER_MODE = "presentation_timer_mode";
+    private static final String PREF_TIMER_COUNTDOWN_OVERTIME = "presentation_timer_countdown_overtime";
     private static final String PREF_TOOL_INDEX = "presentation_tool_index";
 
     private static final int DEFAULT_TIMER_DURATION = 25 * 60; // 25 minutes in seconds
@@ -142,6 +143,8 @@ public class PresentationFragment extends Fragment {
     private int timerDuration = DEFAULT_TIMER_DURATION; // in seconds
     private int timerRemainingSec = timerDuration;
     private int timerMode = TIMER_MODE_COUNTDOWN; // 0=countdown, 1=countup
+    private boolean countdownOvertime = false; // In countdown mode, true after reaching 00:00
+    private boolean timerTargetAlerted = false; // Prevent repeated vibration every second
     private boolean timerRunning = false;
     private boolean blackScreenActive = false;
     private boolean appSwitcherActive = false; // Cmd held, app switcher is open
@@ -842,9 +845,12 @@ public class PresentationFragment extends Fragment {
 
                             if (timerMode == TIMER_MODE_COUNTDOWN) {
                                 timerRemainingSec = timerDuration;
+                                countdownOvertime = false;
                             } else {
                                 timerRemainingSec = 0;
+                                countdownOvertime = false;
                             }
+                            timerTargetAlerted = false;
                             timerRunning = false;
                             timerHandler.removeCallbacks(timerRunnable);
                             updateTimerDisplay();
@@ -871,25 +877,30 @@ public class PresentationFragment extends Fragment {
             public void run() {
                 if (timerRunning) {
                     if (timerMode == TIMER_MODE_COUNTDOWN) {
-                        if (timerRemainingSec > 0) {
-                            timerRemainingSec--;
-                            updateTimerDisplay();
-                            timerHandler.postDelayed(this, TimeUnit.SECONDS.toMillis(1));
-                        } else {
-                            timerRunning = false;
-                            timerRemainingSec = 0;
-                            updateTimerDisplay();
-                            saveState();
-                            if (vibrator != null && vibrator.hasVibrator()) {
-                                vibrator.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE));
+                        if (!countdownOvertime) {
+                            if (timerRemainingSec > 0) {
+                                timerRemainingSec--;
                             }
+                            if (timerRemainingSec <= 0) {
+                                timerRemainingSec = 0;
+                                countdownOvertime = true;
+                                triggerTimerTargetAlertIfNeeded();
+                            }
+                        } else {
+                            // Continue in opposite direction after 00:00 (overtime count up).
+                            timerRemainingSec++;
                         }
                     } else {
-                        // Countup mode
+                        // Countup mode (never auto-stops at target time).
                         timerRemainingSec++;
-                        updateTimerDisplay();
-                        timerHandler.postDelayed(this, TimeUnit.SECONDS.toMillis(1));
+                        if (timerRemainingSec >= timerDuration) {
+                            triggerTimerTargetAlertIfNeeded();
+                        }
                     }
+
+                    updateTimerDisplay();
+                    timerHandler.postDelayed(this, TimeUnit.SECONDS.toMillis(1));
+                    saveState();
                 }
             }
         };
@@ -908,25 +919,40 @@ public class PresentationFragment extends Fragment {
 
     private void resetTimer() {
         stopTimer();
-        timerRemainingSec = timerMode == TIMER_MODE_COUNTDOWN ? timerDuration : 0;
+        if (timerMode == TIMER_MODE_COUNTDOWN) {
+            timerRemainingSec = timerDuration;
+            countdownOvertime = false;
+        } else {
+            timerRemainingSec = 0;
+            countdownOvertime = false;
+        }
+        timerTargetAlerted = false;
         updateTimerDisplay();
         updateTimerButton();
         saveState();
     }
 
     private void updateTimerDisplay() {
-        timerRemaining.setText(formatTime(timerRemainingSec));
+        if (timerMode == TIMER_MODE_COUNTDOWN && countdownOvertime) {
+            timerRemaining.setText("+" + formatTime(timerRemainingSec));
+        } else {
+            timerRemaining.setText(formatTime(timerRemainingSec));
+        }
+
+        boolean warningActive = (timerMode == TIMER_MODE_COUNTUP && timerRemainingSec >= timerDuration)
+                || (timerMode == TIMER_MODE_COUNTDOWN && countdownOvertime);
+        int colorRes = warningActive ? R.color.presentation_red : R.color.presentation_text_primary;
+        timerRemaining.setTextColor(ContextCompat.getColor(requireContext(), colorRes));
     }
 
     private void updateTimerLabel() {
         if (timerMode == TIMER_MODE_COUNTDOWN) {
             timerLabel.setText(R.string.remaining);
-            timerTotal.setVisibility(View.VISIBLE);
-            timerTotal.setText(" of " + formatTime(timerDuration));
         } else {
             timerLabel.setText(R.string.elapsed);
-            timerTotal.setVisibility(View.GONE);
         }
+        timerTotal.setVisibility(View.VISIBLE);
+        timerTotal.setText(" of " + formatTime(timerDuration));
     }
 
     private String formatTime(int seconds) {
@@ -951,10 +977,17 @@ public class PresentationFragment extends Fragment {
         timerDuration = prefs.getInt(PREF_TIMER_DURATION, DEFAULT_TIMER_DURATION);
         timerRemainingSec = prefs.getInt(PREF_TIMER_REMAINING, DEFAULT_TIMER_DURATION);
         timerMode = prefs.getInt(PREF_TIMER_MODE, TIMER_MODE_COUNTDOWN);
+        countdownOvertime = prefs.getBoolean(PREF_TIMER_COUNTDOWN_OVERTIME, false);
         timerRunning = prefs.getBoolean(PREF_TIMER_RUNNING, false);
         blackScreenActive = prefs.getBoolean(PREF_BLACK_SCREEN, false);
         int toolIdx = prefs.getInt(PREF_TOOL_INDEX, 0);
         currentTool = PresentationTool.values()[toolIdx % PresentationTool.values().length];
+
+        if (timerMode == TIMER_MODE_COUNTUP) {
+            timerTargetAlerted = timerRemainingSec >= timerDuration;
+        } else {
+            timerTargetAlerted = countdownOvertime;
+        }
     }
 
     private void saveState() {
@@ -962,10 +995,19 @@ public class PresentationFragment extends Fragment {
             .putInt(PREF_TIMER_DURATION, timerDuration)
             .putInt(PREF_TIMER_REMAINING, timerRemainingSec)
             .putInt(PREF_TIMER_MODE, timerMode)
+            .putBoolean(PREF_TIMER_COUNTDOWN_OVERTIME, countdownOvertime)
             .putBoolean(PREF_TIMER_RUNNING, timerRunning)
             .putBoolean(PREF_BLACK_SCREEN, blackScreenActive)
             .putInt(PREF_TOOL_INDEX, currentTool.ordinal())
             .apply();
+    }
+
+    private void triggerTimerTargetAlertIfNeeded() {
+        if (timerTargetAlerted) return;
+        timerTargetAlerted = true;
+        if (vibrator != null && vibrator.hasVibrator()) {
+            vibrator.vibrate(VibrationEffect.createOneShot(220, VibrationEffect.DEFAULT_AMPLITUDE));
+        }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
