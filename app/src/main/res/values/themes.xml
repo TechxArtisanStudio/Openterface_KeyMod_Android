@@ -11,6 +11,10 @@
         <item name="colorTertiary">@color/theme_accent_orange</item>
         <item name="colorOnTertiary">@android:color/white</item>
         <item name="presentationControlButtonIdleFill">@color/theme_accent_orange_low_emphasis</item>
+        <!-- Match list/card surfaces so status-bar / inset areas are not theme-primary tinted. -->
+        <item name="android:windowBackground">@color/background_light</item>
+        <item name="android:statusBarColor">@color/background_light</item>
+        <item name="android:navigationBarColor">@color/background_light</item>
     </style>
 
     <style name="Theme.KeyMod" parent="Base.Theme.KeyMod" />

@@ -11,6 +11,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
 
 /**
  * Launch Panel - Mode selection screen as app entry point
@@ -52,6 +53,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         ThemeManager.applyTheme(this);
         super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
 
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 

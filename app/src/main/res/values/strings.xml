@@ -1,5 +1,10 @@
 <resources>
     <string name="app_name">KeyMod</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_tab_general">General</string>
+    <string name="settings_tab_voice">Voice</string>
+    <string name="settings_tab_ai">AI</string>
+    <string name="settings_tab_history">History</string>
     <string name="PrtSc">PrtSc</string>
     <string name="ScrLk">ScrLk</string>
     <string name="Pause">Pause</string>
