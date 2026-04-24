@@ -4,7 +4,6 @@ import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.view.ContextThemeWrapper;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -172,10 +171,7 @@ public class PresentationFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        // Use custom theme with dark orange primary color for presentation mode
-        ContextThemeWrapper themedContext = new ContextThemeWrapper(requireContext(), R.style.Theme_KeyMod_Presentation);
-        LayoutInflater themedInflater = inflater.cloneInContext(themedContext);
-        View view = themedInflater.inflate(R.layout.fragment_presentation, container, false);
+        View view = inflater.inflate(R.layout.fragment_presentation, container, false);
         rootView = view;
 
         prefs = PreferenceManager.getDefaultSharedPreferences(requireContext());
@@ -655,14 +651,12 @@ public class PresentationFragment extends Fragment {
             btnPlay.setText(R.string.stop);
             btnPlay.setBackgroundColor(Color.parseColor("#000000"));
             btnPlay.setTextColor(Color.parseColor("#FFFFFFFF"));
-            btnPlay.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_toolbar_stop, 0);
-            btnPlay.getCompoundDrawables()[2].setTint(Color.parseColor("#FFFFFFFF"));
+            btnPlay.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
         } else {
             btnPlay.setText(R.string.play);
             btnPlay.setBackgroundResource(R.drawable.presentation_primary_button);
             btnPlay.setTextColor(Color.parseColor("#FFFFFFFF"));
-            btnPlay.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_play, 0);
-            btnPlay.getCompoundDrawables()[2].setTint(Color.parseColor("#FFFFFFFF"));
+            btnPlay.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
         }
     }
 
@@ -784,13 +778,11 @@ public class PresentationFragment extends Fragment {
         if (blackScreenActive) {
             btnBlackScreen.setBackgroundColor(Color.parseColor("#000000"));
             btnBlackScreen.setTextColor(Color.parseColor("#FFFFFFFF"));
-            btnBlackScreen.setCompoundDrawablesRelativeWithIntrinsicBounds(0, R.drawable.ic_black_screen, 0, 0);
-            btnBlackScreen.getCompoundDrawables()[1].setTint(Color.parseColor("#FFFFFFFF"));
+            btnBlackScreen.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
         } else {
             btnBlackScreen.setBackgroundResource(R.drawable.presentation_action_button);
             btnBlackScreen.setTextColor(Color.parseColor("#FFFFFFFF"));
-            btnBlackScreen.setCompoundDrawablesRelativeWithIntrinsicBounds(0, R.drawable.ic_black_screen, 0, 0);
-            btnBlackScreen.getCompoundDrawables()[1].setTint(Color.parseColor("#FFFFFFFF"));
+            btnBlackScreen.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
         }
     }
 

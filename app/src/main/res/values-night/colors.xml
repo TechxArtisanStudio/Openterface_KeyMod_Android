@@ -27,6 +27,8 @@
     <color name="presentation_text_primary">#FFFFFFFF</color>
     <color name="presentation_text_secondary">#FF9BA3C5</color>
     <color name="presentation_text_muted">#FF5C6380</color>
+    <color name="presentation_button_idle">#1AE65100</color>
+    <color name="presentation_button_pressed">#FFE65100</color>
     <color name="presentation_progress_empty">#FF3A3F57</color>
     <color name="presentation_card_pressed">#FF2A2F45</color>
     <color name="presentation_list_button_bg">#FFE65100</color>

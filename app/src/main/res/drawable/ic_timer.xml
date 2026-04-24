@@ -6,22 +6,22 @@
     <!-- Clock circle -->
     <path
         android:fillColor="#00000000"
-        android:strokeColor="@color/presentation_primary"
+        android:strokeColor="?attr/colorPrimary"
         android:strokeWidth="2"
         android:pathData="M20,6a14,14 0,1,0 0,28 a14,14 0,1,0 0,-28z"/>
     <!-- Clock hand (hour) -->
     <path
-        android:fillColor="@color/presentation_primary"
+        android:fillColor="?attr/colorPrimary"
         android:pathData="M19,12h2v9h-2z"/>
     <!-- Clock hand (minute) -->
     <path
-        android:fillColor="@color/presentation_primary"
+        android:fillColor="?attr/colorPrimary"
         android:pathData="M19,12h2v12h-2z"
         android:rotation="90"
         android:pivotX="20"
         android:pivotY="20"/>
     <!-- Center dot -->
     <path
-        android:fillColor="@color/presentation_primary"
+        android:fillColor="?attr/colorPrimary"
         android:pathData="M18.5,19h3v3h-3z"/>
 </vector>

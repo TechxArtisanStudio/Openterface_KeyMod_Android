@@ -66,6 +66,7 @@ import android.app.PendingIntent;
 public class MainActivity extends AppCompatActivity implements BluetoothDialogFragment.BluetoothConnectionListener {
 
     private static final String TAG = "MainActivity";
+    private int appliedThemeResId;
     private UsbSerialPort port;
     private boolean isReading = false;
     private Handler mSerialAsyncHandler;
@@ -212,6 +213,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         ThemeManager.applyTheme(this);
+        appliedThemeResId = ThemeManager.getSelectedThemeResId(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -263,6 +265,11 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     @Override
     protected void onResume() {
         super.onResume();
+        int selectedThemeResId = ThemeManager.getSelectedThemeResId(this);
+        if (selectedThemeResId != appliedThemeResId) {
+            recreate();
+            return;
+        }
         IntentFilter filter = new IntentFilter();
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
@@ -764,7 +771,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
 
     private void updateNavOsButtonState() {
         String targetOs = getTargetOs();
-        int activeColor = getThemeColor(android.R.attr.colorPrimary);
+        int activeColor = getThemeColor(com.google.android.material.R.attr.colorPrimary);
         int inactiveColor = getColor(R.color.text_secondary);
         if (navOsMacosButton != null) {
             navOsMacosButton.setImageTintList(

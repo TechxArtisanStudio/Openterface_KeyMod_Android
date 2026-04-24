@@ -10,6 +10,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
+import androidx.core.content.ContextCompat;
 
 /**
  * Launch Panel - Mode selection screen as app entry point
@@ -64,6 +65,8 @@ public class LaunchPanelActivity extends AppCompatActivity {
         }
 
         setContentView(R.layout.activity_launch_panel);
+        // Keep status bar neutral on launch panel (avoid accent-colored top bar on some OEM skins).
+        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.background_light));
 
         initializeViews();
         setupClickListeners();

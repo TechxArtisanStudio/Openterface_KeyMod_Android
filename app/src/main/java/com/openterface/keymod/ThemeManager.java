@@ -62,6 +62,12 @@ public final class ThemeManager {
                 .apply();
     }
 
+    public static int getSelectedThemeResId(Context context) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        String family = prefs.getString(PREF_THEME_COLOR_FAMILY, FAMILY_ORANGE);
+        return resolveTheme(family);
+    }
+
     private static int resolveTheme(String family) {
         if (FAMILY_BLUE.equals(family)) {
             return R.style.Theme_KeyMod_Blue;
