@@ -6,6 +6,7 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -47,6 +48,10 @@ public class TutorialOverlay extends FrameLayout {
 
     public TutorialOverlay(Context context) {
         super(context);
+        int surfaceColor = resolveThemeColor(context, com.google.android.material.R.attr.colorSurface, 0xFFFFFFFF);
+        int onSurfaceColor = resolveThemeColor(context, com.google.android.material.R.attr.colorOnSurface, 0xFF000000);
+        int primaryColor = resolveThemeColor(context, android.R.attr.colorPrimary, 0xFF1976D2);
+        int secondaryTextColor = resolveThemeColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant, 0xFF757575);
 
         // Dark dim layer
         dimView = new View(context);
@@ -56,7 +61,7 @@ public class TutorialOverlay extends FrameLayout {
         addView(dimView, dimParams);
 
         // Custom highlight view that draws a glowing border around the target
-        highlightView = new HighlightView(context);
+        highlightView = new HighlightView(context, primaryColor);
         addView(highlightView, new LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
@@ -71,11 +76,11 @@ public class TutorialOverlay extends FrameLayout {
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(padding, padding, padding, padding);
-        content.setBackgroundColor(0xFFFFFFFF);
+        content.setBackgroundColor(surfaceColor);
 
         tooltipText = new TextView(context);
         tooltipText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
-        tooltipText.setTextColor(0xFF000000);
+        tooltipText.setTextColor(onSurfaceColor);
         tooltipText.setGravity(Gravity.CENTER);
         tooltipText.setLineSpacing(0, 1.3f);
         LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
@@ -95,7 +100,7 @@ public class TutorialOverlay extends FrameLayout {
         skipButton = new Button(context);
         skipButton.setText("Skip");
         skipButton.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
-        skipButton.setTextColor(0xFF757575);
+        skipButton.setTextColor(secondaryTextColor);
         skipButton.setBackgroundColor(0x00000000);
         LinearLayout.LayoutParams skipParams = new LinearLayout.LayoutParams(
                 LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
@@ -109,7 +114,7 @@ public class TutorialOverlay extends FrameLayout {
         nextButton.setTextColor(0xFFFFFFFF);
         android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
         bg.setCornerRadius(dpToPx(8));
-        bg.setColor(0xFF1976D2);
+        bg.setColor(primaryColor);
         nextButton.setBackground(bg);
         nextButton.setPadding(dpToPx(20), dpToPx(8), dpToPx(20), dpToPx(8));
         nextButton.setOnClickListener(v -> advance());
@@ -239,9 +244,9 @@ public class TutorialOverlay extends FrameLayout {
         private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private int radius = 0;
 
-        public HighlightView(Context context) {
+        public HighlightView(Context context, int borderColor) {
             super(context);
-            borderPaint.setColor(0xFF64B5F6);
+            borderPaint.setColor(borderColor);
             borderPaint.setStyle(Paint.Style.STROKE);
             borderPaint.setStrokeWidth(6f);
         }
@@ -276,5 +281,13 @@ public class TutorialOverlay extends FrameLayout {
     private int dpToPx(int dp) {
         float density = getContext().getResources().getDisplayMetrics().density;
         return Math.round(dp * density);
+    }
+
+    private static int resolveThemeColor(Context context, int attrId, int fallback) {
+        TypedValue typedValue = new TypedValue();
+        if (context.getTheme().resolveAttribute(attrId, typedValue, true)) {
+            return typedValue.data;
+        }
+        return fallback;
     }
 }

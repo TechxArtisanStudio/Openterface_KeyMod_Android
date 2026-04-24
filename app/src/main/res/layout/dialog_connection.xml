@@ -144,7 +144,7 @@
                 android:layout_height="10dp"
                 android:layout_marginStart="4dp"
                 android:src="@drawable/ic_signal_bars"
-                android:tint="#4CAF50"
+                android:tint="@color/primary"
                 android:visibility="gone"
                 android:contentDescription="Signal strength" />
         </LinearLayout>
@@ -216,7 +216,7 @@
                 android:layout_height="10dp"
                 android:layout_marginStart="4dp"
                 android:src="@drawable/ic_signal_bars"
-                android:tint="#4CAF50"
+                android:tint="@color/primary"
                 android:visibility="gone"
                 android:contentDescription="Signal strength" />
         </LinearLayout>

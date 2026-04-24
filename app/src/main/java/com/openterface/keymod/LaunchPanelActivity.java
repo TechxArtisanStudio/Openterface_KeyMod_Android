@@ -49,6 +49,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ThemeManager.applyTheme(this);
         super.onCreate(savedInstanceState);
 
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);

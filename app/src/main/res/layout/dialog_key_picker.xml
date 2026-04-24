@@ -4,7 +4,7 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="16dp"
-    android:background="#2D2D2D"
+    android:background="@color/background_light"
     android:minWidth="300dp"
     android:minHeight="400dp">
 
@@ -14,7 +14,7 @@
         android:text="Select Key"
         android:textSize="18sp"
         android:textStyle="bold"
-        android:textColor="#FFFFFF"
+        android:textColor="@color/text_primary"
         android:layout_marginBottom="12dp" />
 
     <ScrollView

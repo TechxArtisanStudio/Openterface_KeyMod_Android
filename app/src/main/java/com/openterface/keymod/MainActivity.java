@@ -16,6 +16,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -210,6 +211,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ThemeManager.applyTheme(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -762,7 +764,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
 
     private void updateNavOsButtonState() {
         String targetOs = getTargetOs();
-        int activeColor = getColor(R.color.primary);
+        int activeColor = getThemeColor(android.R.attr.colorPrimary);
         int inactiveColor = getColor(R.color.text_secondary);
         if (navOsMacosButton != null) {
             navOsMacosButton.setImageTintList(
@@ -776,6 +778,14 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             navOsLinuxButton.setImageTintList(
                 android.content.res.ColorStateList.valueOf("linux".equals(targetOs) ? activeColor : inactiveColor));
         }
+    }
+
+    private int getThemeColor(int attrId) {
+        TypedValue value = new TypedValue();
+        if (getTheme().resolveAttribute(attrId, value, true)) {
+            return value.data;
+        }
+        return getColor(R.color.primary);
     }
 
     private void showKeyboardFragment() {

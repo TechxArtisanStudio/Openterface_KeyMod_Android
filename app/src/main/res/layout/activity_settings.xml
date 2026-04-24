@@ -15,8 +15,8 @@
         app:tabMode="scrollable"
         app:tabGravity="start"
         app:tabTextColor="@color/text_secondary"
-        app:tabSelectedTextColor="@color/primary"
-        app:tabIndicatorColor="@color/primary"
+        app:tabSelectedTextColor="?attr/colorPrimary"
+        app:tabIndicatorColor="?attr/colorPrimary"
         app:tabIconTint="@color/text_secondary" />
 
     <!-- ViewPager -->
