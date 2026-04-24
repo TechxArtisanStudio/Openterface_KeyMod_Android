@@ -25,7 +25,7 @@ KeyMod supports two connection methods:
 
 ### 3. Select a Mode
 
-On the launch panel, tap one of six mode cards:
+On the **Welcome & Guide** screen (first launch or side menu), tap one of six mode cards:
 
 | Mode | What It Does |
 |------|-------------|

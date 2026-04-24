@@ -679,7 +679,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             });
         }
 
-        // LaunchPad button - returns to LaunchPanelActivity
+        // Welcome & Guide — returns to LaunchPanelActivity (mode picker + tutorial)
         View chooseModeButton = findViewById(R.id.choose_mode_button);
         if (chooseModeButton != null) {
             chooseModeButton.setOnClickListener(v -> {
@@ -1114,7 +1114,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         overlay.setSteps(new TutorialOverlay.Step[]{
             new TutorialOverlay.Step() {
                 public int[] targetViewIds() { return new int[]{R.id.menu_button}; }
-                public String description() { return "Tap here to open the navigation menu where you can switch modes and settings."; }
+                public String description() { return "Tap here to open the menu: switch modes, open Welcome & Guide (mode picker and tutorial), or Settings."; }
                 public String buttonText() { return "Next"; }
             },
             new TutorialOverlay.Step() {

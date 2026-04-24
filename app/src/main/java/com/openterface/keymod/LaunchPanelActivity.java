@@ -14,8 +14,8 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 
 /**
- * Launch Panel - Mode selection screen as app entry point
- * Matches iOS LaunchPanelView.swift functionality
+ * Welcome & Guide screen (user-facing name): mode picker, remember choice, and tutorial link.
+ * Entry point activity; matches iOS LaunchPanelView.swift functionality.
  */
 public class LaunchPanelActivity extends AppCompatActivity {
 
