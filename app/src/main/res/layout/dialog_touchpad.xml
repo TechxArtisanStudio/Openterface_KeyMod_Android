@@ -4,7 +4,8 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="16dp"
-    android:background="@drawable/presentation_card_bg">
+    android:background="@drawable/bg_presentation_touchpad_dialog"
+    android:clipToOutline="true">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -34,7 +35,7 @@
     <com.openterface.keymod.TouchPadView
         android:id="@+id/touch_surface"
         android:layout_width="match_parent"
-        android:layout_height="200dp"
+        android:layout_height="280dp"
         android:background="@drawable/touchpad_bg"
         android:layout_marginBottom="12dp" />
 

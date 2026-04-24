@@ -9,6 +9,7 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
+import android.graphics.drawable.ColorDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -98,16 +99,18 @@ public class ConnectionDialogFragment extends DialogFragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setStyle(DialogFragment.STYLE_NORMAL, android.R.style.Theme_Material_Light_Dialog);
+        // Use app theme so light/dark mode is applied automatically.
+        setStyle(DialogFragment.STYLE_NORMAL, 0);
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        // Set dialog width to 90% of screen width
+        // Set dialog width and transparent window background so rounded corners render cleanly.
         if (getDialog() != null && getDialog().getWindow() != null) {
             int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.9);
             getDialog().getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+            getDialog().getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
         }
     }
 
@@ -367,15 +370,15 @@ public class ConnectionDialogFragment extends DialogFragment {
         if (isUsbConnected) {
             usbStatus.setText(R.string.connected);
             usbStatusIcon.setImageResource(R.drawable.ic_connection_connected);
-            usbStatusIcon.setColorFilter(0xFF4CAF50);
+            usbStatusIcon.setColorFilter(ContextCompat.getColor(requireContext(), R.color.connected));
             if (usbSignal != null) {
                 usbSignal.setVisibility(View.VISIBLE);
-                usbSignal.setColorFilter(0xFF4CAF50);
+                usbSignal.setColorFilter(ContextCompat.getColor(requireContext(), R.color.connected));
             }
         } else {
             usbStatus.setText(R.string.not_connected);
             usbStatusIcon.setImageResource(R.drawable.ic_connection_disconnected);
-            usbStatusIcon.setColorFilter(0xFF9E9E9E);
+            usbStatusIcon.setColorFilter(ContextCompat.getColor(requireContext(), R.color.text_secondary));
             if (usbSignal != null) usbSignal.setVisibility(View.GONE);
         }
     }
@@ -390,15 +393,15 @@ public class ConnectionDialogFragment extends DialogFragment {
             String deviceName = connectionManager.getLastBleDeviceName();
             bluetoothStatus.setText(deviceName != null ? deviceName : getString(R.string.connected));
             bluetoothStatusIcon.setImageResource(R.drawable.ic_bluetooth);
-            bluetoothStatusIcon.setColorFilter(0xFF4CAF50);
+            bluetoothStatusIcon.setColorFilter(ContextCompat.getColor(requireContext(), R.color.connected));
             if (bluetoothSignal != null) {
                 bluetoothSignal.setVisibility(View.VISIBLE);
-                bluetoothSignal.setColorFilter(0xFF4CAF50);
+                bluetoothSignal.setColorFilter(ContextCompat.getColor(requireContext(), R.color.connected));
             }
         } else {
             bluetoothStatus.setText(R.string.not_connected);
             bluetoothStatusIcon.setImageResource(R.drawable.ic_bluetooth);
-            bluetoothStatusIcon.setColorFilter(0xFF9E9E9E);
+            bluetoothStatusIcon.setColorFilter(ContextCompat.getColor(requireContext(), R.color.text_secondary));
             if (bluetoothSignal != null) bluetoothSignal.setVisibility(View.GONE);
         }
     }

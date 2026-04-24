@@ -207,6 +207,9 @@
     <string name="close">Close</string>
     <string name="connection">Connection</string>
     <string name="menu">Menu</string>
+    <string name="bluetooth_settings_title">Bluetooth Settings</string>
+    <string name="scan_for_devices">Scan for Devices</string>
+    <string name="bluetooth_on_off">Bluetooth On/Off</string>
     
     <!-- Mode Selection Strings -->
     <string name="mode_keyboard">Keyboard Mode</string>
