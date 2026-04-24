@@ -2,7 +2,8 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_selected="true">
         <shape android:shape="rectangle">
-            <solid android:color="#26009900" />
+            <!-- Day: @color/sidebar_nav_selected_fill → colorPrimaryContainer; night: translucent primary -->
+            <solid android:color="@color/sidebar_nav_selected_fill" />
             <corners android:radius="8dp" />
         </shape>
     </item>
