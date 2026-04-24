@@ -1,12 +1,12 @@
 package com.openterface.keymod;
 
-import android.content.SharedPreferences;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.MenuItem;
-import android.widget.Toast;
 
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentPagerAdapter;
@@ -38,6 +38,8 @@ public class SettingsActivity extends AppCompatActivity {
         ThemeManager.applyTheme(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
+        // Keep Settings status bar neutral across theme families.
+        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.background_light));
 
         // Setup ActionBar with back button
         ActionBar actionBar = getSupportActionBar();
@@ -86,15 +88,14 @@ public class SettingsActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        // Save any pending changes before closing
-        saveAllSettings();
-        super.onBackPressed();
-    }
-
-    private void saveAllSettings() {
-        // Fragments should auto-save on preference changes
-        // This is just a safety net
-        Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show();
+        // Settings are auto-saved by individual preference listeners.
+        // If this activity is the root (e.g. process was recreated), route users back into app.
+        if (isTaskRoot()) {
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
+        }
+        finish();
     }
 
     /**

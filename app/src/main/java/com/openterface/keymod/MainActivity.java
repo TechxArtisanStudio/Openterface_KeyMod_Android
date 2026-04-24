@@ -137,6 +137,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     
     private boolean isUsbConnected = false; // Track USB connection state
     public boolean isBluetoothConnected = false; // Track Bluetooth connection state
+    private boolean receiversRegistered = false;
 
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         @Override
@@ -270,12 +271,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             recreate();
             return;
         }
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
-        filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-        filter.addAction(ACTION_USB_PERMISSION);
-        registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        registerReceiver(usbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION), Context.RECEIVER_NOT_EXPORTED);
+        registerUsbReceiversIfNeeded();
         // Don't auto-setup USB here, ConnectionManager handles it
         
         // Re-apply immersive mode
@@ -304,8 +300,37 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     @Override
     protected void onPause() {
         super.onPause();
-        unregisterReceiver(usbReceiver);
-        unregisterReceiver(usbPermissionReceiver);
+        unregisterUsbReceiversIfNeeded();
+    }
+
+    private void registerUsbReceiversIfNeeded() {
+        if (receiversRegistered) {
+            return;
+        }
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        filter.addAction(ACTION_USB_PERMISSION);
+        registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        registerReceiver(usbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION), Context.RECEIVER_NOT_EXPORTED);
+        receiversRegistered = true;
+    }
+
+    private void unregisterUsbReceiversIfNeeded() {
+        if (!receiversRegistered) {
+            return;
+        }
+        try {
+            unregisterReceiver(usbReceiver);
+        } catch (IllegalArgumentException ignored) {
+            // Receiver may already be unregistered during lifecycle transitions.
+        }
+        try {
+            unregisterReceiver(usbPermissionReceiver);
+        } catch (IllegalArgumentException ignored) {
+            // Receiver may already be unregistered during lifecycle transitions.
+        }
+        receiversRegistered = false;
     }
 
     @Override

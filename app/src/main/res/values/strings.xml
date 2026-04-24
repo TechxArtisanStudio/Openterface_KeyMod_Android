@@ -227,7 +227,8 @@
     <string name="pace_ok">OK</string>
     <string name="next">NEXT</string>
     <string name="previous">PREV</string>
-    <string name="black_screen">BLACK SCREEN</string>
+    <string name="hide_screen">HIDE SCREEN</string>
+    <string name="show_screen">SHOW SCREEN</string>
     <string name="play">PLAY</string>
     <string name="stop">STOP</string>
     <string name="laser">SWITCH APP</string>

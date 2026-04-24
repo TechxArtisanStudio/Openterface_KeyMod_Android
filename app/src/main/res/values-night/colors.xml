@@ -25,6 +25,7 @@
     <color name="presentation_bg">#FF16192B</color>
     <color name="presentation_card_bg">#FF1E2236</color>
     <color name="presentation_text_primary">#FFFFFFFF</color>
+    <color name="presentation_button_content">#FFFFFFFF</color>
     <color name="presentation_text_secondary">#FF9BA3C5</color>
     <color name="presentation_text_muted">#FF5C6380</color>
     <color name="presentation_button_idle">#1AE65100</color>

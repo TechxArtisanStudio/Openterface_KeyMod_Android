@@ -256,6 +256,7 @@ public class PresentationFragment extends Fragment {
         updateToolHint();
         updateTimerLabel();
         timerTotal.setText(" of " + formatTime(timerDuration));
+        updateBlackScreenButton();
     }
 
     private void setupListeners() {
@@ -520,7 +521,7 @@ public class PresentationFragment extends Fragment {
         if (cm != null && cm.isConnected()) {
             cm.sendKeyRelease();
             appSwitcherActive = false;
-            btnLaser.setTextColor(Color.parseColor("#FFFFFFFF")); // white = inactive
+            btnLaser.setTextColor(ContextCompat.getColor(requireContext(), R.color.presentation_button_content)); // theme default = inactive
             Log.d(TAG, "App switcher closed (all released)");
         }
     }
@@ -647,15 +648,16 @@ public class PresentationFragment extends Fragment {
     }
 
     private void updatePlayButton() {
+        int textPrimary = ContextCompat.getColor(requireContext(), R.color.presentation_button_content);
         if (playActive) {
             btnPlay.setText(R.string.stop);
             btnPlay.setBackgroundColor(Color.parseColor("#000000"));
-            btnPlay.setTextColor(Color.parseColor("#FFFFFFFF"));
+            btnPlay.setTextColor(textPrimary);
             btnPlay.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
         } else {
             btnPlay.setText(R.string.play);
             btnPlay.setBackgroundResource(R.drawable.presentation_primary_button);
-            btnPlay.setTextColor(Color.parseColor("#FFFFFFFF"));
+            btnPlay.setTextColor(textPrimary);
             btnPlay.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
         }
     }
@@ -775,13 +777,16 @@ public class PresentationFragment extends Fragment {
     }
 
     private void updateBlackScreenButton() {
+        int textPrimary = ContextCompat.getColor(requireContext(), R.color.presentation_button_content);
         if (blackScreenActive) {
             btnBlackScreen.setBackgroundColor(Color.parseColor("#000000"));
-            btnBlackScreen.setTextColor(Color.parseColor("#FFFFFFFF"));
+            btnBlackScreen.setTextColor(textPrimary);
+            btnBlackScreen.setText(R.string.show_screen);
             btnBlackScreen.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
         } else {
             btnBlackScreen.setBackgroundResource(R.drawable.presentation_action_button);
-            btnBlackScreen.setTextColor(Color.parseColor("#FFFFFFFF"));
+            btnBlackScreen.setTextColor(textPrimary);
+            btnBlackScreen.setText(R.string.hide_screen);
             btnBlackScreen.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
         }
     }
@@ -970,7 +975,7 @@ public class PresentationFragment extends Fragment {
                 cm.sendKeyRelease();
             }
             appSwitcherActive = false;
-            btnLaser.setTextColor(Color.parseColor("#FFFFFFFF"));
+            btnLaser.setTextColor(ContextCompat.getColor(requireContext(), R.color.presentation_button_content));
         }
     }
 
