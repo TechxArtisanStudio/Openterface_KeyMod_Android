@@ -92,6 +92,8 @@
     <color name="presentation_button_content">#FF3A3A3A</color>
     <color name="presentation_text_secondary">#FF757575</color>
     <color name="presentation_text_muted">#FFBDBDBD</color>
+    <color name="presentation_timer_header_on_fill">#FFFFFFFF</color>
+    <color name="presentation_timer_status_on_fill">#FFF4F4F4</color>
     <color name="presentation_primary">#FFF57C00</color>
     <color name="presentation_primary_pressed">#FFE65100</color>
     <color name="presentation_button_idle">#1AF57C00</color>
@@ -101,6 +103,7 @@
     <color name="presentation_purple">#FFA855F7</color>
     <color name="presentation_progress_filled">#FF3B82F6</color>
     <color name="presentation_progress_empty">#FFE0E0E0</color>
+    <color name="presentation_timer_progress_fill">#66F57C00</color>
     <color name="presentation_card_pressed">#FFF0F0F0</color>
     <color name="presentation_list_button_bg">#FFF57C00</color>
     <color name="presentation_list_button_pressed">#FFE65100</color>

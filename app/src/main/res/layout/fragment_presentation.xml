@@ -15,24 +15,27 @@
         android:paddingBottom="12dp">
 
         <!-- Timer & Pace Card -->
-        <LinearLayout
+        <FrameLayout
+            android:id="@+id/timer_card_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
             android:background="@drawable/presentation_card_bg"
-            android:padding="16dp"
             android:layout_marginTop="0dp"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="16dp"
+            android:clipToOutline="true">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <View
+                android:id="@+id/timer_progress_fill"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_gravity="start"
+                android:background="@color/presentation_timer_progress_fill" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/timer_pace_label"
-                android:textColor="@color/presentation_text_muted"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.1"
-                android:layout_marginBottom="12dp" />
+                android:orientation="vertical"
+                android:padding="16dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -40,101 +43,42 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
-                <!-- Timer Section -->
-                <LinearLayout
+                <TextView
+                    android:id="@+id/timer_header_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/timer_pace_label"
+                    android:textColor="@color/presentation_text_muted"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/timer_status_text"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <ImageView
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:src="@drawable/ic_timer"
-                        android:tint="?attr/colorPrimary"
-                        android:contentDescription="Timer"
-                        android:layout_marginEnd="12dp" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
-
-                            <TextView
-                                android:id="@+id/timer_remaining"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="25:00"
-                                android:textColor="@color/presentation_text_primary"
-                                android:textSize="32sp"
-                                android:textStyle="bold"
-                                android:fontFamily="sans-serif-light" />
-
-                            <ImageButton
-                                android:id="@+id/btn_edit_timer"
-                                android:layout_width="28dp"
-                                android:layout_height="28dp"
-                                android:layout_marginStart="8dp"
-                                android:src="@drawable/ic_edit"
-                                android:tint="@color/presentation_text_muted"
-                                android:background="?attr/selectableItemBackgroundBorderless"
-                                android:contentDescription="Edit timer" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
-
-                            <TextView
-                                android:id="@+id/timer_label"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/remaining"
-                                android:textColor="@color/presentation_text_secondary"
-                                android:textSize="14sp" />
-
-                            <TextView
-                                android:id="@+id/timer_total"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text=" of 25:00"
-                                android:textColor="@color/presentation_text_muted"
-                                android:textSize="14sp" />
-                        </LinearLayout>
-                    </LinearLayout>
-
-                    <ImageButton
-                        android:id="@+id/btn_timer_start"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginStart="16dp"
-                        android:src="@drawable/ic_play"
-                        android:tint="@android:color/white"
-                        android:background="@drawable/timer_start_button"
-                        android:contentDescription="Start timer" />
-
-                    <ImageButton
-                        android:id="@+id/btn_timer_reset"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginStart="8dp"
-                        android:src="@drawable/ic_reset"
-                        android:tint="@color/presentation_text_primary"
-                        android:background="@drawable/presentation_action_button"
-                        android:contentDescription="Reset timer" />
-                </LinearLayout>
+                    android:text="remaining of 25:00"
+                    android:textColor="@color/presentation_text_secondary"
+                    android:textSize="13sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:gravity="end" />
             </LinearLayout>
-        </LinearLayout>
+
+            <TextView
+                android:id="@+id/timer_remaining"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="6dp"
+                android:text="25:00"
+                android:textColor="@color/presentation_text_primary"
+                android:textSize="46sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-light" />
+            </LinearLayout>
+        </FrameLayout>
 
         <!-- NEXT / Previous Side by Side -->
         <LinearLayout

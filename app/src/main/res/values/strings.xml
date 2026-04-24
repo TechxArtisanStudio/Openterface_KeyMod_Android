@@ -232,13 +232,13 @@
     <string name="previous">PREV</string>
     <string name="hide_screen">HIDE SCREEN</string>
     <string name="show_screen">SHOW SCREEN</string>
-    <string name="play">PLAY</string>
+    <string name="play">PRESENT</string>
     <string name="first_slide">FIRST SLIDE</string>
     <string name="first_slide_multiline">FIRST\nSLIDE</string>
     <string name="last_slide">LAST SLIDE</string>
     <string name="hide_screen_multiline">HIDE\nSCREEN</string>
     <string name="show_screen_multiline">SHOW\nSCREEN</string>
-    <string name="stop">STOP</string>
+    <string name="stop">EXIT</string>
     <string name="laser">SWITCH APP</string>
     <string name="pointer">TOUCHPAD</string>
     <string name="list">List</string>
@@ -246,4 +246,17 @@
     <string name="timer_start">Start</string>
     <string name="timer_reset">Reset</string>
     <string name="timer_pause">Pause</string>
+    <string name="timer_settings_minutes_label">Duration</string>
+    <string name="timer_settings_minutes_hint">Minutes</string>
+    <string name="timer_settings_quick_select_label">Quick Select</string>
+    <string name="timer_preset_5">5</string>
+    <string name="timer_preset_10">10</string>
+    <string name="timer_preset_15">15</string>
+    <string name="timer_preset_20">20</string>
+    <string name="timer_preset_30">30</string>
+    <string name="timer_preset_60">60</string>
+    <string name="timer_settings_mode_label">Mode</string>
+    <string name="timer_mode_countdown">Countdown</string>
+    <string name="timer_mode_countup">Count Up</string>
+    <string name="timer_settings_gesture_hint">Tip: Double-tap the timer card to reset time.</string>
 </resources>

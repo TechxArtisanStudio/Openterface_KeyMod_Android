@@ -2,6 +2,7 @@ package com.openterface.fragment;
 
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.pm.ActivityInfo;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -19,10 +20,11 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.InputDevice;
 import android.view.KeyEvent;
+import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ImageButton;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.RadioGroup;
 import android.widget.RadioButton;
@@ -120,8 +122,10 @@ public class PresentationFragment extends Fragment {
 
     // UI Views
     private TextView timerRemaining;
-    private TextView timerLabel;
-    private TextView timerTotal;
+    private TextView timerHeaderLabel;
+    private TextView timerStatusText;
+    private FrameLayout timerCardContainer;
+    private View timerProgressFill;
     private Button btnNext;
     private Button btnPrevious;
     private Button btnPlay;
@@ -129,9 +133,6 @@ public class PresentationFragment extends Fragment {
     private Button btnLaser;
     private Button btnPointer;
     private TextView hintPlay;
-    private ImageButton btnEditTimer;
-    private ImageButton btnTimerStart;
-    private ImageButton btnTimerReset;
 
     // Tool switcher views
     private RecyclerView toolCarousel;
@@ -205,8 +206,10 @@ public class PresentationFragment extends Fragment {
 
     private void initViews(View view) {
         timerRemaining = view.findViewById(R.id.timer_remaining);
-        timerLabel = view.findViewById(R.id.timer_label);
-        timerTotal = view.findViewById(R.id.timer_total);
+        timerHeaderLabel = view.findViewById(R.id.timer_header_label);
+        timerStatusText = view.findViewById(R.id.timer_status_text);
+        timerCardContainer = view.findViewById(R.id.timer_card_container);
+        timerProgressFill = view.findViewById(R.id.timer_progress_fill);
         btnNext = view.findViewById(R.id.btn_next);
         btnPrevious = view.findViewById(R.id.btn_previous);
         btnPlay = view.findViewById(R.id.btn_play);
@@ -214,9 +217,6 @@ public class PresentationFragment extends Fragment {
         btnLaser = view.findViewById(R.id.btn_laser);
         btnPointer = view.findViewById(R.id.btn_pointer);
         hintPlay = view.findViewById(R.id.hint_play);
-        btnEditTimer = view.findViewById(R.id.btn_edit_timer);
-        btnTimerStart = view.findViewById(R.id.btn_timer_start);
-        btnTimerReset = view.findViewById(R.id.btn_timer_reset);
 
         toolCarousel = view.findViewById(R.id.tool_carousel);
         LinearLayoutManager layoutManager = new LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false);
@@ -261,8 +261,10 @@ public class PresentationFragment extends Fragment {
         // Set timer label and total text based on mode
         updateToolHint();
         updateTimerLabel();
-        timerTotal.setText(" of " + formatTime(timerDuration));
         updateBlackScreenButton();
+        if (timerCardContainer != null) {
+            timerCardContainer.post(this::updateTimerProgressFill);
+        }
     }
 
     private void setupListeners() {
@@ -298,6 +300,9 @@ public class PresentationFragment extends Fragment {
 
         // Black screen toggle
         btnBlackScreen.setOnClickListener(v -> {
+            if (!playActive) {
+                return;
+            }
             vibrate();
             toggleBlackScreen();
         });
@@ -338,30 +343,47 @@ public class PresentationFragment extends Fragment {
             showTouchpadDialog();
         });
 
-        // Edit timer button
-        btnEditTimer.setOnClickListener(v -> {
-            showEditTimerDialog();
-        });
+        // Timer section gestures:
+        // single tap = start/pause, double tap = reset (restart if running), long press = settings.
+        if (timerCardContainer != null) {
+            GestureDetector timerGestureDetector = new GestureDetector(requireContext(),
+                    new GestureDetector.SimpleOnGestureListener() {
+                        @Override
+                        public boolean onDown(MotionEvent e) {
+                            return true;
+                        }
 
-        // Timer start/pause button
-        btnTimerStart.setOnClickListener(v -> {
-            vibrate();
-            if (timerRunning) {
-                stopTimer();
-            } else {
-                startTimer();
-            }
-            updateTimerButton();
-        });
+                        @Override
+                        public boolean onSingleTapConfirmed(MotionEvent e) {
+                            vibrate();
+                            if (timerRunning) {
+                                stopTimer();
+                            } else {
+                                startTimer();
+                            }
+                            return true;
+                        }
 
-        // Timer reset button
-        btnTimerReset.setOnClickListener(v -> {
-            vibrate();
-            resetTimer();
-            updateTimerButton();
-        });
+                        @Override
+                        public boolean onDoubleTap(MotionEvent e) {
+                            vibrate();
+                            boolean wasRunning = timerRunning;
+                            resetTimer();
+                            if (wasRunning) {
+                                startTimer();
+                            }
+                            return true;
+                        }
 
-        updateTimerButton();
+                        @Override
+                        public void onLongPress(MotionEvent e) {
+                            vibrate();
+                            showEditTimerDialog();
+                        }
+                    });
+
+            timerCardContainer.setOnTouchListener((v, event) -> timerGestureDetector.onTouchEvent(event));
+        }
     }
 
     private void setupGestureDetector(View view) {
@@ -595,16 +617,15 @@ public class PresentationFragment extends Fragment {
 
         Dialog dialog = new Dialog(requireContext());
         dialog.setContentView(touchpadView);
-        dialog.setCanceledOnTouchOutside(false);
+        dialog.setCanceledOnTouchOutside(true);
+        dialog.setCancelable(true);
         if (dialog.getWindow() != null) {
             dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
         }
 
-        android.widget.Button btnClose = touchpadView.findViewById(R.id.btn_touchpad_close);
-        if (btnClose != null) {
-            btnClose.setOnClickListener(v -> dialog.dismiss());
-        }
+        // Tap anywhere in the dialog content except touch surface interactions to dismiss.
+        touchpadView.setOnClickListener(v -> dialog.dismiss());
 
         dialog.setOnDismissListener(d -> {
             sendKeyHID(6); // 'C' to hide pointer
@@ -678,7 +699,13 @@ public class PresentationFragment extends Fragment {
             btnPlay.setBackgroundResource(R.drawable.presentation_primary_button);
             btnPlay.setTextColor(textPrimary);
             btnPlay.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
+
+            // Hide-screen action is valid only while presentation is active.
+            if (blackScreenActive) {
+                blackScreenActive = false;
+            }
         }
+        updateBlackScreenButton();
     }
 
     private void selectTool(PresentationTool tool) {
@@ -797,6 +824,8 @@ public class PresentationFragment extends Fragment {
 
     private void updateBlackScreenButton() {
         int textPrimary = ContextCompat.getColor(requireContext(), R.color.presentation_button_content);
+        btnBlackScreen.setEnabled(playActive);
+        btnBlackScreen.setAlpha(playActive ? 1f : 0.55f);
         if (blackScreenActive) {
             btnBlackScreen.setBackgroundResource(R.drawable.presentation_active_dark_button);
             btnBlackScreen.setTextColor(textPrimary);
@@ -820,11 +849,40 @@ public class PresentationFragment extends Fragment {
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_edit_timer, null);
         EditText editText = dialogView.findViewById(R.id.edit_timer_minutes);
         RadioGroup radioGroup = dialogView.findViewById(R.id.radio_timer_mode);
+        View preset5 = dialogView.findViewById(R.id.btn_preset_5);
+        View preset10 = dialogView.findViewById(R.id.btn_preset_10);
+        View preset15 = dialogView.findViewById(R.id.btn_preset_15);
+        View preset20 = dialogView.findViewById(R.id.btn_preset_20);
+        View preset30 = dialogView.findViewById(R.id.btn_preset_30);
+        View preset60 = dialogView.findViewById(R.id.btn_preset_60);
 
         int currentMinutes = timerDuration / 60;
         editText.setText(String.valueOf(currentMinutes));
         editText.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         editText.setHint("Minutes");
+
+        View.OnClickListener applyPresetMinutes = v -> {
+            int minutes = 0;
+            int id = v.getId();
+            if (id == R.id.btn_preset_5) minutes = 5;
+            else if (id == R.id.btn_preset_10) minutes = 10;
+            else if (id == R.id.btn_preset_15) minutes = 15;
+            else if (id == R.id.btn_preset_20) minutes = 20;
+            else if (id == R.id.btn_preset_30) minutes = 30;
+            else if (id == R.id.btn_preset_60) minutes = 60;
+
+            if (minutes > 0) {
+                editText.setText(String.valueOf(minutes));
+                editText.setSelection(editText.getText().length());
+            }
+        };
+
+        if (preset5 != null) preset5.setOnClickListener(applyPresetMinutes);
+        if (preset10 != null) preset10.setOnClickListener(applyPresetMinutes);
+        if (preset15 != null) preset15.setOnClickListener(applyPresetMinutes);
+        if (preset20 != null) preset20.setOnClickListener(applyPresetMinutes);
+        if (preset30 != null) preset30.setOnClickListener(applyPresetMinutes);
+        if (preset60 != null) preset60.setOnClickListener(applyPresetMinutes);
 
         // Set current mode
         radioGroup.check(timerMode == TIMER_MODE_COUNTDOWN
@@ -855,8 +913,6 @@ public class PresentationFragment extends Fragment {
                             timerHandler.removeCallbacks(timerRunnable);
                             updateTimerDisplay();
                             updateTimerLabel();
-                            timerTotal.setText(" of " + formatTime(timerDuration));
-                            updateTimerButton();
                             saveState();
                         }
                     }
@@ -869,7 +925,7 @@ public class PresentationFragment extends Fragment {
         if (timerRunning) return;
         timerRunning = true;
         timerStartTime = System.currentTimeMillis();
-        updateTimerButton();
+        updateTimerProgressFill();
         saveState();
 
         timerRunnable = new Runnable() {
@@ -913,7 +969,7 @@ public class PresentationFragment extends Fragment {
         if (timerRunnable != null) {
             timerHandler.removeCallbacks(timerRunnable);
         }
-        updateTimerButton();
+        updateTimerProgressFill();
         saveState();
     }
 
@@ -928,7 +984,6 @@ public class PresentationFragment extends Fragment {
         }
         timerTargetAlerted = false;
         updateTimerDisplay();
-        updateTimerButton();
         saveState();
     }
 
@@ -943,32 +998,25 @@ public class PresentationFragment extends Fragment {
                 || (timerMode == TIMER_MODE_COUNTDOWN && countdownOvertime);
         int colorRes = warningActive ? R.color.presentation_red : R.color.presentation_text_primary;
         timerRemaining.setTextColor(ContextCompat.getColor(requireContext(), colorRes));
+        updateTimerProgressFill();
+        updateTimerHeaderContrast();
     }
 
     private void updateTimerLabel() {
+        if (timerStatusText == null) return;
+        String modeText;
         if (timerMode == TIMER_MODE_COUNTDOWN) {
-            timerLabel.setText(R.string.remaining);
+            modeText = getString(R.string.remaining);
         } else {
-            timerLabel.setText(R.string.elapsed);
+            modeText = getString(R.string.elapsed);
         }
-        timerTotal.setVisibility(View.VISIBLE);
-        timerTotal.setText(" of " + formatTime(timerDuration));
+        timerStatusText.setText(modeText + " of " + formatTime(timerDuration));
     }
 
     private String formatTime(int seconds) {
         int minutes = seconds / 60;
         int secs = seconds % 60;
         return String.format("%d:%02d", minutes, secs);
-    }
-
-    private void updateTimerButton() {
-        if (timerRunning) {
-            btnTimerStart.setImageResource(R.drawable.ic_pause);
-            btnTimerStart.setContentDescription(getString(R.string.timer_pause));
-        } else {
-            btnTimerStart.setImageResource(R.drawable.ic_play);
-            btnTimerStart.setContentDescription(getString(R.string.timer_start));
-        }
     }
 
     // ── Persistence ──────────────────────────────────────────────────
@@ -1010,6 +1058,73 @@ public class PresentationFragment extends Fragment {
         }
     }
 
+    private void updateTimerProgressFill() {
+        if (timerCardContainer == null || timerProgressFill == null) return;
+
+        int totalWidth = timerCardContainer.getWidth();
+        int totalHeight = timerCardContainer.getHeight();
+        if (totalWidth <= 0 || totalHeight <= 0) {
+            timerCardContainer.post(this::updateTimerProgressFill);
+            return;
+        }
+
+        float fraction = 0f;
+        boolean fromStart = true;
+
+        if (timerMode == TIMER_MODE_COUNTDOWN) {
+            fromStart = false;
+            if (countdownOvertime) {
+                fraction = 0f;
+            } else if (timerDuration > 0) {
+                fraction = Math.max(0f, Math.min(1f, timerRemainingSec / (float) timerDuration));
+            }
+
+            // Keep clean card before first start in countdown mode.
+            if (!timerRunning && !countdownOvertime && timerRemainingSec == timerDuration) {
+                fraction = 0f;
+            }
+        } else {
+            fromStart = true;
+            if (timerDuration > 0) {
+                fraction = Math.max(0f, Math.min(1f, timerRemainingSec / (float) timerDuration));
+            }
+            if (timerRemainingSec >= timerDuration) {
+                fraction = 1f;
+            }
+
+            // Keep clean card before first start in count-up mode.
+            if (!timerRunning && timerRemainingSec == 0) {
+                fraction = 0f;
+            }
+        }
+
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) timerProgressFill.getLayoutParams();
+        params.width = totalWidth;
+        params.height = totalHeight;
+        params.gravity = fromStart ? Gravity.START : Gravity.END;
+        timerProgressFill.setLayoutParams(params);
+        timerProgressFill.setPivotX(fromStart ? 0f : totalWidth);
+        timerProgressFill.setScaleX(fraction);
+        timerProgressFill.setVisibility(fraction > 0f ? View.VISIBLE : View.INVISIBLE);
+        // Dim progress when paused: base fill is ~40%, paused becomes ~20%.
+        timerProgressFill.setAlpha(timerRunning ? 1f : 0.5f);
+    }
+
+    private void updateTimerHeaderContrast() {
+        if (timerHeaderLabel == null) return;
+        boolean useOnFill = timerRunning;
+        timerHeaderLabel.setTextColor(ContextCompat.getColor(
+                requireContext(),
+                useOnFill ? R.color.presentation_timer_header_on_fill : R.color.presentation_text_muted
+        ));
+        if (timerStatusText != null) {
+            timerStatusText.setTextColor(ContextCompat.getColor(
+                    requireContext(),
+                    useOnFill ? R.color.presentation_timer_status_on_fill : R.color.presentation_text_secondary
+            ));
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────
 
     private void vibrate() {
@@ -1023,8 +1138,19 @@ public class PresentationFragment extends Fragment {
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        if (getActivity() != null) {
+            getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
+        }
+    }
+
+    @Override
     public void onPause() {
         super.onPause();
+        if (getActivity() != null) {
+            getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        }
         saveState();
         // Clean up app switcher state if navigating away
         if (appSwitcherActive) {

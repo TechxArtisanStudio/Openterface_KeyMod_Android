@@ -62,7 +62,7 @@
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
                 android:orientation="vertical"
-                android:gravity="center_horizontal"
+                android:gravity="center"
                 android:clickable="true"
                 android:focusable="true"
                 android:background="?attr/selectableItemBackgroundBorderless"

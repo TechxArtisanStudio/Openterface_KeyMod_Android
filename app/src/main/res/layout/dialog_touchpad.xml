@@ -11,25 +11,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center_vertical"
+        android:gravity="center"
         android:layout_marginBottom="12dp">
 
         <TextView
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:text="Touchpad"
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="@color/presentation_text_primary"
             android:gravity="center" />
-
-        <Button
-            android:id="@+id/btn_touchpad_close"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Close"
-            android:textSize="12sp" />
     </LinearLayout>
 
     <com.openterface.keymod.TouchPadView
