@@ -147,7 +147,7 @@
             android:background="@drawable/bg_timer_option"
             android:text="@string/timer_mode_countdown"
             android:textColor="@color/text_primary"
-            android:buttonTint="@color/primary" />
+            android:buttonTint="?attr/colorPrimary" />
 
         <RadioButton
             android:id="@+id/radio_countup"
@@ -160,7 +160,7 @@
             android:background="@drawable/bg_timer_option"
             android:text="@string/timer_mode_countup"
             android:textColor="@color/text_primary"
-            android:buttonTint="@color/primary" />
+            android:buttonTint="?attr/colorPrimary" />
     </RadioGroup>
 
     <TextView

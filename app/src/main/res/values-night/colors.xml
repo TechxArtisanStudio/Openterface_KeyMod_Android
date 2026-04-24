@@ -34,11 +34,6 @@
     <color name="presentation_text_muted">#FF5C6380</color>
     <color name="presentation_timer_header_on_fill">#FFFFFFFF</color>
     <color name="presentation_timer_status_on_fill">#FFE7ECFF</color>
-    <color name="presentation_button_idle">#1AE65100</color>
-    <color name="presentation_button_pressed">#FFE65100</color>
-    <color name="presentation_timer_progress_fill">#66E65100</color>
     <color name="presentation_progress_empty">#FF3A3F57</color>
     <color name="presentation_card_pressed">#FF2A2F45</color>
-    <color name="presentation_list_button_bg">#FFE65100</color>
-    <color name="presentation_list_button_pressed">#FFBF360C</color>
 </resources>

@@ -77,6 +77,16 @@
     <color name="theme_accent_indigo_container">#FFC5CAE9</color>
     <color name="theme_accent_indigo_on_container">#FF1A237E</color>
 
+    <!-- ~10% opacity on same RGB as each theme primary (presentation idle button fill). -->
+    <color name="theme_accent_orange_low_emphasis">#1AF57C00</color>
+    <color name="theme_accent_blue_low_emphasis">#1A1976D2</color>
+    <color name="theme_accent_green_low_emphasis">#1A2E7D32</color>
+    <color name="theme_accent_pink_low_emphasis">#1AAD1457</color>
+    <color name="theme_accent_purple_low_emphasis">#1A6A1B9A</color>
+    <color name="theme_accent_red_low_emphasis">#1AC62828</color>
+    <color name="theme_accent_teal_low_emphasis">#1A00695C</color>
+    <color name="theme_accent_indigo_low_emphasis">#1A303F9F</color>
+
     <!-- Voice Input Colors -->
     <color name="voice_input_field_background">#FFFFFFFF</color>
     <color name="voice_input_instruction_background">#FFBBDEFB</color>
@@ -94,19 +104,11 @@
     <color name="presentation_text_muted">#FFBDBDBD</color>
     <color name="presentation_timer_header_on_fill">#FFFFFFFF</color>
     <color name="presentation_timer_status_on_fill">#FFF4F4F4</color>
-    <color name="presentation_primary">#FFF57C00</color>
-    <color name="presentation_primary_pressed">#FFE65100</color>
-    <color name="presentation_button_idle">#1AF57C00</color>
-    <color name="presentation_button_pressed">#FFF57C00</color>
     <color name="presentation_green">#FF34D399</color>
     <color name="presentation_red">#FFEF4444</color>
     <color name="presentation_purple">#FFA855F7</color>
-    <color name="presentation_progress_filled">#FF3B82F6</color>
     <color name="presentation_progress_empty">#FFE0E0E0</color>
-    <color name="presentation_timer_progress_fill">#66F57C00</color>
     <color name="presentation_card_pressed">#FFF0F0F0</color>
-    <color name="presentation_list_button_bg">#FFF57C00</color>
-    <color name="presentation_list_button_pressed">#FFE65100</color>
 
     <!-- Presentation Mode Colors (Light) -->
     <!-- Keyboard Colors (Light) -->

@@ -10,6 +10,7 @@
         <item name="colorOnSecondaryContainer">@color/theme_accent_orange_on_container</item>
         <item name="colorTertiary">@color/theme_accent_orange</item>
         <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_orange_low_emphasis</item>
     </style>
 
     <style name="Theme.KeyMod" parent="Base.Theme.KeyMod" />
@@ -27,6 +28,7 @@
         <item name="colorOnSecondaryContainer">@color/theme_accent_blue_on_container</item>
         <item name="colorTertiary">@color/theme_accent_blue</item>
         <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_blue_low_emphasis</item>
     </style>
 
     <style name="Theme.KeyMod.Green" parent="Base.Theme.KeyMod">
@@ -40,6 +42,7 @@
         <item name="colorOnSecondaryContainer">@color/theme_accent_green_on_container</item>
         <item name="colorTertiary">@color/theme_accent_green</item>
         <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_green_low_emphasis</item>
     </style>
 
     <style name="Theme.KeyMod.Pink" parent="Base.Theme.KeyMod">
@@ -53,6 +56,7 @@
         <item name="colorOnSecondaryContainer">@color/theme_accent_pink_on_container</item>
         <item name="colorTertiary">@color/theme_accent_pink</item>
         <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_pink_low_emphasis</item>
     </style>
 
     <style name="Theme.KeyMod.Purple" parent="Base.Theme.KeyMod">
@@ -66,6 +70,7 @@
         <item name="colorOnSecondaryContainer">@color/theme_accent_purple_on_container</item>
         <item name="colorTertiary">@color/theme_accent_purple</item>
         <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_purple_low_emphasis</item>
     </style>
 
     <style name="Theme.KeyMod.Red" parent="Base.Theme.KeyMod">
@@ -79,6 +84,7 @@
         <item name="colorOnSecondaryContainer">@color/theme_accent_red_on_container</item>
         <item name="colorTertiary">@color/theme_accent_red</item>
         <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_red_low_emphasis</item>
     </style>
 
     <style name="Theme.KeyMod.Teal" parent="Base.Theme.KeyMod">
@@ -92,6 +98,7 @@
         <item name="colorOnSecondaryContainer">@color/theme_accent_teal_on_container</item>
         <item name="colorTertiary">@color/theme_accent_teal</item>
         <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_teal_low_emphasis</item>
     </style>
 
     <style name="Theme.KeyMod.Indigo" parent="Base.Theme.KeyMod">
@@ -105,5 +112,6 @@
         <item name="colorOnSecondaryContainer">@color/theme_accent_indigo_on_container</item>
         <item name="colorTertiary">@color/theme_accent_indigo</item>
         <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_indigo_low_emphasis</item>
     </style>
 </resources>

@@ -1,5 +1,8 @@
 <!-- res/values/attrs.xml -->
 <resources>
+    <!-- Presentation control rows: idle fill = primary at low opacity (~10%), theme-specific. -->
+    <attr name="presentationControlButtonIdleFill" format="color" />
+
     <declare-styleable name="Keyboard">
         <attr name="keySymbolLabel" format="string" />
         <attr name="keyRequiresShift" format="boolean" />

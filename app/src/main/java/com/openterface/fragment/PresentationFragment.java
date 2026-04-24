@@ -5,7 +5,6 @@ import android.app.Dialog;
 import android.content.pm.ActivityInfo;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -139,6 +138,7 @@ public class PresentationFragment extends Fragment {
     private LinearSnapHelper toolSnapHelper;
     private ToolCarouselAdapter toolAdapter;
     private boolean isProgrammaticScroll = false;
+    private boolean carouselSidePaddingApplied;
 
     // State
     private int timerDuration = DEFAULT_TIMER_DURATION; // in seconds
@@ -229,12 +229,17 @@ public class PresentationFragment extends Fragment {
         toolSnapHelper = new LinearSnapHelper();
         toolSnapHelper.attachToRecyclerView(toolCarousel);
 
-        // Scroll to initial position
-        isProgrammaticScroll = true;
-        int startPos = toolAdapter.positionForTool(currentTool.ordinal());
-        toolCarousel.post(() -> {
-            toolCarousel.scrollToPosition(startPos);
-            isProgrammaticScroll = false;
+        toolCarousel.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            int w = right - left;
+            if (w <= 0) return;
+            int pad = w / 2;
+            int prevStart = toolCarousel.getPaddingStart();
+            if (!carouselSidePaddingApplied || prevStart != pad) {
+                carouselSidePaddingApplied = true;
+                toolCarousel.setPaddingRelative(pad, toolCarousel.getPaddingTop(), pad, toolCarousel.getPaddingBottom());
+                int pos = toolAdapter.positionForTool(currentTool.ordinal());
+                toolCarousel.post(() -> centerCarouselOnPosition(pos, false));
+            }
         });
 
         // Update currentTool when user scrolls to a different tool
@@ -523,7 +528,7 @@ public class PresentationFragment extends Fragment {
                 }
             }, 100);
             appSwitcherActive = true;
-            btnLaser.setTextColor(Color.parseColor("#34D399")); // green = active
+            btnLaser.setTextColor(ContextCompat.getColor(requireContext(), R.color.presentation_green));
             Log.d(TAG, "App switcher opened (modifier=" + mod + " held)");
             // Safety timeout: auto-release after 10s of inactivity
             timerHandler.postDelayed(() -> {
@@ -724,17 +729,54 @@ public class PresentationFragment extends Fragment {
     }
 
     private void scrollToCurrentTool() {
+        int target = toolAdapter.positionForTool(currentTool.ordinal());
+        centerCarouselOnPosition(target, true);
+    }
+
+    /**
+     * Places the item at {@code adapterPosition} in the horizontal center of the carousel.
+     * {@link LinearSnapHelper} only snaps after user flings; programmatic {@link RecyclerView#scrollToPosition}
+     * aligns to an edge, so we apply the snap offset explicitly.
+     */
+    private void centerCarouselOnPosition(int adapterPosition, boolean smooth) {
+        if (toolCarousel == null || toolSnapHelper == null) return;
+        LinearLayoutManager lm = (LinearLayoutManager) toolCarousel.getLayoutManager();
+        if (lm == null) return;
+
         isProgrammaticScroll = true;
-        toolCarousel.post(() -> {
-            int target = toolAdapter.positionForTool(currentTool.ordinal());
-            toolCarousel.scrollToPosition(target);
-            // Use LinearSmoothScroller for center snap
-            LinearLayoutManager lm = (LinearLayoutManager) toolCarousel.getLayoutManager();
-            if (lm != null) {
-                lm.smoothScrollToPosition(toolCarousel, new RecyclerView.State(), target);
+        toolCarousel.scrollToPosition(adapterPosition);
+
+        Runnable finishProgrammatic = () -> isProgrammaticScroll = false;
+
+        Runnable applySnap = new Runnable() {
+            int retries;
+
+            @Override
+            public void run() {
+                View child = lm.findViewByPosition(adapterPosition);
+                if (child == null && retries++ < 8) {
+                    toolCarousel.post(this);
+                    return;
+                }
+                if (child == null) {
+                    finishProgrammatic.run();
+                    return;
+                }
+                int[] dist = toolSnapHelper.calculateDistanceToFinalSnap(lm, child);
+                if (dist == null || dist[0] == 0) {
+                    finishProgrammatic.run();
+                    return;
+                }
+                if (smooth) {
+                    toolCarousel.smoothScrollBy(dist[0], 0);
+                    toolCarousel.postDelayed(finishProgrammatic, 450);
+                } else {
+                    toolCarousel.scrollBy(dist[0], 0);
+                    finishProgrammatic.run();
+                }
             }
-            toolCarousel.postDelayed(() -> isProgrammaticScroll = false, 500);
-        });
+        };
+        toolCarousel.post(applySnap);
     }
 
     /**
@@ -1106,8 +1148,8 @@ public class PresentationFragment extends Fragment {
         timerProgressFill.setPivotX(fromStart ? 0f : totalWidth);
         timerProgressFill.setScaleX(fraction);
         timerProgressFill.setVisibility(fraction > 0f ? View.VISIBLE : View.INVISIBLE);
-        // Dim progress when paused: base fill is ~40%, paused becomes ~20%.
-        timerProgressFill.setAlpha(timerRunning ? 1f : 0.5f);
+        // Opaque colorPrimary with view alpha: running ~40%, paused ~20% effective tint.
+        timerProgressFill.setAlpha(timerRunning ? 0.4f : 0.2f);
     }
 
     private void updateTimerHeaderContrast() {

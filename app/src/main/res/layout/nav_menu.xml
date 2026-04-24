@@ -38,6 +38,18 @@
 
     </LinearLayout>
 
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:scrollbars="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
     <!-- Navigation Items -->
     <LinearLayout
         android:id="@+id/nav_keyboard_mouse"
@@ -66,6 +78,40 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Keyboard &amp; Mouse"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:layout_marginStart="12dp" />
+
+    </LinearLayout>
+
+    <!-- Presentation Mode -->
+    <LinearLayout
+        android:id="@+id/nav_presentation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp"
+        android:background="@drawable/nav_item_background_selector"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/nav_icon_presentation"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/ic_presentation"
+            android:tint="?attr/colorPrimary" />
+
+        <TextView
+            android:id="@+id/nav_text_presentation"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Presentation"
             android:textSize="16sp"
             android:textColor="@color/text_primary"
             android:layout_marginStart="12dp" />
@@ -237,46 +283,6 @@
 
     </LinearLayout>
 
-    <!-- Presentation Mode -->
-    <LinearLayout
-        android:id="@+id/nav_presentation"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:padding="12dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginTop="2dp"
-        android:layout_marginBottom="2dp"
-        android:background="@drawable/nav_item_background_selector"
-        android:clickable="true"
-        android:focusable="true">
-
-        <ImageView
-            android:id="@+id/nav_icon_presentation"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:src="@drawable/ic_presentation"
-            android:tint="?attr/colorPrimary" />
-
-        <TextView
-            android:id="@+id/nav_text_presentation"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Presentation"
-            android:textSize="16sp"
-            android:textColor="@color/text_primary"
-            android:layout_marginStart="12dp" />
-
-    </LinearLayout>
-
-    <!-- Spacer -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
     <!-- Divider -->
     <View
         android:layout_width="match_parent"
@@ -284,6 +290,7 @@
         android:background="@color/divider"
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
+        android:layout_marginTop="16dp"
         android:layout_marginBottom="8dp" />
 
     <!-- Target OS selector -->
@@ -397,6 +404,9 @@
         android:paddingTop="4dp"
         android:paddingBottom="16dp"
         android:gravity="center" />
+
+        </LinearLayout>
+    </ScrollView>
 
 </LinearLayout>
 
