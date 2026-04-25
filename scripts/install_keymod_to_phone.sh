@@ -9,7 +9,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GRADLEW="$ROOT_DIR/gradlew"
-
+ 
 ANDROID_HOME_DEFAULT="/opt/homebrew/share/android-commandlinetools"
 JAVA_HOME_DEFAULT="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
 
@@ -56,8 +56,31 @@ fi
 
 echo "==> Installing current debug build to phone: $TARGET_SERIAL"
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy
+APP_ID="com.openterface.keymod"
+INSTALL_LOG="$(mktemp)"
+
+set +e
 (
   cd "$ROOT_DIR"
   ANDROID_SERIAL="$TARGET_SERIAL" "$GRADLEW" installDebug --no-daemon
-)
+) 2>&1 | tee "$INSTALL_LOG"
+INSTALL_EXIT_CODE=${PIPESTATUS[0]}
+set -e
+
+INSTALL_OUTPUT="$(<"$INSTALL_LOG")"
+if [[ $INSTALL_EXIT_CODE -ne 0 ]] && [[ "$INSTALL_OUTPUT" == *"INSTALL_FAILED_UPDATE_INCOMPATIBLE"* || "$INSTALL_OUTPUT" == *"signatures do not match newer version"* ]]; then
+  echo "==> Existing app signature mismatch detected for $APP_ID."
+  echo "==> Uninstalling old app from device $TARGET_SERIAL and retrying..."
+  adb -s "$TARGET_SERIAL" uninstall "$APP_ID" >/dev/null || true
+
+  (
+    cd "$ROOT_DIR"
+    ANDROID_SERIAL="$TARGET_SERIAL" "$GRADLEW" installDebug --no-daemon
+  )
+elif [[ $INSTALL_EXIT_CODE -ne 0 ]]; then
+  rm -f "$INSTALL_LOG"
+  exit "$INSTALL_EXIT_CODE"
+fi
+
+rm -f "$INSTALL_LOG"
 echo "==> Done."
