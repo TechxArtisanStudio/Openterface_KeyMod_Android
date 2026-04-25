@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.res.Resources;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.text.SpannableString;
@@ -76,6 +77,7 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int ALT_LONG_PRESS_TIMEOUT_MS = ViewConfiguration.getLongPressTimeout();
     private static final int ALT_CANCEL_VERTICAL_DP = 72;
     private static final int ALT_POPUP_VERTICAL_OFFSET_DP = 72;
+    private static final int KEY_OUTER_MARGIN_DP = 2;
     private final Handler longPressHandler = new Handler();
     private PopupWindow alternatePopupWindow;
     private LinearLayout alternatePopupContainer;
@@ -629,7 +631,7 @@ public class CustomKeyboardView extends LinearLayout {
                 View listenerTarget;
                 float weight = key.widthPercent / 10.0f;
                 LayoutParams params = new LayoutParams(0, LayoutParams.MATCH_PARENT, weight);
-                int keyMargin = dpToPx(4);
+                int keyMargin = dpToPx(KEY_OUTER_MARGIN_DP);
                 params.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
 
                 if (key.horizontalGap > 0) {
@@ -649,6 +651,7 @@ public class CustomKeyboardView extends LinearLayout {
                         key.label.equals("Up_arrow") || key.label.equals("Down_arrow") ||
                         key.label.equals("Left_arrow") || key.label.equals("Right_arrow")) {
                     ImageButton imageButton = new ImageButton(getContext());
+                    applyFlatKeyStyle(imageButton);
                     imageButton.setLayoutParams(params);
                     if (key.code == 0xE3 && isWinLeftLocked) {
                         imageButton.setBackgroundResource(R.drawable.press_button_background);
@@ -658,6 +661,9 @@ public class CustomKeyboardView extends LinearLayout {
                     if (key.iconResId != 0) {
                         imageButton.setImageResource(key.iconResId);
                         imageButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
+                        if (isBackspaceKey(key)) {
+                            imageButton.setScaleX(isShiftLeftLocked ? -1f : 1f);
+                        }
                         if ("Win".equals(key.label) || "Cmd".equals(key.label) || "Super".equals(key.label) || "BackSpace".equals(key.label)) {
                             imageButton.setColorFilter(resolveThemeTextColor());
                         }
@@ -667,10 +673,11 @@ public class CustomKeyboardView extends LinearLayout {
                     listenerTarget = imageButton;
                 } else {
                     Button textButton = new Button(getContext());
+                    applyFlatKeyStyle(textButton);
                     textButton.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
                     textButton.setBackgroundResource(R.drawable.key_background);
                     textButton.setGravity(Gravity.CENTER);
-                    textButton.setTextSize(12);
+                    textButton.setTextSize(14);
                     textButton.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
 
                     if (isFunctionalKey) {
@@ -729,9 +736,13 @@ public class CustomKeyboardView extends LinearLayout {
                         hintParams.setMargins(0, dpToPx(3), dpToPx(6), 0);
                         cornerHintView.setLayoutParams(hintParams);
                         cornerHintView.setText(key.cornerHint);
-                        cornerHintView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+                        cornerHintView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
                         cornerHintView.setTextColor(resolveThemeTextColor());
+                        cornerHintView.setAlpha(0.2f);
                         cornerHintView.setTypeface(cornerHintView.getTypeface(), android.graphics.Typeface.BOLD);
+                        cornerHintView.setIncludeFontPadding(false);
+                        cornerHintView.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                        cornerHintView.setPadding(0, 0, 0, 0);
                         cornerHintView.setClickable(false);
                         cornerHintView.setFocusable(false);
                         keyContainer.addView(cornerHintView);
@@ -1064,19 +1075,33 @@ public class CustomKeyboardView extends LinearLayout {
         }
         switch (c) {
             case '1': return new AlternateOption(token, 0x1E, false);
+            case '!': return new AlternateOption(token, 0x1E, true);
             case '2': return new AlternateOption(token, 0x1F, false);
+            case '@': return new AlternateOption(token, 0x1F, true);
             case '3': return new AlternateOption(token, 0x20, false);
+            case '#': return new AlternateOption(token, 0x20, true);
             case '4': return new AlternateOption(token, 0x21, false);
+            case '$': return new AlternateOption(token, 0x21, true);
             case '5': return new AlternateOption(token, 0x22, false);
+            case '%': return new AlternateOption(token, 0x22, true);
             case '6': return new AlternateOption(token, 0x23, false);
+            case '^': return new AlternateOption(token, 0x23, true);
             case '7': return new AlternateOption(token, 0x24, false);
+            case '&': return new AlternateOption(token, 0x24, true);
             case '8': return new AlternateOption(token, 0x25, false);
+            case '*': return new AlternateOption(token, 0x25, true);
             case '9': return new AlternateOption(token, 0x26, false);
+            case '(': return new AlternateOption(token, 0x26, true);
             case '0': return new AlternateOption(token, 0x27, false);
+            case ')': return new AlternateOption(token, 0x27, true);
             case '-': return new AlternateOption(token, 0x2D, false);
             case '_': return new AlternateOption(token, 0x2D, true);
             case '=': return new AlternateOption(token, 0x2E, false);
             case '+': return new AlternateOption(token, 0x2E, true);
+            case '[': return new AlternateOption(token, 0x2F, false);
+            case '{': return new AlternateOption(token, 0x2F, true);
+            case ']': return new AlternateOption(token, 0x30, false);
+            case '}': return new AlternateOption(token, 0x30, true);
             case ',': return new AlternateOption(token, 0x36, false);
             case '<': return new AlternateOption(token, 0x36, true);
             case '.': return new AlternateOption(token, 0x37, false);
@@ -1087,6 +1112,8 @@ public class CustomKeyboardView extends LinearLayout {
             case ':': return new AlternateOption(token, 0x33, true);
             case '\'': return new AlternateOption(token, 0x34, false);
             case '"': return new AlternateOption(token, 0x34, true);
+            case '`': return new AlternateOption(token, 0x35, false);
+            case '~': return new AlternateOption(token, 0x35, true);
             default: return null;
         }
     }
@@ -1097,7 +1124,7 @@ public class CustomKeyboardView extends LinearLayout {
      *   Bottom row (weight 1): ABC , !?# 0 = . Enter
      */
     private void buildNumberPadLayout() {
-        int m = dpToPx(4);
+        int m = dpToPx(KEY_OUTER_MARGIN_DP);
 
         // Single horizontal section: op panel (left, weight 1) + num grid (right, weight 9)
         LinearLayout mainSection = new LinearLayout(getContext());
@@ -1118,6 +1145,7 @@ public class CustomKeyboardView extends LinearLayout {
         for (int i = 0; i < opLabels.length; i++) {
             Key k = new Key(opLabels[i], "", opCodes[i], opCodeStrs[i], 10.0f, 0, 0f, false, opShift[i]);
             Button btn = new Button(getContext());
+            applyFlatKeyStyle(btn);
             LayoutParams p = new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1.0f);
             p.setMargins(m, m, m, m);
             btn.setLayoutParams(p);
@@ -1181,16 +1209,19 @@ public class CustomKeyboardView extends LinearLayout {
                 View btn;
                 if ("BackSpace".equals(k.label)) {
                     ImageButton ib = new ImageButton(getContext());
+                    applyFlatKeyStyle(ib);
                     ib.setLayoutParams(p);
                     ib.setBackgroundResource(R.drawable.key_background);
                     ib.setImageResource(k.iconResId);
                     ib.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
+                    ib.setScaleX(isShiftLeftLocked ? -1f : 1f);
                     ib.setColorFilter(resolveThemeTextColor());
                     ib.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
                     attachKeyListeners(ib, k);
                     btn = ib;
                 } else {
                     Button b = new Button(getContext());
+                    applyFlatKeyStyle(b);
                     b.setLayoutParams(p);
                     b.setGravity(Gravity.CENTER);
                     b.setTextSize(12);
@@ -1358,20 +1389,20 @@ public class CustomKeyboardView extends LinearLayout {
 
     private List<Key> buildStandardTopPanelKeys() {
         List<Key> keys = new ArrayList<>(TOP_PANEL_PAGE_SIZE);
-        keys.add(new Key("ESC",  "", 0x29, "29", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("/",    "", 0x38, "38", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("-",    "", 0x2D, "2D", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("ESC",    "", 0x29, "29", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("INSERT", "", 0x49, "49", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("DEL",    "", 0x4C, "4C", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("HOME", "", 0x4A, "4A", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("\u2191", "", 0x52, "52", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("\u25B2", "", 0x52, "52", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("END",  "", 0x4D, "4D", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("PGUP", "", 0x4B, "4B", 1f, 0, 0f, false, false, -1, true));
 
-        keys.add(new Key("\u21E5",  "", 0x2B, "2B", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("TAB",    "", 0x2B, "2B", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("CTRL",   "", 0xE0, "E0", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("ALT",    "", 0xE2, "E2", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("\u2190", "", 0x50, "50", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("\u2193", "", 0x51, "51", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("\u2192", "", 0x4F, "4F", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("\u25C0", "", 0x50, "50", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("\u25BC", "", 0x51, "51", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("\u25B6", "", 0x4F, "4F", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("PGDN",   "", 0x4E, "4E", 1f, 0, 0f, false, false, -1, true));
         return keys;
     }
@@ -1402,7 +1433,7 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void addShortcutPanelRows(LinearLayout parent, List<Key> panelKeys) {
-        int m = dpToPx(4);
+        int m = dpToPx(KEY_OUTER_MARGIN_DP);
 
         for (int rowIndex = 0; rowIndex < TOP_PANEL_ROWS; rowIndex++) {
             LinearLayout rowLayout = new LinearLayout(getContext());
@@ -1426,6 +1457,7 @@ public class CustomKeyboardView extends LinearLayout {
 
                 Key k = panelKeys.get(index);
                 Button b = new Button(getContext());
+                applyFlatKeyStyle(b);
                 b.setLayoutParams(p);
                 boolean modifierLocked = (k.code == 0xE0 && isCtrlLeftLocked)
                     || (k.code == 0xE1 && isShiftLeftLocked)
@@ -1735,7 +1767,7 @@ public class CustomKeyboardView extends LinearLayout {
             float widthPercent = key != null ? key.widthPercent : (100f / keys.length);
             float weight = widthPercent / 10.0f;
             LayoutParams params = new LayoutParams(0, LayoutParams.MATCH_PARENT, weight);
-            int keyMargin = dpToPx(4);
+            int keyMargin = dpToPx(KEY_OUTER_MARGIN_DP);
             params.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
 
             if (key == null) {
@@ -1746,6 +1778,7 @@ public class CustomKeyboardView extends LinearLayout {
             }
 
             Button textButton = new Button(getContext());
+            applyFlatKeyStyle(textButton);
             textButton.setLayoutParams(params);
             textButton.setBackgroundResource(R.drawable.function_button_background);
             textButton.setGravity(Gravity.CENTER);
@@ -1924,16 +1957,28 @@ public class CustomKeyboardView extends LinearLayout {
             return;
         }
 
+        int effectiveKeyCode = key.code;
+        boolean effectiveShiftLocked = isShiftLeftLocked;
+        if (isBackspaceKey(key) && isShiftLeftLocked) {
+            // Shift+Backspace switches to forward delete behavior.
+            effectiveKeyCode = 0x4C;
+            effectiveShiftLocked = false;
+        }
+
         int combinedValue = 0;
         combinedValue += isCtrlLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Ctrl")) : 0;
-        combinedValue += isShiftLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift")) : 0;
+        combinedValue += effectiveShiftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift")) : 0;
         combinedValue += isAltLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Alt")) : 0;
         combinedValue += isWinLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Win")) : 0;
         if (key.requiresShift) {
             combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift"));
         }
 
-        sendKeyData(combinedValue, key.code);
+        sendKeyData(combinedValue, effectiveKeyCode);
+    }
+
+    private boolean isBackspaceKey(Key key) {
+        return key != null && (key.code == 0x2A || "BackSpace".equals(key.label));
     }
 
     private void sendShortcutWithModifiers(int shortcutModifiers, int keyCode) {
@@ -1998,6 +2043,17 @@ public class CustomKeyboardView extends LinearLayout {
     private int dpToPx(int dp) {
         float density = getContext().getResources().getDisplayMetrics().density;
         return Math.round(dp * density);
+    }
+
+    private void applyFlatKeyStyle(View view) {
+        if (view == null) {
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            view.setStateListAnimator(null);
+            view.setElevation(0f);
+            view.setTranslationZ(0f);
+        }
     }
 
     private int resolveThemeTextColor() {
