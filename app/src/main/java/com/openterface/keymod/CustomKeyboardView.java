@@ -805,7 +805,7 @@ public class CustomKeyboardView extends LinearLayout {
                         repeatHandler.postDelayed(this::sendReleaseData, 30);
                         return true;
                     }
-                    if (key.isRepeatable) stopRepeatingDelete();
+                    if (shouldRepeatOnLongPress(key)) stopRepeatingDelete();
                     if (!longPressConsumed[0] && isTouchInsideView(v, event)) {
                         handleKeyPress(key);
                     }
@@ -823,7 +823,7 @@ public class CustomKeyboardView extends LinearLayout {
                         dismissAlternatesPopup();
                         return true;
                     }
-                    if (key.isRepeatable) stopRepeatingDelete();
+                    if (shouldRepeatOnLongPress(key)) stopRepeatingDelete();
                     repeatHandler.postDelayed(this::sendReleaseData, 30);
                     return false;
                 }
@@ -831,7 +831,7 @@ public class CustomKeyboardView extends LinearLayout {
                     return false;
             }
         });
-        if (key.isRepeatable) {
+        if (shouldRepeatOnLongPress(key)) {
             btn.setOnLongClickListener(v -> {
                 longPressConsumed[0] = true;
                 startRepeatingDelete(key);
@@ -860,6 +860,17 @@ public class CustomKeyboardView extends LinearLayout {
             return false;
         }
         return key.label.length() == 1 || key.symbolLabel.length() == 1 || !TextUtils.isEmpty(key.alternates);
+    }
+
+    private boolean shouldRepeatOnLongPress(Key key) {
+        return key != null && (key.isRepeatable || isArrowKey(key));
+    }
+
+    private boolean isArrowKey(Key key) {
+        if (key == null) {
+            return false;
+        }
+        return key.code == 0x52 || key.code == 0x51 || key.code == 0x50 || key.code == 0x4F;
     }
 
     private boolean isAlternatePopupVisible() {
