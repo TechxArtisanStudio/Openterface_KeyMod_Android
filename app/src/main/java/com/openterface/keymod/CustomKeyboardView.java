@@ -75,6 +75,7 @@ public class CustomKeyboardView extends LinearLayout {
     private boolean isRepeating = false;
     private static final int ALT_LONG_PRESS_TIMEOUT_MS = ViewConfiguration.getLongPressTimeout();
     private static final int ALT_CANCEL_VERTICAL_DP = 72;
+    private static final int ALT_POPUP_VERTICAL_OFFSET_DP = 72;
     private final Handler longPressHandler = new Handler();
     private PopupWindow alternatePopupWindow;
     private LinearLayout alternatePopupContainer;
@@ -863,7 +864,7 @@ public class CustomKeyboardView extends LinearLayout {
         dismissAlternatesPopup();
         alternateAnchorView = anchor;
         currentAlternateOptions = options;
-        currentAlternateSelection = findDefaultAlternateSelection(options, key.label);
+        currentAlternateSelection = findDefaultAlternateSelection(options, key);
 
         alternatePopupContainer = new LinearLayout(getContext());
         alternatePopupContainer.setOrientation(LinearLayout.HORIZONTAL);
@@ -898,19 +899,18 @@ public class CustomKeyboardView extends LinearLayout {
             int[] loc = new int[2];
             anchor.getLocationOnScreen(loc);
             int popupX = (int) (loc[0] + (anchor.getWidth() / 2f) - (alternatePopupContainer.getMeasuredWidth() / 2f));
-            int popupY = loc[1] - dpToPx(52);
+            int popupY = loc[1] - dpToPx(ALT_POPUP_VERTICAL_OFFSET_DP);
             alternatePopupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY, popupX, popupY);
             updateAlternateSelection(initialRawX, loc[1]);
         });
     }
 
     private List<AlternateOption> buildAlternateOptions(Key key) {
+        // Keep alternates ordering predictable: symbol -> alternates -> base label.
+        // Example: h with symbol H and alternate "-" => H - h.
         LinkedHashSet<String> labels = new LinkedHashSet<>();
         if (!TextUtils.isEmpty(key.symbolLabel) && key.symbolLabel.length() == 1) {
             labels.add(key.symbolLabel);
-        }
-        if (!TextUtils.isEmpty(key.label) && key.label.length() == 1) {
-            labels.add(key.label);
         }
         if (!TextUtils.isEmpty(key.alternates)) {
             String[] extra = key.alternates.split(",");
@@ -920,6 +920,9 @@ public class CustomKeyboardView extends LinearLayout {
                     labels.add(trimmed);
                 }
             }
+        }
+        if (!TextUtils.isEmpty(key.label) && key.label.length() == 1) {
+            labels.add(key.label);
         }
 
         List<AlternateOption> result = new ArrayList<>();
@@ -932,7 +935,22 @@ public class CustomKeyboardView extends LinearLayout {
         return result;
     }
 
-    private int findDefaultAlternateSelection(List<AlternateOption> options, String baseLabel) {
+    private int findDefaultAlternateSelection(List<AlternateOption> options, Key key) {
+        if (!TextUtils.isEmpty(key.alternates)) {
+            String[] extra = key.alternates.split(",");
+            for (String token : extra) {
+                String trimmed = token.trim();
+                if (trimmed.length() != 1) {
+                    continue;
+                }
+                for (int i = 0; i < options.size(); i++) {
+                    if (options.get(i).display.equals(trimmed)) {
+                        return i;
+                    }
+                }
+            }
+        }
+        String baseLabel = key.label;
         for (int i = 0; i < options.size(); i++) {
             if (options.get(i).display.equals(baseLabel)) {
                 return i;
