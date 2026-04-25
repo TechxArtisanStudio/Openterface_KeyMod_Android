@@ -4,15 +4,16 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.content.Intent;
 import android.content.res.Resources;
 import android.os.Handler;
 import android.os.IBinder;
 import android.text.SpannableString;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
@@ -21,8 +22,11 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.PopupWindow;
+import android.widget.TextView;
 
 import androidx.core.content.ContextCompat;
+import androidx.preference.PreferenceManager;
 
 import com.openterface.target.CH9329MSKBMap;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
@@ -33,6 +37,7 @@ import org.xmlpull.v1.XmlPullParserException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 public class CustomKeyboardView extends LinearLayout {
@@ -68,6 +73,15 @@ public class CustomKeyboardView extends LinearLayout {
     private Handler repeatHandler = new Handler();
     private Runnable repeatRunnable;
     private boolean isRepeating = false;
+    private static final int ALT_LONG_PRESS_TIMEOUT_MS = ViewConfiguration.getLongPressTimeout();
+    private static final int ALT_CANCEL_VERTICAL_DP = 72;
+    private final Handler longPressHandler = new Handler();
+    private PopupWindow alternatePopupWindow;
+    private LinearLayout alternatePopupContainer;
+    private View alternateAnchorView;
+    private final List<TextView> alternateOptionViews = new ArrayList<>();
+    private List<AlternateOption> currentAlternateOptions = new ArrayList<>();
+    private int currentAlternateSelection = -1;
     private int topPanelPageIndex = 0;
     private ShortcutProfileManager shortcutProfileManager;
     private final List<TopShortcutPanel> topShortcutPanels = new ArrayList<>();
@@ -99,6 +113,8 @@ public class CustomKeyboardView extends LinearLayout {
     private static class Key {
         String label;
         String symbolLabel;
+        String alternates;
+        String cornerHint;
         int code;
         String codeStr;
         float widthPercent;
@@ -109,10 +125,12 @@ public class CustomKeyboardView extends LinearLayout {
         int shortcutModifiers;
         boolean isTopPanelKey;
 
-        Key(String label, String symbolLabel, int code, String codeStr, float widthPercent, int iconResId,
+        Key(String label, String symbolLabel, String alternates, String cornerHint, int code, String codeStr, float widthPercent, int iconResId,
             float horizontalGap, boolean isRepeatable, boolean requiresShift, int shortcutModifiers, boolean isTopPanelKey) {
             this.label = label;
             this.symbolLabel = symbolLabel;
+            this.alternates = alternates;
+            this.cornerHint = cornerHint;
             this.code = code;
             this.codeStr = codeStr;
             this.widthPercent = widthPercent;
@@ -124,12 +142,29 @@ public class CustomKeyboardView extends LinearLayout {
             this.isTopPanelKey = isTopPanelKey;
         }
 
+        Key(String label, String symbolLabel, int code, String codeStr, float widthPercent, int iconResId,
+            float horizontalGap, boolean isRepeatable, boolean requiresShift, int shortcutModifiers, boolean isTopPanelKey) {
+            this(label, symbolLabel, "", "", code, codeStr, widthPercent, iconResId, horizontalGap, isRepeatable, requiresShift, shortcutModifiers, isTopPanelKey);
+        }
+
         Key(String label, String symbolLabel, int code, String codeStr, float widthPercent, int iconResId, float horizontalGap, boolean isRepeatable, boolean requiresShift) {
-            this(label, symbolLabel, code, codeStr, widthPercent, iconResId, horizontalGap, isRepeatable, requiresShift, -1, false);
+            this(label, symbolLabel, "", "", code, codeStr, widthPercent, iconResId, horizontalGap, isRepeatable, requiresShift, -1, false);
         }
 
         Key(String label, String symbolLabel, int code, String codeStr, float widthPercent, int iconResId, float horizontalGap, boolean isRepeatable) {
             this(label, symbolLabel, code, codeStr, widthPercent, iconResId, horizontalGap, isRepeatable, false);
+        }
+    }
+
+    private static class AlternateOption {
+        final String display;
+        final int keyCode;
+        final boolean requiresShift;
+
+        AlternateOption(String display, int keyCode, boolean requiresShift) {
+            this.display = display;
+            this.keyCode = keyCode;
+            this.requiresShift = requiresShift;
         }
     }
 
@@ -402,6 +437,14 @@ public class CustomKeyboardView extends LinearLayout {
                             symbolLabel = "";
                             System.out.println("Warning: custom:keySymbolLabel is missing");
                         }
+                        String alternates = parser.getAttributeValue(CUSTOM_NS, "keyAlternates");
+                        if (alternates == null) {
+                            alternates = "";
+                        }
+                        String cornerHint = parser.getAttributeValue(CUSTOM_NS, "keyCornerHint");
+                        if (cornerHint == null) {
+                            cornerHint = "";
+                        }
 
                         String codeStr = parser.getAttributeValue(ANDROID_NS, "codes");
                         int code = 0;
@@ -474,7 +517,7 @@ public class CustomKeyboardView extends LinearLayout {
                         }
 
 //                        Log.d(TAG,"Parsed Key: label=" + label + ", symbolLabel=" + symbolLabel + ", code=0x" + Integer.toHexString(code).toUpperCase() + ", codeStr=" + codeStr + ", width=" + widthPercent + ", icon=" + iconResId + ", gap=" + horizontalGap + ", repeatable=" + isRepeatable);
-                        currentRow.add(new Key(label, symbolLabel, code, codeStr, widthPercent, iconResId, horizontalGap, isRepeatable, requiresShift));
+                        currentRow.add(new Key(label, symbolLabel, alternates, cornerHint, code, codeStr, widthPercent, iconResId, horizontalGap, isRepeatable, requiresShift, -1, false));
                     }
                 } else if (eventType == XmlPullParser.END_TAG) {
                     if ("Row".equals(parser.getName()) && currentRow != null) {
@@ -582,6 +625,7 @@ public class CustomKeyboardView extends LinearLayout {
 
             for (Key key : row) {
                 View button;
+                View listenerTarget;
                 float weight = key.widthPercent / 10.0f;
                 LayoutParams params = new LayoutParams(0, LayoutParams.MATCH_PARENT, weight);
                 int keyMargin = dpToPx(4);
@@ -619,9 +663,10 @@ public class CustomKeyboardView extends LinearLayout {
                     }
                     imageButton.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
                     button = imageButton;
+                    listenerTarget = imageButton;
                 } else {
                     Button textButton = new Button(getContext());
-                    textButton.setLayoutParams(params);
+                    textButton.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
                     textButton.setBackgroundResource(R.drawable.key_background);
                     textButton.setGravity(Gravity.CENTER);
                     textButton.setTextSize(12);
@@ -672,33 +717,34 @@ public class CustomKeyboardView extends LinearLayout {
                         textButton.setCompoundDrawablesWithIntrinsicBounds(0, key.iconResId, 0, 0);
                         textButton.setCompoundDrawablePadding(dpToPx(4));
                     }
-                    button = textButton;
-                }
+                    if (!TextUtils.isEmpty(key.cornerHint)) {
+                        FrameLayout keyContainer = new FrameLayout(getContext());
+                        keyContainer.setLayoutParams(params);
+                        keyContainer.addView(textButton);
 
-                button.setOnClickListener(v -> handleKeyPress(key));
+                        TextView cornerHintView = new TextView(getContext());
+                        FrameLayout.LayoutParams hintParams = new FrameLayout.LayoutParams(
+                                LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.END | Gravity.TOP);
+                        hintParams.setMargins(0, dpToPx(3), dpToPx(6), 0);
+                        cornerHintView.setLayoutParams(hintParams);
+                        cornerHintView.setText(key.cornerHint);
+                        cornerHintView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+                        cornerHintView.setTextColor(resolveThemeTextColor());
+                        cornerHintView.setTypeface(cornerHintView.getTypeface(), android.graphics.Typeface.BOLD);
+                        cornerHintView.setClickable(false);
+                        cornerHintView.setFocusable(false);
+                        keyContainer.addView(cornerHintView);
+                        cornerHintView.bringToFront();
 
-                // Add touch listener to handle key release on all buttons.
-                // Repeatable keys (e.g. BackSpace) must also send release, otherwise they can remain stuck.
-                button.setOnTouchListener((v, event) -> {
-                    int action = event.getAction();
-                    if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                        if (key.isRepeatable) {
-                            stopRepeatingDelete();
-                        }
-                        repeatHandler.postDelayed(() -> {
-                            sendReleaseData();
-                            Log.d(TAG, "Sent key release for: " + key.label);
-                        }, 30);
+                        button = keyContainer;
+                    } else {
+                        textButton.setLayoutParams(params);
+                        button = textButton;
                     }
-                    return false;
-                });
-
-                if (key.isRepeatable) {
-                    button.setOnLongClickListener(v -> {
-                        startRepeatingDelete(key);
-                        return true;
-                    });
+                    listenerTarget = textButton;
                 }
+
+                attachKeyListeners(listenerTarget, key);
                 rowLayout.addView(button);
             }
             addView(rowLayout);
@@ -711,20 +757,319 @@ public class CustomKeyboardView extends LinearLayout {
 
     /** Attaches click + touch + long-click listeners to a key view. */
     private void attachKeyListeners(View btn, Key key) {
-        btn.setOnClickListener(v -> handleKeyPress(key));
+        final boolean[] longPressConsumed = new boolean[]{false};
         btn.setOnTouchListener((v, event) -> {
-            int action = event.getAction();
-            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                if (key.isRepeatable) stopRepeatingDelete();
-                repeatHandler.postDelayed(() -> sendReleaseData(), 30);
+            int action = event.getActionMasked();
+            switch (action) {
+                case MotionEvent.ACTION_DOWN: {
+                    longPressConsumed[0] = false;
+                    performKeyHapticFeedback(v);
+                    if (shouldEnableAlternates(key)) {
+                        final float downRawX = event.getRawX();
+                        final float downRawY = event.getRawY();
+                        final Runnable openAlternates = () -> showAlternatesPopup(v, key, downRawX);
+                        v.setTag(openAlternates);
+                        longPressHandler.postDelayed(openAlternates, ALT_LONG_PRESS_TIMEOUT_MS);
+                    }
+                    return false;
+                }
+                case MotionEvent.ACTION_MOVE: {
+                    if (isAlternatePopupVisible()) {
+                        updateAlternateSelection(event.getRawX(), event.getRawY());
+                        return true;
+                    }
+                    return false;
+                }
+                case MotionEvent.ACTION_UP: {
+                    v.setPressed(false);
+                    Runnable pending = (Runnable) v.getTag();
+                    if (pending != null) {
+                        longPressHandler.removeCallbacks(pending);
+                        v.setTag(null);
+                    }
+                    if (isAlternatePopupVisible()) {
+                        commitCurrentAlternateSelection();
+                        dismissAlternatesPopup();
+                        repeatHandler.postDelayed(this::sendReleaseData, 30);
+                        return true;
+                    }
+                    if (key.isRepeatable) stopRepeatingDelete();
+                    if (!longPressConsumed[0] && isTouchInsideView(v, event)) {
+                        handleKeyPress(key);
+                    }
+                    repeatHandler.postDelayed(this::sendReleaseData, 30);
+                    return false;
+                }
+                case MotionEvent.ACTION_CANCEL: {
+                    v.setPressed(false);
+                    Runnable pending = (Runnable) v.getTag();
+                    if (pending != null) {
+                        longPressHandler.removeCallbacks(pending);
+                        v.setTag(null);
+                    }
+                    if (isAlternatePopupVisible()) {
+                        dismissAlternatesPopup();
+                        return true;
+                    }
+                    if (key.isRepeatable) stopRepeatingDelete();
+                    repeatHandler.postDelayed(this::sendReleaseData, 30);
+                    return false;
+                }
+                default:
+                    return false;
             }
-            return false;
         });
         if (key.isRepeatable) {
             btn.setOnLongClickListener(v -> {
+                longPressConsumed[0] = true;
                 startRepeatingDelete(key);
                 return true;
             });
+        }
+    }
+
+    private boolean isTouchInsideView(View view, MotionEvent event) {
+        float x = event.getX();
+        float y = event.getY();
+        return x >= 0 && x <= view.getWidth() && y >= 0 && y <= view.getHeight();
+    }
+
+    private boolean shouldEnableAlternates(Key key) {
+        if (key == null || key.isRepeatable || key.isTopPanelKey) {
+            return false;
+        }
+        if (key.code >= 0xE0 && key.code <= 0xE7) {
+            return false;
+        }
+        if (key.code >= 0xF001 && key.code <= 0xF004) {
+            return false;
+        }
+        if ("Space".equalsIgnoreCase(key.label) || "Enter".equalsIgnoreCase(key.label)) {
+            return false;
+        }
+        return key.label.length() == 1 || key.symbolLabel.length() == 1 || !TextUtils.isEmpty(key.alternates);
+    }
+
+    private boolean isAlternatePopupVisible() {
+        return alternatePopupWindow != null && alternatePopupWindow.isShowing();
+    }
+
+    private void showAlternatesPopup(View anchor, Key key, float initialRawX) {
+        List<AlternateOption> options = buildAlternateOptions(key);
+        if (options.size() < 2) {
+            return;
+        }
+
+        dismissAlternatesPopup();
+        alternateAnchorView = anchor;
+        currentAlternateOptions = options;
+        currentAlternateSelection = findDefaultAlternateSelection(options, key.label);
+
+        alternatePopupContainer = new LinearLayout(getContext());
+        alternatePopupContainer.setOrientation(LinearLayout.HORIZONTAL);
+        alternatePopupContainer.setBackgroundResource(R.drawable.function_button_background);
+        alternatePopupContainer.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
+
+        alternateOptionViews.clear();
+        for (AlternateOption option : options) {
+            TextView optionView = new TextView(getContext());
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+            p.setMargins(dpToPx(2), 0, dpToPx(2), 0);
+            optionView.setLayoutParams(p);
+            optionView.setText(option.display);
+            optionView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+            optionView.setPadding(dpToPx(8), dpToPx(5), dpToPx(8), dpToPx(5));
+            optionView.setTextColor(resolveThemeTextColor());
+            alternatePopupContainer.addView(optionView);
+            alternateOptionViews.add(optionView);
+        }
+
+        highlightAlternateSelection(currentAlternateSelection);
+
+        alternatePopupWindow = new PopupWindow(alternatePopupContainer,
+                LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, false);
+        alternatePopupWindow.setOutsideTouchable(false);
+        alternatePopupWindow.setClippingEnabled(true);
+        alternatePopupContainer.measure(
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        );
+        anchor.post(() -> {
+            int[] loc = new int[2];
+            anchor.getLocationOnScreen(loc);
+            int popupX = (int) (loc[0] + (anchor.getWidth() / 2f) - (alternatePopupContainer.getMeasuredWidth() / 2f));
+            int popupY = loc[1] - dpToPx(52);
+            alternatePopupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY, popupX, popupY);
+            updateAlternateSelection(initialRawX, loc[1]);
+        });
+    }
+
+    private List<AlternateOption> buildAlternateOptions(Key key) {
+        LinkedHashSet<String> labels = new LinkedHashSet<>();
+        if (!TextUtils.isEmpty(key.symbolLabel) && key.symbolLabel.length() == 1) {
+            labels.add(key.symbolLabel);
+        }
+        if (!TextUtils.isEmpty(key.label) && key.label.length() == 1) {
+            labels.add(key.label);
+        }
+        if (!TextUtils.isEmpty(key.alternates)) {
+            String[] extra = key.alternates.split(",");
+            for (String token : extra) {
+                String trimmed = token.trim();
+                if (trimmed.length() == 1) {
+                    labels.add(trimmed);
+                }
+            }
+        }
+
+        List<AlternateOption> result = new ArrayList<>();
+        for (String label : labels) {
+            AlternateOption mapped = mapAsciiAlternate(label);
+            if (mapped != null) {
+                result.add(mapped);
+            }
+        }
+        return result;
+    }
+
+    private int findDefaultAlternateSelection(List<AlternateOption> options, String baseLabel) {
+        for (int i = 0; i < options.size(); i++) {
+            if (options.get(i).display.equals(baseLabel)) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    private void updateAlternateSelection(float rawX, float rawY) {
+        if (alternatePopupContainer == null || currentAlternateOptions.isEmpty()) {
+            return;
+        }
+        int[] loc = new int[2];
+        alternatePopupContainer.getLocationOnScreen(loc);
+        float localX = rawX - loc[0];
+        float localY = rawY - loc[1];
+        if (localY < -dpToPx(ALT_CANCEL_VERTICAL_DP) || localY > alternatePopupContainer.getHeight() + dpToPx(ALT_CANCEL_VERTICAL_DP)) {
+            currentAlternateSelection = -1;
+            highlightAlternateSelection(-1);
+            return;
+        }
+        int nextIndex = -1;
+        for (int i = 0; i < alternateOptionViews.size(); i++) {
+            View option = alternateOptionViews.get(i);
+            if (localX >= option.getLeft() && localX <= option.getRight()) {
+                nextIndex = i;
+                break;
+            }
+        }
+        if (nextIndex == -1 && !alternateOptionViews.isEmpty()) {
+            if (localX < alternateOptionViews.get(0).getLeft()) {
+                nextIndex = 0;
+            } else if (localX > alternateOptionViews.get(alternateOptionViews.size() - 1).getRight()) {
+                nextIndex = alternateOptionViews.size() - 1;
+            }
+        }
+        currentAlternateSelection = nextIndex;
+        highlightAlternateSelection(nextIndex);
+    }
+
+    private void highlightAlternateSelection(int selectedIndex) {
+        for (int i = 0; i < alternateOptionViews.size(); i++) {
+            TextView view = alternateOptionViews.get(i);
+            if (i == selectedIndex) {
+                view.setBackgroundResource(R.drawable.press_button_background);
+            } else {
+                view.setBackgroundResource(android.R.color.transparent);
+            }
+        }
+    }
+
+    private void commitCurrentAlternateSelection() {
+        if (currentAlternateSelection < 0 || currentAlternateSelection >= currentAlternateOptions.size()) {
+            return;
+        }
+        sendAlternateOption(currentAlternateOptions.get(currentAlternateSelection));
+    }
+
+    private void sendAlternateOption(AlternateOption option) {
+        int combinedValue = 0;
+        combinedValue += isCtrlLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Ctrl")) : 0;
+        combinedValue += isShiftLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift")) : 0;
+        combinedValue += isAltLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Alt")) : 0;
+        combinedValue += isWinLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Win")) : 0;
+        if (option.requiresShift) {
+            combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift"));
+        }
+        sendKeyData(combinedValue, option.keyCode);
+    }
+
+    private void dismissAlternatesPopup() {
+        if (alternatePopupWindow != null) {
+            alternatePopupWindow.dismiss();
+            alternatePopupWindow = null;
+        }
+        if (alternateAnchorView != null) {
+            alternateAnchorView.setPressed(false);
+            alternateAnchorView = null;
+        }
+        alternatePopupContainer = null;
+        alternateOptionViews.clear();
+        currentAlternateOptions = new ArrayList<>();
+        currentAlternateSelection = -1;
+    }
+
+    private void performKeyHapticFeedback(View view) {
+        if (view == null || getContext() == null) {
+            return;
+        }
+        boolean enabled = PreferenceManager.getDefaultSharedPreferences(getContext())
+                .getBoolean("haptic_feedback", true);
+        if (!enabled) {
+            return;
+        }
+        view.performHapticFeedback(
+                HapticFeedbackConstants.KEYBOARD_TAP,
+                HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+        );
+    }
+
+    private AlternateOption mapAsciiAlternate(String token) {
+        if (TextUtils.isEmpty(token) || token.length() != 1) {
+            return null;
+        }
+        char c = token.charAt(0);
+        if (c >= 'a' && c <= 'z') {
+            return new AlternateOption(token, 0x04 + (c - 'a'), false);
+        }
+        if (c >= 'A' && c <= 'Z') {
+            return new AlternateOption(token, 0x04 + (c - 'A'), true);
+        }
+        switch (c) {
+            case '1': return new AlternateOption(token, 0x1E, false);
+            case '2': return new AlternateOption(token, 0x1F, false);
+            case '3': return new AlternateOption(token, 0x20, false);
+            case '4': return new AlternateOption(token, 0x21, false);
+            case '5': return new AlternateOption(token, 0x22, false);
+            case '6': return new AlternateOption(token, 0x23, false);
+            case '7': return new AlternateOption(token, 0x24, false);
+            case '8': return new AlternateOption(token, 0x25, false);
+            case '9': return new AlternateOption(token, 0x26, false);
+            case '0': return new AlternateOption(token, 0x27, false);
+            case '-': return new AlternateOption(token, 0x2D, false);
+            case '_': return new AlternateOption(token, 0x2D, true);
+            case '=': return new AlternateOption(token, 0x2E, false);
+            case '+': return new AlternateOption(token, 0x2E, true);
+            case ',': return new AlternateOption(token, 0x36, false);
+            case '<': return new AlternateOption(token, 0x36, true);
+            case '.': return new AlternateOption(token, 0x37, false);
+            case '>': return new AlternateOption(token, 0x37, true);
+            case '/': return new AlternateOption(token, 0x38, false);
+            case '?': return new AlternateOption(token, 0x38, true);
+            case ';': return new AlternateOption(token, 0x33, false);
+            case ':': return new AlternateOption(token, 0x33, true);
+            case '\'': return new AlternateOption(token, 0x34, false);
+            case '"': return new AlternateOption(token, 0x34, true);
+            default: return null;
         }
     }
 
@@ -1122,6 +1467,7 @@ public class CustomKeyboardView extends LinearLayout {
                         return true;
                     }
                     if (event.getActionMasked() == MotionEvent.ACTION_UP && key != null) {
+                        performKeyHapticFeedback(v);
                         v.performClick();
                         handleKeyPress(key);
                         repeatHandler.postDelayed(this::sendReleaseData, 30);
@@ -1392,6 +1738,9 @@ public class CustomKeyboardView extends LinearLayout {
 
             textButton.setOnClickListener(v -> handleKeyPress(key));
             textButton.setOnTouchListener((v, event) -> {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    performKeyHapticFeedback(v);
+                }
                 if (event.getAction() == MotionEvent.ACTION_UP) {
                     repeatHandler.postDelayed(() -> {
                         sendReleaseData();
@@ -1641,6 +1990,8 @@ public class CustomKeyboardView extends LinearLayout {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        longPressHandler.removeCallbacksAndMessages(null);
+        dismissAlternatesPopup();
         if (isServiceBound) {
             getContext().unbindService(serviceConnection);
             isServiceBound = false;
