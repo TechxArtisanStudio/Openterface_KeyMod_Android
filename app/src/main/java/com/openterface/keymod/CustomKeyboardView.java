@@ -879,8 +879,8 @@ public class CustomKeyboardView extends LinearLayout {
 
         alternatePopupContainer = new LinearLayout(getContext());
         alternatePopupContainer.setOrientation(LinearLayout.HORIZONTAL);
-        alternatePopupContainer.setBackgroundResource(R.drawable.function_button_background);
-        alternatePopupContainer.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
+        alternatePopupContainer.setBackgroundResource(R.drawable.alternate_popup_background);
+        alternatePopupContainer.setPadding(dpToPx(6), dpToPx(6), dpToPx(6), dpToPx(6));
 
         alternateOptionViews.clear();
         for (AlternateOption option : options) {
@@ -902,6 +902,9 @@ public class CustomKeyboardView extends LinearLayout {
                 LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, false);
         alternatePopupWindow.setOutsideTouchable(false);
         alternatePopupWindow.setClippingEnabled(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            alternatePopupWindow.setElevation(dpToPx(12));
+        }
         alternatePopupContainer.measure(
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
@@ -1006,7 +1009,7 @@ public class CustomKeyboardView extends LinearLayout {
         for (int i = 0; i < alternateOptionViews.size(); i++) {
             TextView view = alternateOptionViews.get(i);
             if (i == selectedIndex) {
-                view.setBackgroundResource(R.drawable.press_button_background);
+                view.setBackgroundResource(R.drawable.alternate_popup_option_selected_background);
             } else {
                 view.setBackgroundResource(android.R.color.transparent);
             }

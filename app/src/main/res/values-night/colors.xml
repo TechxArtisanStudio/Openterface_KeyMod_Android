@@ -22,7 +22,7 @@
     <!-- Keyboard Colors (Dark) -->
     <color name="key_bg_normal">#FF3A3A3C</color>
     <color name="key_bg_function">#FF4A4A4E</color>
-    <color name="key_bg_pressed">#FF6A7EA3</color>
+    <color name="key_bg_pressed">#FF6B3A0A</color>
     <color name="key_border">#FF5A5A5F</color>
     <color name="key_text">#FFFFFFFF</color>
 

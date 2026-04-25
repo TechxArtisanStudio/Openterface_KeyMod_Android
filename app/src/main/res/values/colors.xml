@@ -117,7 +117,7 @@
     <!-- Keyboard Colors (Light) -->
     <color name="key_bg_normal">#FFFFFFFF</color>
     <color name="key_bg_function">#FFE9E9EC</color>
-    <color name="key_bg_pressed">#FFBFD6F8</color>
+    <color name="key_bg_pressed">#FFFFE0B2</color>
     <color name="key_border">#FF9A9AA0</color>
     <color name="key_text">#FF1F1F24</color>
 </resources>
