@@ -2047,6 +2047,9 @@ public class CustomKeyboardView extends LinearLayout {
                         };
                         longPressHandler.postDelayed(pendingModeLongPress[0], ALT_LONG_PRESS_TIMEOUT_MS);
                     }
+                    if (key != null) {
+                        v.setPressed(true);
+                    }
                     return true;
                 case MotionEvent.ACTION_MOVE:
                     float dx = event.getRawX() - startX[0];
@@ -2055,6 +2058,9 @@ public class CustomKeyboardView extends LinearLayout {
                     // when the user is clearly horizontal-swipe paging the strip.
                     if (!isDragging[0] && Math.abs(dx) > touchSlop && Math.abs(dx) > Math.abs(dy)) {
                         isDragging[0] = true;
+                        if (key != null) {
+                            v.setPressed(false);
+                        }
                         if (pendingModeLongPress[0] != null) {
                             longPressHandler.removeCallbacks(pendingModeLongPress[0]);
                             pendingModeLongPress[0] = null;
@@ -2066,6 +2072,9 @@ public class CustomKeyboardView extends LinearLayout {
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                 case MotionEvent.ACTION_UP:
+                    if (key != null) {
+                        v.setPressed(false);
+                    }
                     if (pendingModeLongPress[0] != null) {
                         longPressHandler.removeCallbacks(pendingModeLongPress[0]);
                         pendingModeLongPress[0] = null;
