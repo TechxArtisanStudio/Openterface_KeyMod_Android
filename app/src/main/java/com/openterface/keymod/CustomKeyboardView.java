@@ -2002,15 +2002,15 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     /**
-     * Row-height ratio target for extra grid after removing the top two navigation rows:
-     * total(row0-row1) : total(row2-row6) = 1 : 2
-     * -> top rows weight=1.0 each, bottom rows weight=0.8 each.
+     * Row-height ratio for extra numpad grid (1-based UI rows 1–2 vs 3–7 map to row indices 0–1 vs 2–6):
+     * total(row0–row1) : total(row2–row6) = 1 : 5
+     * -> top two rows weight 0.5 each; lower rows weight 1.0 each.
      */
     private float getExtraGridRowSpanWeight(int row, int rowSpan) {
         float total = 0f;
         for (int i = 0; i < rowSpan; i++) {
             int r = row + i;
-            total += r <= 1 ? 1.0f : 0.8f;
+            total += r <= 1 ? 0.5f : 1.0f;
         }
         return total;
     }
