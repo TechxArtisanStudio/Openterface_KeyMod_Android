@@ -1,6 +1,8 @@
 package com.openterface.keymod;
 
 import android.Manifest;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -9,12 +11,12 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
+import android.graphics.PorterDuff;
 import android.graphics.drawable.ColorDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CheckBox;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -53,7 +55,6 @@ public class ConnectionDialogFragment extends DialogFragment {
     private ImageView bluetoothSignal;
     private CheckBox autoConnectCheckbox;
     private TextView lastConnectedInfo;
-    private ImageButton closeButton;
 
     public interface ConnectionDialogListener {
         void onConnectionChanged(ConnectionManager.ConnectionType type, ConnectionManager.ConnectionState state);
@@ -101,6 +102,7 @@ public class ConnectionDialogFragment extends DialogFragment {
         super.onCreate(savedInstanceState);
         // Use app theme so light/dark mode is applied automatically.
         setStyle(DialogFragment.STYLE_NORMAL, 0);
+        setCancelable(true);
     }
 
     @Override
@@ -108,6 +110,7 @@ public class ConnectionDialogFragment extends DialogFragment {
         super.onStart();
         // Set dialog width and transparent window background so rounded corners render cleanly.
         if (getDialog() != null && getDialog().getWindow() != null) {
+            getDialog().setCanceledOnTouchOutside(true);
             int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.9);
             getDialog().getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
             getDialog().getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
@@ -141,7 +144,6 @@ public class ConnectionDialogFragment extends DialogFragment {
         bluetoothSignal = view.findViewById(R.id.bluetooth_signal);
         autoConnectCheckbox = view.findViewById(R.id.auto_connect_checkbox);
         lastConnectedInfo = view.findViewById(R.id.last_connected_info);
-        closeButton = view.findViewById(R.id.close_button);
 
         // Set initial auto-connect state
         if (connectionManager != null) {
@@ -150,8 +152,6 @@ public class ConnectionDialogFragment extends DialogFragment {
     }
 
     private void setupListeners() {
-        closeButton.setOnClickListener(v -> dismiss());
-
         usbCard.setOnClickListener(v -> {
             Log.d(TAG, "USB card clicked");
             Toast.makeText(requireContext(), "USB card clicked", Toast.LENGTH_SHORT).show();
@@ -367,18 +367,21 @@ public class ConnectionDialogFragment extends DialogFragment {
         boolean isUsbConnected = connectionManager.getCurrentConnectionType() == ConnectionManager.ConnectionType.USB &&
                                 connectionManager.getCurrentConnectionState() == ConnectionManager.ConnectionState.CONNECTED;
 
+        int connected = ContextCompat.getColor(requireContext(), R.color.connected);
+        int idle = ContextCompat.getColor(requireContext(), R.color.text_secondary);
+
         if (isUsbConnected) {
             usbStatus.setText(R.string.connected);
-            usbStatusIcon.setImageResource(R.drawable.ic_connection_connected);
-            usbStatusIcon.setColorFilter(ContextCompat.getColor(requireContext(), R.color.connected));
+            usbStatusIcon.setImageResource(R.drawable.ic_usb_24);
+            usbStatusIcon.setColorFilter(connected, PorterDuff.Mode.SRC_IN);
             if (usbSignal != null) {
                 usbSignal.setVisibility(View.VISIBLE);
-                usbSignal.setColorFilter(ContextCompat.getColor(requireContext(), R.color.connected));
+                usbSignal.setColorFilter(connected, PorterDuff.Mode.SRC_IN);
             }
         } else {
             usbStatus.setText(R.string.not_connected);
-            usbStatusIcon.setImageResource(R.drawable.ic_connection_disconnected);
-            usbStatusIcon.setColorFilter(ContextCompat.getColor(requireContext(), R.color.text_secondary));
+            usbStatusIcon.setImageResource(R.drawable.ic_usb_off_24);
+            usbStatusIcon.setColorFilter(idle, PorterDuff.Mode.SRC_IN);
             if (usbSignal != null) usbSignal.setVisibility(View.GONE);
         }
     }
@@ -386,22 +389,34 @@ public class ConnectionDialogFragment extends DialogFragment {
     private void updateBluetoothStatus() {
         if (connectionManager == null) return;
 
+        BluetoothManager btMgr = (BluetoothManager) requireContext().getSystemService(Context.BLUETOOTH_SERVICE);
+        BluetoothAdapter adapter = btMgr != null ? btMgr.getAdapter() : null;
+        boolean btOff = adapter == null || !adapter.isEnabled();
+
         boolean isBluetoothConnected = connectionManager.getCurrentConnectionType() == ConnectionManager.ConnectionType.BLUETOOTH &&
                                       connectionManager.getCurrentConnectionState() == ConnectionManager.ConnectionState.CONNECTED;
 
-        if (isBluetoothConnected) {
+        int connected = ContextCompat.getColor(requireContext(), R.color.connected);
+        int idle = ContextCompat.getColor(requireContext(), R.color.text_secondary);
+
+        if (btOff) {
+            bluetoothStatus.setText(R.string.not_connected);
+            bluetoothStatusIcon.setImageResource(R.drawable.ic_bluetooth_disabled_24);
+            bluetoothStatusIcon.setColorFilter(idle, PorterDuff.Mode.SRC_IN);
+            if (bluetoothSignal != null) bluetoothSignal.setVisibility(View.GONE);
+        } else if (isBluetoothConnected) {
             String deviceName = connectionManager.getLastBleDeviceName();
             bluetoothStatus.setText(deviceName != null ? deviceName : getString(R.string.connected));
-            bluetoothStatusIcon.setImageResource(R.drawable.ic_bluetooth);
-            bluetoothStatusIcon.setColorFilter(ContextCompat.getColor(requireContext(), R.color.connected));
+            bluetoothStatusIcon.setImageResource(R.drawable.ic_bluetooth_connected_24);
+            bluetoothStatusIcon.setColorFilter(connected, PorterDuff.Mode.SRC_IN);
             if (bluetoothSignal != null) {
                 bluetoothSignal.setVisibility(View.VISIBLE);
-                bluetoothSignal.setColorFilter(ContextCompat.getColor(requireContext(), R.color.connected));
+                bluetoothSignal.setColorFilter(connected, PorterDuff.Mode.SRC_IN);
             }
         } else {
             bluetoothStatus.setText(R.string.not_connected);
-            bluetoothStatusIcon.setImageResource(R.drawable.ic_bluetooth);
-            bluetoothStatusIcon.setColorFilter(ContextCompat.getColor(requireContext(), R.color.text_secondary));
+            bluetoothStatusIcon.setImageResource(R.drawable.ic_bluetooth_24);
+            bluetoothStatusIcon.setColorFilter(idle, PorterDuff.Mode.SRC_IN);
             if (bluetoothSignal != null) bluetoothSignal.setVisibility(View.GONE);
         }
     }

@@ -11,6 +11,7 @@ import android.text.style.StyleSpan;
 import androidx.core.content.ContextCompat;
 
 import com.openterface.keymod.R;
+import com.openterface.keymod.ThemeManager;
 
 /**
  * Rich text for the on-pad status overlay and gesture help overlay.
@@ -43,7 +44,7 @@ public final class TouchPadTipsFormatter {
         SpannableStringBuilder ssb = new SpannableStringBuilder(full);
         int primary = ContextCompat.getColor(context, R.color.text_primary);
         int secondary = ContextCompat.getColor(context, R.color.text_secondary);
-        int accent = ContextCompat.getColor(context, R.color.primary);
+        int accent = ThemeManager.getColorPrimary(context);
 
         int titleEnd = title.length();
         ssb.setSpan(new StyleSpan(Typeface.BOLD), 0, titleEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);

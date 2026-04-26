@@ -3,8 +3,10 @@ package com.openterface.keymod;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.TypedValue;
 
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
 /**
@@ -66,6 +68,29 @@ public final class ThemeManager {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         String family = prefs.getString(PREF_THEME_COLOR_FAMILY, FAMILY_ORANGE);
         return resolveTheme(family);
+    }
+
+    /**
+     * Resolves a theme color attribute (e.g. {@link android.R.attr#colorPrimary}) from the
+     * context's current theme — matches General Settings color family + light/dark.
+     */
+    public static int resolveThemeColor(Context context, int attrId, int fallbackArgb) {
+        TypedValue typedValue = new TypedValue();
+        if (context.getTheme().resolveAttribute(attrId, typedValue, true)) {
+            if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT
+                    && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
+                return typedValue.data;
+            }
+        }
+        return fallbackArgb;
+    }
+
+    /** Material / app theme primary accent (Orange, Blue, … per user setting). */
+    public static int getColorPrimary(Context context) {
+        return resolveThemeColor(
+                context,
+                android.R.attr.colorPrimary,
+                ContextCompat.getColor(context, R.color.primary));
     }
 
     private static int resolveTheme(String family) {

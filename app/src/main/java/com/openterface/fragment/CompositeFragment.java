@@ -1,30 +1,42 @@
 package com.openterface.fragment;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.AnimatorSet;
+import android.animation.ValueAnimator;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.res.Configuration;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.LinearInterpolator;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.graphics.ColorUtils;
 import androidx.fragment.app.Fragment;
 
 import com.openterface.keymod.BluetoothService;
 import com.openterface.keymod.CustomKeyboardView;
 import com.openterface.keymod.MainActivity;
 import com.openterface.keymod.R;
+import com.openterface.keymod.ThemeManager;
 import com.openterface.keymod.TouchPadView;
 import com.openterface.keymod.util.TouchPadHaptics;
 import com.openterface.keymod.util.TouchPadHelpOverlay;
@@ -40,6 +52,12 @@ import java.util.List;
 public class CompositeFragment extends Fragment {
 
     private static final String TAG = "CompositeFragment";
+    private static final float TOUCHPAD_WASH_HEIGHT_RATIO = 0.32f;
+    private static final float TOUCHPAD_WASH_CLICK_PEAK_INTENSITY = 0.20f;
+    private static final float TOUCHPAD_WASH_DRAG_BASE_INTENSITY = 0.12f;
+    private static final long TOUCHPAD_WASH_CLICK_FADE_IN_MS = 70L;
+    private static final long TOUCHPAD_WASH_CLICK_FADE_OUT_MS = 460L;
+    private static final long TOUCHPAD_WASH_DRAG_OFF_FADE_OUT_MS = 340L;
     private CustomKeyboardView keyboardView;
     private TouchPadView touchPad;
     private LinearLayout rootLayout;
@@ -68,6 +86,11 @@ public class CompositeFragment extends Fragment {
     private static final long POINTER_IDLE_AFTER_MS = 400L;
     private final Handler tipHandler = new Handler(Looper.getMainLooper());
     private TouchPadPointerPhase pointerPhase = TouchPadPointerPhase.IDLE;
+    private View touchPadBottomWashOverlay;
+    private View splitTouchPadBottomWashOverlay;
+    private int touchPadWashColor = Color.TRANSPARENT;
+    private float currentTouchPadWashIntensity = 0f;
+    private AnimatorSet touchPadButtonPulseAnimator;
     private final Runnable pointerIdleRunnable =
             () -> {
                 pointerPhase = TouchPadPointerPhase.IDLE;
@@ -166,11 +189,147 @@ public class CompositeFragment extends Fragment {
     }
 
     private void setDragMode(boolean enabled) {
+        cancelTouchPadButtonPulseAnimation();
         isDragMode = enabled;
         sendMouseButtonState(enabled ? 0x01 : 0x00);
+        if (enabled) {
+            applyBottomWashIntensity(TOUCHPAD_WASH_DRAG_BASE_INTENSITY);
+        } else {
+            animateBottomWashIntensityTo(0f, TOUCHPAD_WASH_DRAG_OFF_FADE_OUT_MS, new DecelerateInterpolator());
+        }
         updateTouchPadTips();
         updateSplitTouchPadTips();
         Log.d(TAG, "Drag mode " + (enabled ? "ON" : "OFF"));
+    }
+
+    private void initTouchPadWashStyle() {
+        int accent = ThemeManager.getColorPrimary(requireContext());
+        touchPadWashColor = ColorUtils.setAlphaComponent(accent, 0x88);
+    }
+
+    private View ensureBottomWashOverlayForPad(TouchPadView pad, View existingOverlay) {
+        if (pad == null) return null;
+        ViewParent parentRef = pad.getParent();
+        if (!(parentRef instanceof ViewGroup)) return null;
+        ViewGroup parent = (ViewGroup) parentRef;
+        if (!(parent instanceof FrameLayout)) return null;
+
+        View overlay = existingOverlay;
+        if (overlay == null) {
+            overlay = new View(requireContext());
+            overlay.setClickable(false);
+            overlay.setFocusable(false);
+            GradientDrawable washDrawable = new GradientDrawable(
+                    GradientDrawable.Orientation.BOTTOM_TOP,
+                    new int[] {touchPadWashColor, Color.TRANSPARENT});
+            overlay.setBackground(washDrawable);
+        } else {
+            ViewParent existingParent = overlay.getParent();
+            if (existingParent instanceof ViewGroup && existingParent != parent) {
+                ((ViewGroup) existingParent).removeView(overlay);
+            }
+        }
+
+        if (overlay.getParent() == null) {
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    1,
+                    Gravity.BOTTOM);
+            parent.addView(overlay, lp);
+        }
+
+        View finalOverlay = overlay;
+        pad.post(() -> {
+            ViewGroup.LayoutParams params = finalOverlay.getLayoutParams();
+            int washHeight = Math.max(1, Math.round(pad.getHeight() * TOUCHPAD_WASH_HEIGHT_RATIO));
+            if (params != null && params.height != washHeight) {
+                params.height = washHeight;
+                finalOverlay.setLayoutParams(params);
+            }
+            applyBottomWashIntensity(isDragMode ? TOUCHPAD_WASH_DRAG_BASE_INTENSITY : 0f);
+        });
+        return overlay;
+    }
+
+    private void setupBottomWashOverlays() {
+        touchPadBottomWashOverlay = ensureBottomWashOverlayForPad(touchPad, touchPadBottomWashOverlay);
+        splitTouchPadBottomWashOverlay = ensureBottomWashOverlayForPad(splitTouchPad, splitTouchPadBottomWashOverlay);
+    }
+
+    private void applyBottomWashIntensity(float intensity) {
+        currentTouchPadWashIntensity = Math.max(0f, Math.min(1f, intensity));
+        if (touchPadBottomWashOverlay != null) {
+            touchPadBottomWashOverlay.setAlpha(currentTouchPadWashIntensity);
+        }
+        if (splitTouchPadBottomWashOverlay != null) {
+            splitTouchPadBottomWashOverlay.setAlpha(currentTouchPadWashIntensity);
+        }
+    }
+
+    private void animateBottomWashIntensityTo(float target, long durationMs, android.animation.TimeInterpolator interpolator) {
+        float clampedTarget = Math.max(0f, Math.min(1f, target));
+        ValueAnimator animator = ValueAnimator.ofFloat(currentTouchPadWashIntensity, clampedTarget);
+        animator.setDuration(durationMs);
+        animator.setInterpolator(interpolator);
+        animator.addUpdateListener(a -> applyBottomWashIntensity((float) a.getAnimatedValue()));
+        AnimatorSet set = new AnimatorSet();
+        set.play(animator);
+        set.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                touchPadButtonPulseAnimator = null;
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                touchPadButtonPulseAnimator = null;
+            }
+        });
+        touchPadButtonPulseAnimator = set;
+        set.start();
+    }
+
+    private void cancelTouchPadButtonPulseAnimation() {
+        if (touchPadButtonPulseAnimator != null) {
+            touchPadButtonPulseAnimator.cancel();
+            touchPadButtonPulseAnimator = null;
+        }
+    }
+
+    private void pulseTouchPadButtonVisual() {
+        if (touchPadBottomWashOverlay == null && splitTouchPadBottomWashOverlay == null) return;
+        cancelTouchPadButtonPulseAnimation();
+        final float rest = isDragMode ? TOUCHPAD_WASH_DRAG_BASE_INTENSITY : 0f;
+        final float peak = Math.max(rest, TOUCHPAD_WASH_CLICK_PEAK_INTENSITY);
+
+        ValueAnimator fadeIn = ValueAnimator.ofFloat(rest, peak);
+        fadeIn.setDuration(TOUCHPAD_WASH_CLICK_FADE_IN_MS);
+        fadeIn.setInterpolator(new LinearInterpolator());
+        fadeIn.addUpdateListener(a -> applyBottomWashIntensity((float) a.getAnimatedValue()));
+
+        ValueAnimator fadeOut = ValueAnimator.ofFloat(peak, rest);
+        fadeOut.setDuration(TOUCHPAD_WASH_CLICK_FADE_OUT_MS);
+        fadeOut.setInterpolator(new DecelerateInterpolator());
+        fadeOut.addUpdateListener(a -> applyBottomWashIntensity((float) a.getAnimatedValue()));
+
+        AnimatorSet set = new AnimatorSet();
+        set.playSequentially(fadeIn, fadeOut);
+        set.addListener(
+                new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        touchPadButtonPulseAnimator = null;
+                        applyBottomWashIntensity(rest);
+                    }
+
+                    @Override
+                    public void onAnimationCancel(Animator animation) {
+                        touchPadButtonPulseAnimator = null;
+                        applyBottomWashIntensity(isDragMode ? TOUCHPAD_WASH_DRAG_BASE_INTENSITY : 0f);
+                    }
+                });
+        touchPadButtonPulseAnimator = set;
+        set.start();
     }
 
     private void updateTouchPadTips() {
@@ -364,6 +523,7 @@ public class CompositeFragment extends Fragment {
         // Bind to BluetoothService
         Intent intent = new Intent(requireContext(), BluetoothService.class);
         requireContext().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+        initTouchPadWashStyle();
 
         // Create container to swap between normal and split layouts
         contentContainer = new FrameLayout(requireContext());
@@ -401,6 +561,21 @@ public class CompositeFragment extends Fragment {
     @Override
     public void onDestroyView() {
         tipHandler.removeCallbacks(pointerIdleRunnable);
+        cancelTouchPadButtonPulseAnimation();
+        if (touchPadBottomWashOverlay != null) {
+            ViewParent parent = touchPadBottomWashOverlay.getParent();
+            if (parent instanceof ViewGroup) {
+                ((ViewGroup) parent).removeView(touchPadBottomWashOverlay);
+            }
+            touchPadBottomWashOverlay = null;
+        }
+        if (splitTouchPadBottomWashOverlay != null) {
+            ViewParent parent = splitTouchPadBottomWashOverlay.getParent();
+            if (parent instanceof ViewGroup) {
+                ((ViewGroup) parent).removeView(splitTouchPadBottomWashOverlay);
+            }
+            splitTouchPadBottomWashOverlay = null;
+        }
         super.onDestroyView();
         if (requireActivity() instanceof MainActivity) {
             for (MainActivity.OnTargetOsChangeListener listener : osChangeListeners) {
@@ -435,6 +610,7 @@ public class CompositeFragment extends Fragment {
         toggleHandlePill = view.findViewById(R.id.toggle_handle_pill);
         touchPadTips = view.findViewById(R.id.touchPadTips);
         touchPadHelpOverlay = view.findViewById(R.id.touchPadHelpOverlay);
+        setupBottomWashOverlays();
         updateTouchPadTips();
     }
 
@@ -450,6 +626,7 @@ public class CompositeFragment extends Fragment {
         splitTouchPadTips = view.findViewById(R.id.touchPadTips);
         splitTouchPadHelpOverlay = view.findViewById(R.id.touchPadHelpOverlay);
         View splitToggleHandle = view.findViewById(R.id.toggle_handle);
+        setupBottomWashOverlays();
 
         if (splitTouchPadTips != null) {
             updateSplitTouchPadTips();
@@ -527,6 +704,7 @@ public class CompositeFragment extends Fragment {
                     setDragMode(false);
                     return;
                 }
+                pulseTouchPadButtonVisual();
                 TouchPadHaptics.onLeftClick(pad.getContext());
                 new Thread(() -> {
                     try {
@@ -552,6 +730,7 @@ public class CompositeFragment extends Fragment {
                     setDragMode(false);
                     return;
                 }
+                pulseTouchPadButtonVisual();
                 TouchPadHaptics.onDoubleClick(pad.getContext());
                 new Thread(() -> {
                     try {
@@ -559,6 +738,7 @@ public class CompositeFragment extends Fragment {
                         clickData += makeChecksum(clickData);
                         byte[] bytes = hexStringToByteArray(clickData);
                         for (int i = 0; i < 2; i++) {
+                            tipHandler.post(CompositeFragment.this::pulseTouchPadButtonVisual);
                             if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
                                 bluetoothService.sendData(bytes);
                             } else if (port != null) {
@@ -576,6 +756,7 @@ public class CompositeFragment extends Fragment {
 
             @Override
             public void onTouchRightClick() {
+                pulseTouchPadButtonVisual();
                 TouchPadHaptics.onRightClick(pad.getContext());
                 new Thread(() -> {
                     try {

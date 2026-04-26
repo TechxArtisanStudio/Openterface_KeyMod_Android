@@ -8,6 +8,8 @@ import android.widget.CheckBox;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
@@ -23,6 +25,9 @@ public class LaunchPanelActivity extends AppCompatActivity {
     private static final String REMEMBER_CHOICE_KEY = "rememberChoice";
     private static final String LAST_MODE_KEY = "lastMode";
     public static final String SHOW_PANEL = "show_panel";
+
+    private static final String STATE_SELECTED_MODE = "state_selected_mode";
+    private static final String STATE_REMEMBER_CHECKED = "state_remember_checked";
 
     // Mode constants
     public static final String MODE_KEYBOARD_MOUSE = "keyboard_mouse";
@@ -50,7 +55,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
     private CardView presentationCard;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         ThemeManager.applyTheme(this);
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
@@ -71,8 +76,22 @@ public class LaunchPanelActivity extends AppCompatActivity {
         getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.background_light));
 
         initializeViews();
+        if (savedInstanceState != null) {
+            selectedMode = savedInstanceState.getString(STATE_SELECTED_MODE, MODE_KEYBOARD_MOUSE);
+            rememberChoiceCheckBox.setChecked(
+                savedInstanceState.getBoolean(STATE_REMEMBER_CHECKED, false));
+        }
         setupClickListeners();
         updateCardSelections();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(STATE_SELECTED_MODE, selectedMode);
+        if (rememberChoiceCheckBox != null) {
+            outState.putBoolean(STATE_REMEMBER_CHECKED, rememberChoiceCheckBox.isChecked());
+        }
     }
 
     private void initializeViews() {
