@@ -1459,20 +1459,20 @@ public class CustomKeyboardView extends LinearLayout {
         keys.add(new Key("UP",     "", 0x52, "52", 1f, R.drawable.keyboard_arrow_up_24, 0f, false, false, -1, true));
         keys.add(new Key("UNDO",   "", 0x1D, "1D", 1f, R.drawable.undo_24, 0f, false, false, primaryModifier, true));
 
-        keys.add(new Key("PH1",    "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH2",    "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH3",    "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("TAB",    "", 0x2B, "2B", 1f, R.drawable.keyboard_tab_24, 0f, false, false, -1, true));
+        keys.add(new Key("HOME",   "", 0x4A, "4A", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("END",    "", 0x4D, "4D", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PGUP",   "", 0x4B, "4B", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PGDN",   "", 0x4E, "4E", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("LEFT",   "", 0x50, "50", 1f, R.drawable.keyboard_arrow_left_24, 0f, false, false, -1, true));
         keys.add(new Key("DOWN",   "", 0x51, "51", 1f, R.drawable.keyboard_arrow_down_24, 0f, false, false, -1, true));
         keys.add(new Key("RIGHT",  "", 0x4F, "4F", 1f, R.drawable.keyboard_arrow_right_24, 0f, false, false, -1, true));
         keys.add(new Key("ESC",    "", 0x29, "29", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("CTRL",   "", 0xE0, "E0", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("ALT",    "", 0xE2, "E2", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("HOME",   "", 0x4A, "4A", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("END",    "", 0x4D, "4D", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PGUP",   "", 0x4B, "4B", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PGDN",   "", 0x4E, "4E", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("TAB",    "", 0x2B, "2B", 1f, R.drawable.keyboard_tab_24, 0f, false, false, -1, true));
+        keys.add(new Key("PH1",    "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH2",    "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH3",    "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
         return keys;
     }
 
