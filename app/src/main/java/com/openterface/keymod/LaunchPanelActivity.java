@@ -38,6 +38,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
     public static final String MODE_SHORTCUTS = "shortcuts";
     public static final String MODE_MACROS = "macros";
     public static final String MODE_VOICE = "voice";
+    public static final String MODE_COMPOSE = "compose";
     public static final String MODE_PRESENTATION = "presentation";
 
     private CheckBox rememberChoiceCheckBox;
@@ -53,6 +54,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
     private CardView shortcutsCard;
     private CardView macrosCard;
     private CardView voiceCard;
+    private CardView composeCard;
     private CardView presentationCard;
 
     @Override
@@ -107,6 +109,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
         shortcutsCard = findViewById(R.id.shortcuts_card);
         macrosCard = findViewById(R.id.macros_card);
         voiceCard = findViewById(R.id.voice_card);
+        composeCard = findViewById(R.id.compose_card);
         presentationCard = findViewById(R.id.presentation_card);
 
         TextView credit = findViewById(R.id.launch_panel_credit);
@@ -121,6 +124,9 @@ public class LaunchPanelActivity extends AppCompatActivity {
         shortcutsCard.setSelected(selectedMode.equals(MODE_SHORTCUTS));
         macrosCard.setSelected(selectedMode.equals(MODE_MACROS));
         voiceCard.setSelected(selectedMode.equals(MODE_VOICE));
+        if (composeCard != null) {
+            composeCard.setSelected(selectedMode.equals(MODE_COMPOSE));
+        }
         presentationCard.setSelected(selectedMode.equals(MODE_PRESENTATION));
     }
 
@@ -149,6 +155,13 @@ public class LaunchPanelActivity extends AppCompatActivity {
             selectedMode = MODE_VOICE;
             updateCardSelections();
         });
+
+        if (composeCard != null) {
+            composeCard.setOnClickListener(v -> {
+                selectedMode = MODE_COMPOSE;
+                updateCardSelections();
+            });
+        }
 
         presentationCard.setOnClickListener(v -> {
             selectedMode = MODE_PRESENTATION;
@@ -217,6 +230,8 @@ public class LaunchPanelActivity extends AppCompatActivity {
                 return "Macros";
             case MODE_VOICE:
                 return "Voice Input";
+            case MODE_COMPOSE:
+                return "Compose";
             case MODE_PRESENTATION:
                 return "Presentation";
             default:

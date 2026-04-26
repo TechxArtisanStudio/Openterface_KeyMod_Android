@@ -7,4 +7,6 @@
 
     <!-- Split + narrow center column: cap hint width so wrap matches portrait-style bubble -->
     <dimen name="touchpad_help_overlay_max_width_split">256dp</dimen>
+
+    <dimen name="compose_shortcut_strip_height">108dp</dimen>
 </resources>

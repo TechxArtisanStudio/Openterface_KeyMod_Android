@@ -234,6 +234,19 @@
     <string name="composite_mode">Keyboard + Mouse</string>
     <string name="mode_info">Select your preferred input mode</string>
 
+    <!-- Compose mode -->
+    <string name="compose_mode_title">Compose</string>
+    <string name="compose_text_hint">Type or paste text (ASCII only). Tap Send to type it on the target.</string>
+    <string name="compose_ascii_warning">Non-ASCII characters are not supported for HID send. Remove them to enable Send.</string>
+    <string name="compose_send">Send</string>
+    <string name="compose_stop">Stop</string>
+    <string name="compose_char_count">%1$d / %2$d</string>
+    <string name="compose_no_connection">Not connected — connect USB or Bluetooth first.</string>
+    <string name="compose_empty">No text to send.</string>
+    <string name="compose_sent">Sent %1$d characters.</string>
+    <string name="compose_cancelled">Send stopped.</string>
+    <string name="compose_done">Finished sending.</string>
+
     <!-- Presentation Mode Strings -->
     <string name="presentation_mode">Presentation</string>
     <string name="slide_progress_label">PRESENTATION</string>

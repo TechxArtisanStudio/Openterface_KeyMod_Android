@@ -40,6 +40,7 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
+import com.openterface.fragment.ComposeFragment;
 import com.openterface.fragment.CompositeFragment;
 import com.openterface.fragment.GamepadFragment;
 import com.openterface.fragment.KeyboardFragment;
@@ -89,6 +90,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private LinearLayout navShortcuts;
     private LinearLayout navMacros;
     private LinearLayout navVoice;
+    private LinearLayout navCompose;
     private LinearLayout navPresentation;
     private ImageButton targetOsHeaderButton;
 
@@ -387,6 +389,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         navShortcuts = findViewById(R.id.nav_shortcuts);
         navMacros = findViewById(R.id.nav_macros);
         navVoice = findViewById(R.id.nav_voice);
+        navCompose = findViewById(R.id.nav_compose);
         navPresentation = findViewById(R.id.nav_presentation);
 
         targetOsHeaderButton = findViewById(R.id.target_os_header_button);
@@ -668,6 +671,14 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 drawerLayout.closeDrawer(android.view.Gravity.START);
             });
         }
+        if (navCompose != null) {
+            navCompose.setOnClickListener(v -> {
+                currentNavMode = LaunchPanelActivity.MODE_COMPOSE;
+                updateNavSelection();
+                showComposeFragment();
+                drawerLayout.closeDrawer(android.view.Gravity.START);
+            });
+        }
         if (navPresentation != null) {
             navPresentation.setOnClickListener(v -> {
                 currentNavMode = LaunchPanelActivity.MODE_PRESENTATION;
@@ -791,6 +802,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (navShortcuts != null) navShortcuts.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_SHORTCUTS));
         if (navMacros != null) navMacros.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_MACROS));
         if (navVoice != null) navVoice.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_VOICE));
+        if (navCompose != null) navCompose.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_COMPOSE));
         if (navPresentation != null) navPresentation.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_PRESENTATION));
     }
 
@@ -906,6 +918,13 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         transaction.commit();
     }
 
+    private void showComposeFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, new ComposeFragment());
+        transaction.commit();
+    }
+
     private void showPresentationFragment() {
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction transaction = fragmentManager.beginTransaction();
@@ -940,6 +959,9 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             case LaunchPanelActivity.MODE_VOICE:
                 showVoiceInputFragment();
                 break;
+            case LaunchPanelActivity.MODE_COMPOSE:
+                showComposeFragment();
+                break;
             case LaunchPanelActivity.MODE_PRESENTATION:
                 showPresentationFragment();
                 break;
@@ -964,6 +986,13 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                     currentFragment.getView().findViewById(R.id.keyboard_view) : null;
             if (keyboardView != null) {
                 keyboardView.setPort(newPort);
+            }
+        } else if (currentFragment instanceof ComposeFragment) {
+            ((ComposeFragment) currentFragment).port = newPort;
+            CustomKeyboardView composeKeyboard = currentFragment.getView() != null
+                    ? currentFragment.getView().findViewById(R.id.compose_keyboard_view) : null;
+            if (composeKeyboard != null) {
+                composeKeyboard.setPort(newPort);
             }
         } else if (currentFragment instanceof MouseFragment) {
             ((MouseFragment) currentFragment).setPort(newPort);
@@ -1114,7 +1143,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             },
             new TutorialOverlay.Step() {
                 public int[] targetViewIds() { return new int[]{R.id.nav_keyboard_mouse}; }
-                public String description() { return "Open the menu to choose your preferred input mode: Keyboard & Mouse, Shortcuts, Macros, Voice, Presentation, or Gamepad."; }
+                public String description() { return "Open the menu to choose your preferred input mode: Keyboard & Mouse, Compose, Presentation, Shortcuts, Macros, Voice, or Gamepad."; }
                 public String buttonText() { return "Next"; }
                 public void onShow(android.content.Context context) {
                     androidx.drawerlayout.widget.DrawerLayout drawer = ((android.app.Activity) context).findViewById(R.id.drawer_layout);

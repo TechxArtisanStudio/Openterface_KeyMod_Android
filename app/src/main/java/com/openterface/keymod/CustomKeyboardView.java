@@ -85,6 +85,8 @@ public class CustomKeyboardView extends LinearLayout {
     private GridLayout extraNumpadGrid;
     private ImageButton extraNumpadFnButton;
     private boolean showExtraPortraitKeys = false;
+    /** When true, only the top shortcut strip(s) are shown (Compose mode). */
+    private boolean shortcutsStripOnly = false;
 
     /** Split keyboard mode: which half to render (for landscape split mode with touchpad in middle) */
     public static final int SPLIT_NONE = 0;
@@ -320,6 +322,16 @@ public class CustomKeyboardView extends LinearLayout {
             extraNumpadFnLocked = false;
         }
         showExtraPortraitKeys = enabled;
+        removeAllViews();
+        updateKeyboard();
+    }
+
+    /**
+     * Compose mode: render only the same top shortcut rows as Keyboard &amp; Mouse, no letter grid.
+     */
+    public void setShortcutsStripOnly(boolean enabled) {
+        if (shortcutsStripOnly == enabled) return;
+        shortcutsStripOnly = enabled;
         removeAllViews();
         updateKeyboard();
     }
@@ -681,6 +693,11 @@ public class CustomKeyboardView extends LinearLayout {
 
     private void updateKeyboard() {
         removeAllViews();
+
+        if (shortcutsStripOnly && splitPart == SPLIT_NONE) {
+            addTopFunctionRows();
+            return;
+        }
 
         List<List<Key>> currentKeys = lowerKeys;
 

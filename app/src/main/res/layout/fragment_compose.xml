@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background_light">
+
+    <EditText
+        android:id="@+id/compose_body"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="top|start"
+        android:hint="@string/compose_text_hint"
+        android:inputType="textMultiLine|textCapSentences"
+        android:scrollbars="vertical"
+        android:padding="16dp"
+        android:textSize="16sp"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_secondary"
+        android:background="@drawable/voice_input_text_background"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginTop="10dp" />
+
+    <TextView
+        android:id="@+id/compose_ascii_warning"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="4dp"
+        android:text="@string/compose_ascii_warning"
+        android:textColor="@android:color/holo_orange_dark"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/compose_char_count"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="4dp"
+        android:textSize="12sp"
+        android:textColor="@color/text_secondary" />
+
+    <Button
+        android:id="@+id/compose_send_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="4dp"
+        android:text="@string/compose_send"
+        android:textAllCaps="false" />
+
+    <!-- Fixed height matches Keyboard+Mouse shortcut band; sits directly above IME when window uses adjustResize -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/compose_shortcut_strip_height"
+        android:layout_marginBottom="0dp">
+
+        <com.openterface.keymod.CustomKeyboardView
+            android:id="@+id/compose_keyboard_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:keyBackground="@drawable/key_background"
+            android:theme="@style/ButtonTheme" />
+
+    </FrameLayout>
+
+</LinearLayout>
