@@ -27,6 +27,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
     // Mode constants
     public static final String MODE_KEYBOARD_MOUSE = "keyboard_mouse";
     public static final String MODE_GAMEPAD = "gamepad";
+    // Kept for backward compatibility with older intents/preferences.
     public static final String MODE_NUMPAD = "numpad";
     public static final String MODE_SHORTCUTS = "shortcuts";
     public static final String MODE_MACROS = "macros";
@@ -43,7 +44,6 @@ public class LaunchPanelActivity extends AppCompatActivity {
     // Mode cards
     private CardView keyboardMouseCard;
     private CardView gamepadCard;
-    private CardView numpadCard;
     private CardView shortcutsCard;
     private CardView macrosCard;
     private CardView voiceCard;
@@ -62,7 +62,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
         boolean showPanel = getIntent().getBooleanExtra(SHOW_PANEL, false);
         if (rememberChoice && !showPanel) {
             String lastMode = prefs.getString(LAST_MODE_KEY, MODE_KEYBOARD_MOUSE);
-            launchModeInternal(lastMode);
+            launchModeInternal(normalizeMode(lastMode));
             return;
         }
 
@@ -84,7 +84,6 @@ public class LaunchPanelActivity extends AppCompatActivity {
         // Mode cards
         keyboardMouseCard = findViewById(R.id.keyboard_mouse_card);
         gamepadCard = findViewById(R.id.gamepad_card);
-        numpadCard = findViewById(R.id.numpad_card);
         shortcutsCard = findViewById(R.id.shortcuts_card);
         macrosCard = findViewById(R.id.macros_card);
         voiceCard = findViewById(R.id.voice_card);
@@ -94,7 +93,6 @@ public class LaunchPanelActivity extends AppCompatActivity {
     private void updateCardSelections() {
         keyboardMouseCard.setSelected(selectedMode.equals(MODE_KEYBOARD_MOUSE));
         gamepadCard.setSelected(selectedMode.equals(MODE_GAMEPAD));
-        numpadCard.setSelected(selectedMode.equals(MODE_NUMPAD));
         shortcutsCard.setSelected(selectedMode.equals(MODE_SHORTCUTS));
         macrosCard.setSelected(selectedMode.equals(MODE_MACROS));
         voiceCard.setSelected(selectedMode.equals(MODE_VOICE));
@@ -109,11 +107,6 @@ public class LaunchPanelActivity extends AppCompatActivity {
 
         gamepadCard.setOnClickListener(v -> {
             selectedMode = MODE_GAMEPAD;
-            updateCardSelections();
-        });
-
-        numpadCard.setOnClickListener(v -> {
-            selectedMode = MODE_NUMPAD;
             updateCardSelections();
         });
 
@@ -157,14 +150,15 @@ public class LaunchPanelActivity extends AppCompatActivity {
     }
 
     private void launchMode(String mode) {
+        String normalizedMode = normalizeMode(mode);
         // Save preference if checkbox is checked
         if (rememberChoiceCheckBox.isChecked()) {
             prefs.edit()
                 .putBoolean(REMEMBER_CHOICE_KEY, true)
-                .putString(LAST_MODE_KEY, mode)
+                .putString(LAST_MODE_KEY, normalizedMode)
                 .apply();
             
-            Toast.makeText(this, "Will remember: " + getModeDisplayName(mode), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Will remember: " + getModeDisplayName(normalizedMode), Toast.LENGTH_SHORT).show();
         } else {
             // Clear remembered choice
             prefs.edit()
@@ -172,12 +166,12 @@ public class LaunchPanelActivity extends AppCompatActivity {
                 .apply();
         }
 
-        launchModeInternal(mode);
+        launchModeInternal(normalizedMode);
     }
 
     private void launchModeInternal(String mode) {
         Intent intent = new Intent(this, MainActivity.class);
-        intent.putExtra("launch_mode", mode);
+        intent.putExtra("launch_mode", normalizeMode(mode));
         
         startActivity(intent);
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
@@ -203,6 +197,13 @@ public class LaunchPanelActivity extends AppCompatActivity {
             default:
                 return "Keyboard & Mouse";
         }
+    }
+
+    private String normalizeMode(String mode) {
+        if (MODE_NUMPAD.equals(mode)) {
+            return MODE_KEYBOARD_MOUSE;
+        }
+        return mode;
     }
 
     @Override

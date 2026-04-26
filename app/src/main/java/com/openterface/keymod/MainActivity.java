@@ -44,7 +44,6 @@ import com.openterface.fragment.GamepadFragment;
 import com.openterface.fragment.KeyboardFragment;
 import com.openterface.fragment.MacrosFragment;
 import com.openterface.fragment.MouseFragment;
-import com.openterface.fragment.NumpadFragment;
 import com.openterface.fragment.PresentationFragment;
 import com.openterface.fragment.ShortcutFragment;
 import com.openterface.fragment.ShortcutHubFragment;
@@ -86,7 +85,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     // Sidebar nav item views
     private LinearLayout navKeyboardMouse;
     private LinearLayout navGamepad;
-    private LinearLayout navNumpad;
     private LinearLayout navShortcuts;
     private LinearLayout navMacros;
     private LinearLayout navVoice;
@@ -377,7 +375,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         drawerLayout = findViewById(R.id.drawer_layout);
         navKeyboardMouse = findViewById(R.id.nav_keyboard_mouse);
         navGamepad = findViewById(R.id.nav_gamepad);
-        navNumpad = findViewById(R.id.nav_numpad);
         navShortcuts = findViewById(R.id.nav_shortcuts);
         navMacros = findViewById(R.id.nav_macros);
         navVoice = findViewById(R.id.nav_voice);
@@ -638,14 +635,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 drawerLayout.closeDrawer(android.view.Gravity.START);
             });
         }
-        if (navNumpad != null) {
-            navNumpad.setOnClickListener(v -> {
-                currentNavMode = LaunchPanelActivity.MODE_NUMPAD;
-                updateNavSelection();
-                showNumpadFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
-            });
-        }
         if (navShortcuts != null) {
             navShortcuts.setOnClickListener(v -> {
                 currentNavMode = LaunchPanelActivity.MODE_SHORTCUTS;
@@ -790,7 +779,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private void updateNavSelection() {
         if (navKeyboardMouse != null) navKeyboardMouse.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_KEYBOARD_MOUSE));
         if (navGamepad != null) navGamepad.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_GAMEPAD));
-        if (navNumpad != null) navNumpad.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_NUMPAD));
         if (navShortcuts != null) navShortcuts.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_SHORTCUTS));
         if (navMacros != null) navMacros.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_MACROS));
         if (navVoice != null) navVoice.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_VOICE));
@@ -902,13 +890,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         transaction.commit();
     }
 
-    private void showNumpadFragment() {
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        FragmentTransaction transaction = fragmentManager.beginTransaction();
-        transaction.replace(R.id.fragment_container, NumpadFragment.newInstance(port));
-        transaction.commit();
-    }
-
     private void showVoiceInputFragment() {
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction transaction = fragmentManager.beginTransaction();
@@ -937,7 +918,9 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 showGamepadFragment();
                 break;
             case LaunchPanelActivity.MODE_NUMPAD:
-                showNumpadFragment();
+                currentNavMode = LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
+                updateNavSelection();
+                showCompositeFragment();
                 break;
             case LaunchPanelActivity.MODE_SHORTCUTS:
                 showShortcutHubFragment();
@@ -975,8 +958,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             }
         } else if (currentFragment instanceof MouseFragment) {
             ((MouseFragment) currentFragment).setPort(newPort);
-        } else if (currentFragment instanceof NumpadFragment) {
-            ((NumpadFragment) currentFragment).port = newPort;
         }
     }
 
@@ -1124,7 +1105,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             },
             new TutorialOverlay.Step() {
                 public int[] targetViewIds() { return new int[]{R.id.nav_keyboard_mouse}; }
-                public String description() { return "Open the menu to choose your preferred input mode: Keyboard & Mouse, Numpad, Shortcuts, Macros, or Voice."; }
+                public String description() { return "Open the menu to choose your preferred input mode: Keyboard & Mouse, Shortcuts, Macros, Voice, Presentation, or Gamepad."; }
                 public String buttonText() { return "Next"; }
                 public void onShow(android.content.Context context) {
                     androidx.drawerlayout.widget.DrawerLayout drawer = ((android.app.Activity) context).findViewById(R.id.drawer_layout);

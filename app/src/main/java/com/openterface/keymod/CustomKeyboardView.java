@@ -21,6 +21,7 @@ import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.GridLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
@@ -179,6 +180,26 @@ public class CustomKeyboardView extends LinearLayout {
         TopShortcutPanel(String title, List<Key> keys) {
             this.title = title;
             this.keys = keys;
+        }
+    }
+
+    private static class ExtraGridKey {
+        final Key key;
+        final int row;
+        final int col;
+        final int rowSpan;
+        final int colSpan;
+
+        ExtraGridKey(Key key, int row, int col) {
+            this(key, row, col, 1, 1);
+        }
+
+        ExtraGridKey(Key key, int row, int col, int rowSpan, int colSpan) {
+            this.key = key;
+            this.row = row;
+            this.col = col;
+            this.rowSpan = rowSpan;
+            this.colSpan = colSpan;
         }
     }
 
@@ -1823,109 +1844,139 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void addExtraPortraitKeys() {
-        // iOS parity: top 101-key cluster
-        addExtraRow(new Key[]{
-            new Key("PrtSc", "", 0x46, "46", 33.33f, 0, 0f, false),
-            new Key("Scroll Lock", "", 0x47, "47", 33.33f, 0, 0f, false),
-            new Key("Pause", "", 0x48, "48", 33.34f, 0, 0f, false)
-        });
+        int primaryModifier = "macos".equals(getTargetOs()) ? MOD_WIN : MOD_CTRL;
+        List<ExtraGridKey> gridKeys = new ArrayList<>();
 
-        addExtraRow(new Key[]{
-            new Key("Insert", "", 0x49, "49", 33.33f, 0, 0f, false),
-            new Key("Home", "", 0x4A, "4A", 33.33f, 0, 0f, false),
-            new Key("PgUp", "", 0x4B, "4B", 33.34f, 0, 0f, false)
-        });
+        // Row 1
+        gridKeys.add(new ExtraGridKey(new Key("HOME", "", 0x4A, "4A", 25f, 0, 0f, false), 0, 0));
+        gridKeys.add(new ExtraGridKey(new Key("UP", "", 0x52, "52", 25f, R.drawable.keyboard_arrow_up_24, 0f, false), 0, 1));
+        gridKeys.add(new ExtraGridKey(new Key("END", "", 0x4D, "4D", 25f, 0, 0f, false), 0, 2));
+        gridKeys.add(new ExtraGridKey(new Key("PGUP", "", 0x4B, "4B", 25f, 0, 0f, false), 0, 3));
 
-        addExtraRow(new Key[]{
-            new Key("Delete", "", 0x4C, "4C", 33.33f, 0, 0f, false),
-            new Key("End", "", 0x4D, "4D", 33.33f, 0, 0f, false),
-            new Key("PgDn", "", 0x4E, "4E", 33.34f, 0, 0f, false)
-        });
+        // Row 2
+        gridKeys.add(new ExtraGridKey(new Key("LEFT", "", 0x50, "50", 25f, R.drawable.keyboard_arrow_left_24, 0f, false), 1, 0));
+        gridKeys.add(new ExtraGridKey(new Key("DOWN", "", 0x51, "51", 25f, R.drawable.keyboard_arrow_down_24, 0f, false), 1, 1));
+        gridKeys.add(new ExtraGridKey(new Key("RIGHT", "", 0x4F, "4F", 25f, R.drawable.keyboard_arrow_right_24, 0f, false), 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("PGDN", "", 0x4E, "4E", 25f, 0, 0f, false), 1, 3));
 
-        // Keep middle direction keys (iOS extra panel style)
-        addExtraRow(new Key[]{
-            null,
-            new Key("↑", "", 0x52, "52", 33.33f, 0, 0f, false),
-            null
-        });
+        // Row 3
+        gridKeys.add(new ExtraGridKey(new Key("COPY", "", 0x06, "06", 25f, R.drawable.content_copy_24, 0f, false, false, primaryModifier, false), 2, 0));
+        gridKeys.add(new ExtraGridKey(new Key("CUT", "", 0x1B, "1B", 25f, R.drawable.content_cut_24, 0f, false, false, primaryModifier, false), 2, 1));
+        gridKeys.add(new ExtraGridKey(new Key("PASTE", "", 0x19, "19", 25f, R.drawable.content_paste_24, 0f, false, false, primaryModifier, false), 2, 2));
+        gridKeys.add(new ExtraGridKey(new Key("UNDO", "", 0x1D, "1D", 25f, R.drawable.undo_24, 0f, false, false, primaryModifier, false), 2, 3));
 
-        addExtraRow(new Key[]{
-            new Key("←", "", 0x50, "50", 33.33f, 0, 0f, false),
-            new Key("↓", "", 0x51, "51", 33.33f, 0, 0f, false),
-            new Key("→", "", 0x4F, "4F", 33.34f, 0, 0f, false)
-        });
+        // Row 4
+        gridKeys.add(new ExtraGridKey(new Key("ESC", "", 0x29, "29", 25f, 0, 0f, false), 3, 0));
+        gridKeys.add(new ExtraGridKey(new Key("Tab", "", 0x2B, "2B", 25f, R.drawable.keyboard_tab_24, 0f, false), 3, 1));
+        gridKeys.add(new ExtraGridKey(new Key("SAVE", "", 0x16, "16", 25f, R.drawable.save_24, 0f, false, false, primaryModifier, false), 3, 2));
+        gridKeys.add(new ExtraGridKey(new Key("DEL", "", 0x4C, "4C", 25f, 0, 0f, false), 3, 3));
 
-        addExtraRow(new Key[]{
-                new Key("7", "", 0x5F, "5F", 33.33f, 0, 0f, false),
-                new Key("8", "", 0x60, "60", 33.33f, 0, 0f, false),
-                new Key("9", "", 0x61, "61", 33.34f, 0, 0f, false)
-        });
+        // Row 5
+        gridKeys.add(new ExtraGridKey(new Key("/", "", 0x54, "54", 25f, 0, 0f, false), 4, 0));
+        gridKeys.add(new ExtraGridKey(new Key("*", "", 0x55, "55", 25f, 0, 0f, false), 4, 1));
+        gridKeys.add(new ExtraGridKey(new Key("+", "", 0x57, "57", 25f, 0, 0f, false), 4, 2));
+        gridKeys.add(new ExtraGridKey(new Key("-", "", 0x56, "56", 25f, 0, 0f, false), 4, 3));
 
-        addExtraRow(new Key[]{
-                new Key("4", "", 0x5C, "5C", 33.33f, 0, 0f, false),
-                new Key("5", "", 0x5D, "5D", 33.33f, 0, 0f, false),
-                new Key("6", "", 0x5E, "5E", 33.34f, 0, 0f, false)
-        });
+        // Row 6
+        gridKeys.add(new ExtraGridKey(new Key("7", "", 0x5F, "5F", 25f, 0, 0f, false), 5, 0));
+        gridKeys.add(new ExtraGridKey(new Key("8", "", 0x60, "60", 25f, 0, 0f, false), 5, 1));
+        gridKeys.add(new ExtraGridKey(new Key("9", "", 0x61, "61", 25f, 0, 0f, false), 5, 2));
+        gridKeys.add(new ExtraGridKey(new Key("=", "", 0x67, "67", 25f, 0, 0f, false), 5, 3));
 
-        addExtraRow(new Key[]{
-                new Key("1", "", 0x59, "59", 33.33f, 0, 0f, false),
-                new Key("2", "", 0x5A, "5A", 33.33f, 0, 0f, false),
-                new Key("3", "", 0x5B, "5B", 33.34f, 0, 0f, false)
-        });
+        // Row 7
+        gridKeys.add(new ExtraGridKey(new Key("4", "", 0x5C, "5C", 25f, 0, 0f, false), 6, 0));
+        gridKeys.add(new ExtraGridKey(new Key("5", "", 0x5D, "5D", 25f, 0, 0f, false), 6, 1));
+        gridKeys.add(new ExtraGridKey(new Key("6", "", 0x5E, "5E", 25f, 0, 0f, false), 6, 2));
+        gridKeys.add(new ExtraGridKey(new Key(",", "", 0x36, "36", 25f, 0, 0f, false), 6, 3));
 
-        addExtraRow(new Key[]{
-            new Key("0", "", 0x62, "62", 50f, 0, 0f, false),
-            new Key(".", "", 0x63, "63", 50f, 0, 0f, false)
-        });
+        // Row 8
+        gridKeys.add(new ExtraGridKey(new Key("1", "", 0x59, "59", 25f, 0, 0f, false), 7, 0));
+        gridKeys.add(new ExtraGridKey(new Key("2", "", 0x5A, "5A", 25f, 0, 0f, false), 7, 1));
+        gridKeys.add(new ExtraGridKey(new Key("3", "", 0x5B, "5B", 25f, 0, 0f, false), 7, 2));
+        gridKeys.add(new ExtraGridKey(new Key("ENTER", "", 0x28, "28", 25f, 0, 0f, false), 7, 3, 2, 1));
+
+        // Row 9
+        gridKeys.add(new ExtraGridKey(new Key("0", "", 0x62, "62", 25f, 0, 0f, false), 8, 0, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key(".", "", 0x63, "63", 25f, 0, 0f, false), 8, 2));
+
+        addExtraGrid(9, 4, gridKeys);
     }
 
-    private void addExtraRow(Key[] keys) {
-        LinearLayout rowLayout = new LinearLayout(getContext());
-        rowLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, 0.9f));
-        rowLayout.setOrientation(HORIZONTAL);
+    private void addExtraGrid(int rows, int columns, List<ExtraGridKey> gridKeys) {
+        GridLayout gridLayout = new GridLayout(getContext());
+        gridLayout.setColumnCount(columns);
+        gridLayout.setRowCount(rows);
+        gridLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, 8.1f));
 
-        for (Key key : keys) {
-            float widthPercent = key != null ? key.widthPercent : (100f / keys.length);
-            float weight = widthPercent / 10.0f;
-            LayoutParams params = new LayoutParams(0, LayoutParams.MATCH_PARENT, weight);
+        for (ExtraGridKey entry : gridKeys) {
+            GridLayout.Spec rowSpec = GridLayout.spec(entry.row, entry.rowSpan, (float) entry.rowSpan);
+            GridLayout.Spec colSpec = GridLayout.spec(entry.col, entry.colSpan, 1f);
+            GridLayout.LayoutParams params = new GridLayout.LayoutParams(rowSpec, colSpec);
+            params.width = 0;
+            params.height = 0;
+            params.setGravity(Gravity.FILL);
             int keyMargin = dpToPx(KEY_OUTER_MARGIN_DP);
             params.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
-
-            if (key == null) {
-                View spacer = new View(getContext());
-                spacer.setLayoutParams(params);
-                rowLayout.addView(spacer);
-                continue;
+            if (entry.key.iconResId != 0) {
+                ImageButton iconButton = new ImageButton(getContext());
+                applyFlatKeyStyle(iconButton);
+                iconButton.setBackgroundResource(R.drawable.function_button_background);
+                iconButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
+                iconButton.setPadding(dpToPx(6), dpToPx(6), dpToPx(6), dpToPx(6));
+                iconButton.setImageResource(entry.key.iconResId);
+                iconButton.setColorFilter(resolveThemeTextColor());
+                iconButton.setLayoutParams(params);
+                iconButton.setOnClickListener(v -> handleKeyPress(entry.key));
+                iconButton.setOnTouchListener((v, event) -> {
+                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                        performKeyHapticFeedback(v);
+                    }
+                    if (event.getAction() == MotionEvent.ACTION_UP) {
+                        repeatHandler.postDelayed(() -> {
+                            sendReleaseData();
+                            Log.d(TAG, "Sent key release for extra key: " + entry.key.label);
+                        }, 30);
+                    }
+                    return false;
+                });
+                gridLayout.addView(iconButton);
+            } else {
+                Button textButton = new Button(getContext());
+                applyFlatKeyStyle(textButton);
+                textButton.setBackgroundResource(R.drawable.function_button_background);
+                textButton.setGravity(Gravity.CENTER);
+                textButton.setTextSize(14);
+                textButton.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
+                textButton.setText(entry.key.label);
+                textButton.setTextColor(resolveThemeTextColor());
+                if ("HOME".equals(entry.key.label)
+                        || "END".equals(entry.key.label)
+                        || "PGUP".equals(entry.key.label)
+                        || "PGDN".equals(entry.key.label)
+                        || "ESC".equals(entry.key.label)
+                        || "DEL".equals(entry.key.label)
+                        || "ENTER".equals(entry.key.label)) {
+                    textButton.setTypeface(textButton.getTypeface(), android.graphics.Typeface.BOLD);
+                }
+                textButton.setLayoutParams(params);
+                textButton.setOnClickListener(v -> handleKeyPress(entry.key));
+                textButton.setOnTouchListener((v, event) -> {
+                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                        performKeyHapticFeedback(v);
+                    }
+                    if (event.getAction() == MotionEvent.ACTION_UP) {
+                        repeatHandler.postDelayed(() -> {
+                            sendReleaseData();
+                            Log.d(TAG, "Sent key release for extra key: " + entry.key.label);
+                        }, 30);
+                    }
+                    return false;
+                });
+                gridLayout.addView(textButton);
             }
-
-            Button textButton = new Button(getContext());
-            applyFlatKeyStyle(textButton);
-            textButton.setLayoutParams(params);
-            textButton.setBackgroundResource(R.drawable.function_button_background);
-            textButton.setGravity(Gravity.CENTER);
-            textButton.setTextSize(14);
-            textButton.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
-            textButton.setText(key.label);
-            textButton.setTextColor(resolveThemeTextColor());
-
-            textButton.setOnClickListener(v -> handleKeyPress(key));
-            textButton.setOnTouchListener((v, event) -> {
-                if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                    performKeyHapticFeedback(v);
-                }
-                if (event.getAction() == MotionEvent.ACTION_UP) {
-                    repeatHandler.postDelayed(() -> {
-                        sendReleaseData();
-                        Log.d(TAG, "Sent key release for extra key: " + key.label);
-                    }, 30);
-                }
-                return false;
-            });
-
-            rowLayout.addView(textButton);
         }
 
-        addView(rowLayout);
+        addView(gridLayout);
     }
 
     public static byte[] hexStringToByteArray(String ByteData) {

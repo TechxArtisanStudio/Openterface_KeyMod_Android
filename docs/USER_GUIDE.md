@@ -34,7 +34,7 @@ On the **Welcome & Guide** screen (first launch or side menu), tap one of six mo
 | 📋 **Macros** | Programmable macro sequences |
 | ⚡ **Shortcuts** | Pre-built keyboard shortcuts (Ctrl+C, Win+L, etc.) |
 | 🎤 **Voice** | Voice-to-keyboard input with AI |
-| 🔢 **Numpad** | Numeric keypad layout |
+| 🖥️ **Presentation** | Slide/presenter controls for decks |
 
 ---
 
