@@ -288,7 +288,7 @@
     <string name="touch_pad_status_touch_scroll">Touch: scrolling</string>
     <string name="touch_pad_help_overlay_title">Touchpad gestures</string>
     <string name="touch_pad_help_overlay_one_finger">One finger</string>
-    <string name="touch_pad_help_overlay_one_finger_detail">Glide to move the pointer.\nTap to click.\nDouble-tap to double-click.\nLong press toggles drag.</string>
+    <string name="touch_pad_help_overlay_one_finger_detail">Glide to move the pointer.\nTap to click.\nDouble-tap to double-click.\nLong press to start drag.\nTap to release drag.</string>
     <string name="touch_pad_help_overlay_two_fingers">Two fingers</string>
     <string name="touch_pad_help_overlay_two_fingers_detail">Tap for right-click.\nGlide with two fingers to scroll.</string>
     <string name="touch_pad_compact_initial">Touchpad\nButtons: up (no drag)\nTouch: idle</string>

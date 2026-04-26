@@ -26,6 +26,7 @@ import com.openterface.keymod.CustomKeyboardView;
 import com.openterface.keymod.MainActivity;
 import com.openterface.keymod.R;
 import com.openterface.keymod.TouchPadView;
+import com.openterface.keymod.util.TouchPadHaptics;
 import com.openterface.keymod.util.TouchPadHelpOverlay;
 import com.openterface.keymod.util.TouchPadPointerPhase;
 import com.openterface.keymod.util.TouchPadTipsFormatter;
@@ -514,6 +515,11 @@ public class CompositeFragment extends Fragment {
 
             @Override
             public void onTouchClick() {
+                if (isDragMode) {
+                    setDragMode(false);
+                    return;
+                }
+                TouchPadHaptics.onLeftClick(pad.getContext());
                 new Thread(() -> {
                     try {
                         String sendKBData = "57AB0005050101000000";
@@ -534,6 +540,11 @@ public class CompositeFragment extends Fragment {
 
             @Override
             public void onTouchDoubleClick() {
+                if (isDragMode) {
+                    setDragMode(false);
+                    return;
+                }
+                TouchPadHaptics.onDoubleClick(pad.getContext());
                 new Thread(() -> {
                     try {
                         String clickData = "57AB0005050101000000";
@@ -557,6 +568,7 @@ public class CompositeFragment extends Fragment {
 
             @Override
             public void onTouchRightClick() {
+                TouchPadHaptics.onRightClick(pad.getContext());
                 new Thread(() -> {
                     try {
                         String sendKBData = "57AB0005050102000000";
@@ -577,7 +589,11 @@ public class CompositeFragment extends Fragment {
 
             @Override
             public void onTouchLongPress() {
-                setDragMode(!isDragMode);
+                if (isDragMode) {
+                    return;
+                }
+                TouchPadHaptics.onDragToggle(pad.getContext());
+                setDragMode(true);
             }
 
             @Override

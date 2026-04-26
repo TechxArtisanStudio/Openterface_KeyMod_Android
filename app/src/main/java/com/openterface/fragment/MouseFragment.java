@@ -21,6 +21,7 @@ import androidx.fragment.app.Fragment;
 import com.openterface.keymod.BluetoothService;
 import com.openterface.keymod.R;
 import com.openterface.keymod.TouchPadView;
+import com.openterface.keymod.util.TouchPadHaptics;
 import com.openterface.keymod.util.TouchPadHelpOverlay;
 import com.openterface.keymod.util.TouchPadPointerPhase;
 import com.openterface.keymod.util.TouchPadTipsFormatter;
@@ -345,6 +346,11 @@ public class MouseFragment extends Fragment {
 
                 @Override
                 public void onTouchClick() {
+                    if (isDragMode) {
+                        setDragMode(false);
+                        return;
+                    }
+                    TouchPadHaptics.onLeftClick(touchPad.getContext());
                     Log.d(TAG, "TouchPad single tap -> left click");
                     new Thread(() -> {
                         try {
@@ -366,6 +372,11 @@ public class MouseFragment extends Fragment {
 
                 @Override
                 public void onTouchDoubleClick() {
+                    if (isDragMode) {
+                        setDragMode(false);
+                        return;
+                    }
+                    TouchPadHaptics.onDoubleClick(touchPad.getContext());
                     Log.d(TAG, "TouchPad double tap -> double click");
                     new Thread(() -> {
                         try {
@@ -390,6 +401,7 @@ public class MouseFragment extends Fragment {
 
                 @Override
                 public void onTouchRightClick() {
+                    TouchPadHaptics.onRightClick(touchPad.getContext());
                     Log.d(TAG, "TouchPad 2-finger tap -> right click");
                     new Thread(() -> {
                         try {
@@ -411,7 +423,11 @@ public class MouseFragment extends Fragment {
 
                 @Override
                 public void onTouchLongPress() {
-                    setDragMode(!isDragMode);
+                    if (isDragMode) {
+                        return;
+                    }
+                    TouchPadHaptics.onDragToggle(touchPad.getContext());
+                    setDragMode(true);
                 }
 
                 @Override

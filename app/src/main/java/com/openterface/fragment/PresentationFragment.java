@@ -42,6 +42,7 @@ import com.openterface.keymod.ConnectionManager;
 import com.openterface.keymod.MainActivity;
 import com.openterface.keymod.R;
 import com.openterface.keymod.TouchPadView;
+import com.openterface.keymod.util.TouchPadHaptics;
 
 import java.util.concurrent.TimeUnit;
 
@@ -605,17 +606,20 @@ public class PresentationFragment extends Fragment {
 
             @Override
             public void onTouchClick() {
+                TouchPadHaptics.onLeftClick(touchSurface.getContext());
                 sendMouseClick(1);
             }
 
             @Override
             public void onTouchDoubleClick() {
+                TouchPadHaptics.onDoubleClick(touchSurface.getContext());
                 sendMouseClick(1);
                 timerHandler.postDelayed(() -> sendMouseClick(1), 150);
             }
 
             @Override
             public void onTouchRightClick() {
+                TouchPadHaptics.onRightClick(touchSurface.getContext());
                 sendMouseClick(2);
             }
         });

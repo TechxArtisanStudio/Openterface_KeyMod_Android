@@ -1144,7 +1144,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             },
             new TutorialOverlay.Step() {
                 public int[] targetViewIds() { return new int[]{R.id.touchPad}; }
-                public String description() { return "Use the touchpad to control the cursor. Long press to toggle drag mode."; }
+                public String description() { return "Use the touchpad to control the cursor. Long press to start drag; tap to release."; }
                 public String buttonText() { return "Done"; }
             }
         });

@@ -61,12 +61,9 @@ public final class TouchPadTipsFormatter {
 
         int touchStart = mouseEnd + 1;
         int touchEnd = touchStart + touch.length();
-        boolean touchActive = pointerPhase != TouchPadPointerPhase.IDLE;
-        if (touchActive) {
-            ssb.setSpan(new StyleSpan(Typeface.BOLD), touchStart, touchEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
+        // Touch phase (move / scroll / idle): keep low-profile grey in light and dark — no primary or bold.
         ssb.setSpan(
-                new ForegroundColorSpan(touchActive ? primary : secondary),
+                new ForegroundColorSpan(secondary),
                 touchStart,
                 touchEnd,
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
