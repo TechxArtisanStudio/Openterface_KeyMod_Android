@@ -51,7 +51,7 @@
         android:layout_weight="1"
         android:divider="@color/divider"
         android:dividerHeight="1dp"
-        android:background="@color/white" />
+        android:background="@color/card_unselected_bg" />
 
     <!-- Empty State -->
     <TextView

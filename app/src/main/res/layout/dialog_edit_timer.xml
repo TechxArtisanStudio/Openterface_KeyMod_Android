@@ -3,35 +3,171 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="20dp">
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/timer_settings_minutes_label"
+        android:textColor="@color/text_primary"
+        android:textStyle="bold"
+        android:textSize="14sp"
+        android:layout_marginBottom="8dp" />
 
     <EditText
         android:id="@+id/edit_timer_minutes"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Minutes"
+        android:hint="@string/timer_settings_minutes_hint"
         android:inputType="number"
-        android:padding="12dp" />
+        android:padding="12dp"
+        android:background="@drawable/bg_timer_input"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_secondary" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/timer_settings_quick_select_label"
+        android:textColor="@color/text_secondary"
+        android:textStyle="bold"
+        android:textSize="12sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_preset_5"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_timer_option"
+            android:text="@string/timer_preset_5"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary" />
+
+        <Button
+            android:id="@+id/btn_preset_10"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="3dp"
+            android:layout_marginEnd="3dp"
+            android:background="@drawable/bg_timer_option"
+            android:text="@string/timer_preset_10"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary" />
+
+        <Button
+            android:id="@+id/btn_preset_15"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_timer_option"
+            android:text="@string/timer_preset_15"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_preset_20"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_timer_option"
+            android:text="@string/timer_preset_20"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary" />
+
+        <Button
+            android:id="@+id/btn_preset_30"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="3dp"
+            android:layout_marginEnd="3dp"
+            android:background="@drawable/bg_timer_option"
+            android:text="@string/timer_preset_30"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary" />
+
+        <Button
+            android:id="@+id/btn_preset_60"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_timer_option"
+            android:text="@string/timer_preset_60"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/timer_settings_mode_label"
+        android:textColor="@color/text_primary"
+        android:textStyle="bold"
+        android:textSize="14sp" />
 
     <RadioGroup
         android:id="@+id/radio_timer_mode"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
         <RadioButton
             android:id="@+id/radio_countdown"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Countdown" />
+            android:layout_marginEnd="6dp"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="12dp"
+            android:background="@drawable/bg_timer_option"
+            android:text="@string/timer_mode_countdown"
+            android:textColor="@color/text_primary"
+            android:buttonTint="?attr/colorPrimary" />
 
         <RadioButton
             android:id="@+id/radio_countup"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Count Up" />
+            android:layout_marginStart="6dp"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="12dp"
+            android:background="@drawable/bg_timer_option"
+            android:text="@string/timer_mode_countup"
+            android:textColor="@color/text_primary"
+            android:buttonTint="?attr/colorPrimary" />
     </RadioGroup>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/timer_settings_gesture_hint"
+        android:textSize="12sp"
+        android:textColor="@color/text_secondary" />
 </LinearLayout>

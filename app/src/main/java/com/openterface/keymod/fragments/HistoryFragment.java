@@ -148,7 +148,7 @@ public class HistoryFragment extends Fragment {
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             if (convertView == null) {
-                convertView = inflater.inflate(android.R.layout.simple_list_item_1, parent, false);
+                convertView = inflater.inflate(R.layout.item_history_entry, parent, false);
             }
             
             TextView textView = convertView.findViewById(android.R.id.text1);

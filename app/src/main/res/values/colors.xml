@@ -5,7 +5,7 @@
     <color name="white">#FFFFFFFF</color>
     <color name="background_light">#FFF5F5F5</color>
     <color name="card_unselected_bg">#FFF0F0F0</color>
-    <color name="card_selected_bg">#FF2196F3</color>
+    <color name="card_selected_bg">#FFF57C00</color>
     <color name="text_primary">#FF212121</color>
     <color name="text_secondary">#FF757575</color>
     <color name="header_background">#FFFFFFFF</color>
@@ -18,11 +18,14 @@
     <color name="color_shortcuts">#FFFF9800</color>
     <color name="color_macros">#FFF44336</color>
     <color name="color_voice">#FF00BCD4</color>
+    <color name="color_presentation">#FF673AB7</color>
 
     <!-- Connection Status Colors -->
     <color name="connected">#FF4CAF50</color>
     <color name="connecting">#FFFF9800</color>
     <color name="disconnected">#FF757575</color>
+    <!-- Header Bluetooth + Target OS idle tint (matches previous hard-coded #9E9E9E) -->
+    <color name="header_connection_idle">#FF9E9E9E</color>
 
     <!-- Legacy Colors (for existing drawables) -->
     <color name="DODGERBLUE">#FF1E90FF</color>
@@ -30,8 +33,8 @@
     <color name="gray_400">#FFBDBDBD</color>
     
     <!-- Additional Colors (for existing layouts) -->
-    <color name="sidebar_item_selected">#FF1976D2</color>
-    <color name="primary">#FF1976D2</color>
+    <color name="sidebar_item_selected">#FFF57C00</color>
+    <color name="primary">#FFF57C00</color>
     <color name="card_background">#FFFFFFFF</color>
     <color name="divider">#FFBDBDBD</color>
     <color name="holo_red_light">#FFFF4444</color>
@@ -39,37 +42,82 @@
     <color name="touchpad_background">#FFE0E0E0</color>
     <color name="sidebar_background">#FFFFFFFF</color>
     <color name="sidebar_item_text">#FF212121</color>
-    <color name="ic_launcher_background">#FF1976D2</color>
+    <color name="ic_launcher_background">#FFF57C00</color>
     
     <!-- Settings Colors -->
-    <color name="primary_light">#FFBBDEFB</color>
+    <color name="primary_light">#FFFFE0B2</color>
+
+    <!-- Theme accent families -->
+    <color name="theme_accent_orange">#FFF57C00</color>
+    <color name="theme_accent_orange_container">#FFFFE0B2</color>
+    <color name="theme_accent_orange_on_container">#FF5D2A00</color>
+
+    <color name="theme_accent_blue">#FF1976D2</color>
+    <color name="theme_accent_blue_container">#FFBBDEFB</color>
+    <color name="theme_accent_blue_on_container">#FF0D47A1</color>
+
+    <color name="theme_accent_green">#FF2E7D32</color>
+    <color name="theme_accent_green_container">#FFC8E6C9</color>
+    <color name="theme_accent_green_on_container">#FF1B5E20</color>
+
+    <color name="theme_accent_pink">#FFAD1457</color>
+    <color name="theme_accent_pink_container">#FFF8BBD0</color>
+    <color name="theme_accent_pink_on_container">#FF880E4F</color>
+
+    <color name="theme_accent_purple">#FF6A1B9A</color>
+    <color name="theme_accent_purple_container">#FFE1BEE7</color>
+    <color name="theme_accent_purple_on_container">#FF4A148C</color>
+
+    <color name="theme_accent_red">#FFC62828</color>
+    <color name="theme_accent_red_container">#FFFFCDD2</color>
+    <color name="theme_accent_red_on_container">#FFB71C1C</color>
+
+    <color name="theme_accent_teal">#FF00695C</color>
+    <color name="theme_accent_teal_container">#FFB2DFDB</color>
+    <color name="theme_accent_teal_on_container">#FF004D40</color>
+
+    <color name="theme_accent_indigo">#FF303F9F</color>
+    <color name="theme_accent_indigo_container">#FFC5CAE9</color>
+    <color name="theme_accent_indigo_on_container">#FF1A237E</color>
+
+    <!-- ~10% opacity on same RGB as each theme primary (presentation idle button fill). -->
+    <color name="theme_accent_orange_low_emphasis">#1AF57C00</color>
+    <color name="theme_accent_blue_low_emphasis">#1A1976D2</color>
+    <color name="theme_accent_green_low_emphasis">#1A2E7D32</color>
+    <color name="theme_accent_pink_low_emphasis">#1AAD1457</color>
+    <color name="theme_accent_purple_low_emphasis">#1A6A1B9A</color>
+    <color name="theme_accent_red_low_emphasis">#1AC62828</color>
+    <color name="theme_accent_teal_low_emphasis">#1A00695C</color>
+    <color name="theme_accent_indigo_low_emphasis">#1A303F9F</color>
 
     <!-- Voice Input Colors -->
     <color name="voice_input_field_background">#FFFFFFFF</color>
     <color name="voice_input_instruction_background">#FFBBDEFB</color>
 
+    <!-- Bluetooth dialogs -->
+    <color name="bluetooth_dialog_bg">#FFF3F4F6</color>
+    <color name="bluetooth_surface">#FFFFFFFF</color>
+
     <!-- Presentation Mode Colors (Light) -->
     <color name="presentation_bg">#FFF5F7FA</color>
     <color name="presentation_card_bg">#FFFFFFFF</color>
     <color name="presentation_text_primary">#FF212121</color>
+    <color name="presentation_button_content">#FF3A3A3A</color>
     <color name="presentation_text_secondary">#FF757575</color>
     <color name="presentation_text_muted">#FFBDBDBD</color>
-    <color name="presentation_primary">#FFF57C00</color>
-    <color name="presentation_primary_pressed">#FFE65100</color>
+    <color name="presentation_timer_header_on_fill">#FFFFFFFF</color>
+    <color name="presentation_timer_status_on_fill">#FFF4F4F4</color>
     <color name="presentation_green">#FF34D399</color>
     <color name="presentation_red">#FFEF4444</color>
     <color name="presentation_purple">#FFA855F7</color>
-    <color name="presentation_progress_filled">#FF3B82F6</color>
     <color name="presentation_progress_empty">#FFE0E0E0</color>
     <color name="presentation_card_pressed">#FFF0F0F0</color>
-    <color name="presentation_list_button_bg">#FFF57C00</color>
-    <color name="presentation_list_button_pressed">#FFE65100</color>
 
     <!-- Presentation Mode Colors (Light) -->
     <!-- Keyboard Colors (Light) -->
     <color name="key_bg_normal">#FFFFFFFF</color>
     <color name="key_bg_function">#FFE9E9EC</color>
-    <color name="key_bg_pressed">#FFBFD6F8</color>
+    <color name="key_bg_pressed">#FFFFE0B2</color>
     <color name="key_border">#FF9A9AA0</color>
     <color name="key_text">#FF1F1F24</color>
 </resources>

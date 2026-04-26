@@ -4,40 +4,37 @@
     android:layout_height="match_parent"
     android:background="@color/presentation_bg">
 
-    <ScrollView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_above="@+id/tool_carousel"
-        android:fillViewport="true">
-
-        <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="24dp">
+        android:paddingTop="8dp"
+        android:paddingBottom="12dp">
 
         <!-- Timer & Pace Card -->
-        <LinearLayout
+        <FrameLayout
+            android:id="@+id/timer_card_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
             android:background="@drawable/presentation_card_bg"
-            android:padding="16dp"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="16dp"
+            android:clipToOutline="true">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <View
+                android:id="@+id/timer_progress_fill"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_gravity="start"
+                android:background="?attr/colorPrimary" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/timer_pace_label"
-                android:textColor="@color/presentation_text_muted"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.1"
-                android:layout_marginBottom="12dp" />
+                android:orientation="vertical"
+                android:padding="16dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -45,128 +42,79 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
-                <!-- Timer Section -->
-                <LinearLayout
+                <TextView
+                    android:id="@+id/timer_header_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/timer_pace_label"
+                    android:textColor="@color/presentation_text_muted"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/timer_status_text"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <ImageView
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:src="@drawable/ic_timer"
-                        android:tint="@color/presentation_primary"
-                        android:contentDescription="Timer"
-                        android:layout_marginEnd="12dp" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
-
-                            <TextView
-                                android:id="@+id/timer_remaining"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="25:00"
-                                android:textColor="@color/presentation_text_primary"
-                                android:textSize="32sp"
-                                android:textStyle="bold"
-                                android:fontFamily="sans-serif-light" />
-
-                            <ImageButton
-                                android:id="@+id/btn_edit_timer"
-                                android:layout_width="28dp"
-                                android:layout_height="28dp"
-                                android:layout_marginStart="8dp"
-                                android:src="@drawable/ic_edit"
-                                android:tint="@color/presentation_text_muted"
-                                android:background="?attr/selectableItemBackgroundBorderless"
-                                android:contentDescription="Edit timer" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
-
-                            <TextView
-                                android:id="@+id/timer_label"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/remaining"
-                                android:textColor="@color/presentation_text_secondary"
-                                android:textSize="14sp" />
-
-                            <TextView
-                                android:id="@+id/timer_total"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text=" of 25:00"
-                                android:textColor="@color/presentation_text_muted"
-                                android:textSize="14sp" />
-                        </LinearLayout>
-                    </LinearLayout>
-
-                    <ImageButton
-                        android:id="@+id/btn_timer_start"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginStart="16dp"
-                        android:src="@drawable/ic_play"
-                        android:tint="@android:color/white"
-                        android:background="@drawable/timer_start_button"
-                        android:contentDescription="Start timer" />
-
-                    <ImageButton
-                        android:id="@+id/btn_timer_reset"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginStart="8dp"
-                        android:src="@drawable/ic_reset"
-                        android:tint="@color/presentation_text_primary"
-                        android:background="@drawable/presentation_action_button"
-                        android:contentDescription="Reset timer" />
-                </LinearLayout>
+                    android:text="remaining of 25:00"
+                    android:textColor="@color/presentation_text_secondary"
+                    android:textSize="13sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:gravity="end" />
             </LinearLayout>
-        </LinearLayout>
+
+            <TextView
+                android:id="@+id/timer_remaining"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="6dp"
+                android:text="25:00"
+                android:textColor="@color/presentation_text_primary"
+                android:textSize="46sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-light" />
+            </LinearLayout>
+        </FrameLayout>
 
         <!-- NEXT / Previous Side by Side -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="2"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="12dp">
+            android:layout_marginBottom="8dp">
 
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:layout_marginEnd="4dp"
                 android:orientation="vertical">
 
                 <Button
                     android:id="@+id/btn_previous"
                     android:layout_width="match_parent"
-                    android:layout_height="160dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:minHeight="0dp"
                     android:text="@string/previous"
-                    android:textColor="@android:color/white"
-                    android:textSize="22sp"
+                    android:textColor="@color/presentation_button_content"
+                    android:textSize="20sp"
                     android:textAllCaps="false"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="12sp"
+                    android:autoSizeMaxTextSize="20sp"
+                    android:autoSizeStepGranularity="1sp"
                     android:background="@drawable/presentation_primary_button"
                     android:drawableEnd="@drawable/caret_left_fill"
                     android:drawablePadding="8dp"
-                    android:drawableTint="@android:color/white"
+                    android:drawableTint="@color/presentation_button_content"
                     android:paddingStart="16dp"
                     android:paddingEnd="16dp" />
 
@@ -174,32 +122,42 @@
                     android:id="@+id/hint_previous"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="← Left Arrow"
+                    android:layout_marginTop="2dp"
+                    android:text="← Left Arrow / Home\nFirst Slide"
                     android:textColor="@color/presentation_text_muted"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
+                    android:maxLines="2"
+                    android:ellipsize="end"
                     android:gravity="center" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="2"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="4dp"
                 android:orientation="vertical">
 
                 <Button
                     android:id="@+id/btn_next"
                     android:layout_width="match_parent"
-                    android:layout_height="160dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:minHeight="0dp"
                     android:text="@string/next"
-                    android:textColor="@android:color/white"
+                    android:textColor="@color/presentation_button_content"
                     android:textSize="28sp"
                     android:textStyle="bold"
                     android:textAllCaps="false"
+                    android:maxLines="1"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="16sp"
+                    android:autoSizeMaxTextSize="28sp"
+                    android:autoSizeStepGranularity="1sp"
                     android:background="@drawable/presentation_primary_button"
                     android:drawableEnd="@drawable/caret_right_fill"
                     android:drawablePadding="8dp"
-                    android:drawableTint="@android:color/white"
+                    android:drawableTint="@color/presentation_button_content"
                     android:paddingStart="24dp"
                     android:paddingEnd="24dp" />
 
@@ -207,9 +165,12 @@
                     android:id="@+id/hint_next"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="→ Right Arrow"
+                    android:layout_marginTop="2dp"
+                    android:text="→ Right Arrow / End\nLast Slide"
                     android:textColor="@color/presentation_text_muted"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
+                    android:maxLines="2"
+                    android:ellipsize="end"
                     android:gravity="center" />
             </LinearLayout>
         </LinearLayout>
@@ -217,74 +178,89 @@
         <!-- Action Buttons Row (Play / Black Screen) -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:layout_marginBottom="8dp">
 
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:layout_marginEnd="8dp"
+                android:layout_marginEnd="4dp"
                 android:orientation="vertical">
 
                 <Button
                     android:id="@+id/btn_play"
                     android:layout_width="match_parent"
-                    android:layout_height="200dp"
-                    android:minHeight="100dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:minHeight="0dp"
                     android:text="@string/play"
-                    android:textColor="@android:color/white"
-                    android:textSize="22sp"
+                    android:textColor="@color/presentation_button_content"
+                    android:textSize="16sp"
                     android:textAllCaps="false"
+                    android:maxLines="2"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="10sp"
+                    android:autoSizeMaxTextSize="16sp"
+                    android:autoSizeStepGranularity="1sp"
                     android:background="@drawable/presentation_primary_button"
-                    android:drawableEnd="@drawable/ic_play"
-                    android:drawablePadding="8dp"
-                    android:drawableTint="@android:color/white"
-                    android:paddingStart="24dp"
-                    android:paddingEnd="24dp" />
+                    android:gravity="center"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp" />
 
                 <TextView
                     android:id="@+id/hint_play"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:text="⌥⌘P / ESC"
                     android:textColor="@color/presentation_text_muted"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:gravity="center" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="4dp"
                 android:orientation="vertical">
 
                 <Button
                     android:id="@+id/btn_black_screen"
                     android:layout_width="match_parent"
-                    android:layout_height="200dp"
-                    android:minHeight="100dp"
-                    android:text="@string/black_screen"
-                    android:textColor="@android:color/white"
-                    android:textSize="16sp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:minHeight="0dp"
+                    android:text="@string/hide_screen_multiline"
+                    android:textColor="@color/presentation_button_content"
+                    android:textSize="14sp"
                     android:textAllCaps="false"
+                    android:maxLines="2"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="10sp"
+                    android:autoSizeMaxTextSize="14sp"
+                    android:autoSizeStepGranularity="1sp"
                     android:background="@drawable/presentation_action_button"
-                    android:drawableTop="@drawable/ic_black_screen"
-                    android:drawablePadding="4dp"
-                    android:drawableTint="@android:color/white"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="4dp" />
+                    android:gravity="center"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp" />
 
                 <TextView
                     android:id="@+id/hint_black_screen"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:text="B"
                     android:textColor="@color/presentation_text_muted"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:gravity="center" />
             </LinearLayout>
         </LinearLayout>
@@ -292,31 +268,35 @@
         <!-- Action Buttons Row (Laser / Pointer) -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="8dp">
 
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:layout_marginEnd="8dp"
+                android:layout_marginEnd="4dp"
                 android:orientation="vertical">
 
                 <Button
                     android:id="@+id/btn_laser"
                     android:layout_width="match_parent"
-                    android:layout_height="200dp"
-                    android:minHeight="100dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:minHeight="0dp"
                     android:text="@string/laser"
-                    android:textColor="@android:color/white"
+                    android:textColor="@color/presentation_button_content"
                     android:textSize="16sp"
                     android:textAllCaps="false"
+                    android:maxLines="1"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="10sp"
+                    android:autoSizeMaxTextSize="16sp"
+                    android:autoSizeStepGranularity="1sp"
                     android:background="@drawable/presentation_action_button"
-                    android:drawableTop="@drawable/ic_laser"
-                    android:drawablePadding="4dp"
-                    android:drawableTint="@android:color/white"
                     android:paddingTop="8dp"
                     android:paddingBottom="4dp" />
 
@@ -324,32 +304,38 @@
                     android:id="@+id/hint_laser"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:text="⌘Tab (tap/cycle/double-tap)"
                     android:textColor="@color/presentation_text_muted"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:gravity="center" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="4dp"
                 android:orientation="vertical">
 
                 <Button
                     android:id="@+id/btn_pointer"
                     android:layout_width="match_parent"
-                    android:layout_height="200dp"
-                    android:minHeight="100dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:minHeight="0dp"
                     android:text="@string/pointer"
-                    android:textColor="@android:color/white"
+                    android:textColor="@color/presentation_button_content"
                     android:textSize="16sp"
                     android:textAllCaps="false"
+                    android:maxLines="1"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="10sp"
+                    android:autoSizeMaxTextSize="16sp"
+                    android:autoSizeStepGranularity="1sp"
                     android:background="@drawable/presentation_action_button"
-                    android:drawableTop="@drawable/ic_pointer"
-                    android:drawablePadding="4dp"
-                    android:drawableTint="@android:color/white"
                     android:paddingTop="8dp"
                     android:paddingBottom="4dp" />
 
@@ -357,16 +343,17 @@
                     android:id="@+id/hint_pointer"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:text="Mouse move / click / right-click"
                     android:textColor="@color/presentation_text_muted"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:gravity="center" />
             </LinearLayout>
         </LinearLayout>
 
     </LinearLayout>
-
-    </ScrollView>
 
     <!-- Presentation Tool Carousel (Fixed at Bottom) -->
     <androidx.recyclerview.widget.RecyclerView

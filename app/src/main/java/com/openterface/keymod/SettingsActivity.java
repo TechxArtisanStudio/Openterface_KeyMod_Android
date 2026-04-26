@@ -1,25 +1,28 @@
 package com.openterface.keymod;
 
-import android.content.SharedPreferences;
+import android.content.Intent;
+import android.content.res.Configuration;
 import android.os.Bundle;
-import android.view.MenuItem;
-import android.widget.Toast;
+import android.view.View;
 
-import androidx.appcompat.app.ActionBar;
+import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentPagerAdapter;
-import androidx.viewpager.widget.ViewPager;
+import androidx.viewpager2.adapter.FragmentStateAdapter;
+import androidx.viewpager2.widget.ViewPager2;
 
+import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.tabs.TabLayout;
-import com.openterface.keymod.fragments.GeneralSettingsFragment;
-import com.openterface.keymod.fragments.VoiceSettingsFragment;
+import com.google.android.material.tabs.TabLayoutMediator;
 import com.openterface.keymod.fragments.AISettingsFragment;
+import com.openterface.keymod.fragments.GeneralSettingsFragment;
 import com.openterface.keymod.fragments.HistoryFragment;
-
-import java.util.ArrayList;
-import java.util.List;
+import com.openterface.keymod.fragments.VoiceSettingsFragment;
 
 /**
  * Settings Activity - Centralized settings management
@@ -27,104 +30,102 @@ import java.util.List;
  */
 public class SettingsActivity extends AppCompatActivity {
 
-    private static final String TAG = "SettingsActivity";
-    
-    private ViewPager viewPager;
-    private TabLayout tabLayout;
-    private SettingsPagerAdapter adapter;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ThemeManager.applyTheme(this);
         super.onCreate(savedInstanceState);
+        // Lay out below status bar (targetSdk 35+ defaults to edge-to-edge).
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
         setContentView(R.layout.activity_settings);
+        applyNonImmersiveSystemBars();
 
-        // Setup ActionBar with back button
-        ActionBar actionBar = getSupportActionBar();
-        if (actionBar != null) {
-            actionBar.setTitle("Settings");
-            actionBar.setDisplayHomeAsUpEnabled(true);
-            actionBar.setDisplayShowHomeEnabled(true);
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
+        toolbar.setNavigationOnClickListener(v ->
+                getOnBackPressedDispatcher().onBackPressed());
 
-        initializeViews();
-        setupViewPager();
-    }
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (isTaskRoot()) {
+                    Intent intent = new Intent(SettingsActivity.this, MainActivity.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                    startActivity(intent);
+                }
+                finish();
+            }
+        });
 
-    private void initializeViews() {
-        viewPager = findViewById(R.id.viewPager);
-        tabLayout = findViewById(R.id.tabLayout);
-    }
+        ViewPager2 viewPager = findViewById(R.id.viewPager);
+        TabLayout tabLayout = findViewById(R.id.tabLayout);
 
-    private void setupViewPager() {
-        adapter = new SettingsPagerAdapter(getSupportFragmentManager());
-        
-        // Add tabs
-        adapter.addFragment(new GeneralSettingsFragment(), "General");
-        adapter.addFragment(new VoiceSettingsFragment(), "Voice Input");
-        adapter.addFragment(new AISettingsFragment(), "AI Settings");
-        adapter.addFragment(new HistoryFragment(), "History");
+        viewPager.setAdapter(new SettingsPagerAdapter(this));
 
-        viewPager.setAdapter(adapter);
-        tabLayout.setupWithViewPager(viewPager);
-
-        // Set tab icons (optional)
-        tabLayout.getTabAt(0).setIcon(R.drawable.ic_settings);
-        tabLayout.getTabAt(1).setIcon(R.drawable.ic_voice);
-        tabLayout.getTabAt(2).setIcon(R.drawable.ic_ai);
-        tabLayout.getTabAt(3).setIcon(R.drawable.ic_history);
+        String[] tabTitles = new String[]{
+                getString(R.string.settings_tab_general),
+                getString(R.string.settings_tab_voice),
+                getString(R.string.settings_tab_ai),
+                getString(R.string.settings_tab_history)
+        };
+        new TabLayoutMediator(tabLayout, viewPager,
+                (tab, position) -> tab.setText(tabTitles[position])).attach();
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            onBackPressed();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
-    @Override
-    public void onBackPressed() {
-        // Save any pending changes before closing
-        saveAllSettings();
-        super.onBackPressed();
-    }
-
-    private void saveAllSettings() {
-        // Fragments should auto-save on preference changes
-        // This is just a safety net
-        Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show();
+    protected void onResume() {
+        super.onResume();
+        applyNonImmersiveSystemBars();
     }
 
     /**
-     * Pager Adapter for Settings Tabs
+     * Settings uses normal system bars (contrast with MainActivity immersive). Keeps status/nav
+     * colors aligned with {@link R.color#background_light} and icon appearance in sync with theme.
      */
-    private static class SettingsPagerAdapter extends FragmentPagerAdapter {
-        private final List<Fragment> fragmentList = new ArrayList<>();
-        private final List<String> fragmentTitleList = new ArrayList<>();
+    private void applyNonImmersiveSystemBars() {
+        int bg = ContextCompat.getColor(this, R.color.background_light);
+        getWindow().setStatusBarColor(bg);
+        getWindow().setNavigationBarColor(bg);
 
-        public SettingsPagerAdapter(FragmentManager manager) {
-            super(manager, BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT);
+        View decor = getWindow().getDecorView();
+        WindowInsetsControllerCompat controller =
+                WindowCompat.getInsetsController(getWindow(), decor);
+        controller.show(WindowInsetsCompat.Type.systemBars());
+
+        boolean night = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES;
+        controller.setAppearanceLightStatusBars(!night);
+        controller.setAppearanceLightNavigationBars(!night);
+    }
+
+    private static class SettingsPagerAdapter extends FragmentStateAdapter {
+
+        public SettingsPagerAdapter(@NonNull SettingsActivity activity) {
+            super(activity);
+        }
+
+        @NonNull
+        @Override
+        public Fragment createFragment(int position) {
+            switch (position) {
+                case 0:
+                    return new GeneralSettingsFragment();
+                case 1:
+                    return new VoiceSettingsFragment();
+                case 2:
+                    return new AISettingsFragment();
+                case 3:
+                    return new HistoryFragment();
+                default:
+                    throw new IllegalArgumentException("Invalid settings page: " + position);
+            }
         }
 
         @Override
-        public Fragment getItem(int position) {
-            return fragmentList.get(position);
-        }
-
-        @Override
-        public int getCount() {
-            return fragmentList.size();
-        }
-
-        @Override
-        public CharSequence getPageTitle(int position) {
-            return fragmentTitleList.get(position);
-        }
-
-        public void addFragment(Fragment fragment, String title) {
-            fragmentList.add(fragment);
-            fragmentTitleList.add(title);
+        public int getItemCount() {
+            return 4;
         }
     }
 }

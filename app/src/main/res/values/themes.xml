@@ -1,20 +1,128 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
     <style name="Base.Theme.KeyMod" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/theme_accent_orange</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorPrimaryContainer">@color/theme_accent_orange_container</item>
+        <item name="colorOnPrimaryContainer">@color/theme_accent_orange_on_container</item>
+        <item name="colorSecondary">@color/theme_accent_orange</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorSecondaryContainer">@color/theme_accent_orange_container</item>
+        <item name="colorOnSecondaryContainer">@color/theme_accent_orange_on_container</item>
+        <item name="colorTertiary">@color/theme_accent_orange</item>
+        <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_orange_low_emphasis</item>
+        <!-- Match list/card surfaces so status-bar / inset areas are not theme-primary tinted. -->
+        <item name="android:windowBackground">@color/background_light</item>
+        <item name="android:statusBarColor">@color/background_light</item>
+        <item name="android:navigationBarColor">@color/background_light</item>
     </style>
 
     <style name="Theme.KeyMod" parent="Base.Theme.KeyMod" />
+    <style name="Theme.KeyMod.Orange" parent="Base.Theme.KeyMod" />
+
+    <style name="Theme.KeyMod.Blue" parent="Base.Theme.KeyMod">
+        <item name="colorPrimary">@color/theme_accent_blue</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorPrimaryContainer">@color/theme_accent_blue_container</item>
+        <item name="colorOnPrimaryContainer">@color/theme_accent_blue_on_container</item>
+        <item name="colorSecondary">@color/theme_accent_blue</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorSecondaryContainer">@color/theme_accent_blue_container</item>
+        <item name="colorOnSecondaryContainer">@color/theme_accent_blue_on_container</item>
+        <item name="colorTertiary">@color/theme_accent_blue</item>
+        <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_blue_low_emphasis</item>
+    </style>
+
+    <style name="Theme.KeyMod.Green" parent="Base.Theme.KeyMod">
+        <item name="colorPrimary">@color/theme_accent_green</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorPrimaryContainer">@color/theme_accent_green_container</item>
+        <item name="colorOnPrimaryContainer">@color/theme_accent_green_on_container</item>
+        <item name="colorSecondary">@color/theme_accent_green</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorSecondaryContainer">@color/theme_accent_green_container</item>
+        <item name="colorOnSecondaryContainer">@color/theme_accent_green_on_container</item>
+        <item name="colorTertiary">@color/theme_accent_green</item>
+        <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_green_low_emphasis</item>
+    </style>
+
+    <style name="Theme.KeyMod.Pink" parent="Base.Theme.KeyMod">
+        <item name="colorPrimary">@color/theme_accent_pink</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorPrimaryContainer">@color/theme_accent_pink_container</item>
+        <item name="colorOnPrimaryContainer">@color/theme_accent_pink_on_container</item>
+        <item name="colorSecondary">@color/theme_accent_pink</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorSecondaryContainer">@color/theme_accent_pink_container</item>
+        <item name="colorOnSecondaryContainer">@color/theme_accent_pink_on_container</item>
+        <item name="colorTertiary">@color/theme_accent_pink</item>
+        <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_pink_low_emphasis</item>
+    </style>
+
+    <style name="Theme.KeyMod.Purple" parent="Base.Theme.KeyMod">
+        <item name="colorPrimary">@color/theme_accent_purple</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorPrimaryContainer">@color/theme_accent_purple_container</item>
+        <item name="colorOnPrimaryContainer">@color/theme_accent_purple_on_container</item>
+        <item name="colorSecondary">@color/theme_accent_purple</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorSecondaryContainer">@color/theme_accent_purple_container</item>
+        <item name="colorOnSecondaryContainer">@color/theme_accent_purple_on_container</item>
+        <item name="colorTertiary">@color/theme_accent_purple</item>
+        <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_purple_low_emphasis</item>
+    </style>
+
+    <style name="Theme.KeyMod.Red" parent="Base.Theme.KeyMod">
+        <item name="colorPrimary">@color/theme_accent_red</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorPrimaryContainer">@color/theme_accent_red_container</item>
+        <item name="colorOnPrimaryContainer">@color/theme_accent_red_on_container</item>
+        <item name="colorSecondary">@color/theme_accent_red</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorSecondaryContainer">@color/theme_accent_red_container</item>
+        <item name="colorOnSecondaryContainer">@color/theme_accent_red_on_container</item>
+        <item name="colorTertiary">@color/theme_accent_red</item>
+        <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_red_low_emphasis</item>
+    </style>
+
+    <style name="Theme.KeyMod.Teal" parent="Base.Theme.KeyMod">
+        <item name="colorPrimary">@color/theme_accent_teal</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorPrimaryContainer">@color/theme_accent_teal_container</item>
+        <item name="colorOnPrimaryContainer">@color/theme_accent_teal_on_container</item>
+        <item name="colorSecondary">@color/theme_accent_teal</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorSecondaryContainer">@color/theme_accent_teal_container</item>
+        <item name="colorOnSecondaryContainer">@color/theme_accent_teal_on_container</item>
+        <item name="colorTertiary">@color/theme_accent_teal</item>
+        <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_teal_low_emphasis</item>
+    </style>
+
+    <style name="Theme.KeyMod.Indigo" parent="Base.Theme.KeyMod">
+        <item name="colorPrimary">@color/theme_accent_indigo</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorPrimaryContainer">@color/theme_accent_indigo_container</item>
+        <item name="colorOnPrimaryContainer">@color/theme_accent_indigo_on_container</item>
+        <item name="colorSecondary">@color/theme_accent_indigo</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorSecondaryContainer">@color/theme_accent_indigo_container</item>
+        <item name="colorOnSecondaryContainer">@color/theme_accent_indigo_on_container</item>
+        <item name="colorTertiary">@color/theme_accent_indigo</item>
+        <item name="colorOnTertiary">@android:color/white</item>
+        <item name="presentationControlButtonIdleFill">@color/theme_accent_indigo_low_emphasis</item>
+    </style>
 
     <style name="ButtonTheme" parent="Theme.AppCompat.Light">
         <item name="android:background">@drawable/key_background</item>
         <item name="android:textAllCaps">false</item>
     </style>
 
-    <!-- Presentation Mode Button Theme - Dark Orange -->
-    <style name="Theme.KeyMod.Presentation" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/presentation_primary</item>
-        <item name="colorOnPrimary">@android:color/white</item>
-    </style>
+    <!-- Inherits accent from the active KeyMod theme (no fixed orange). -->
+    <style name="Theme.KeyMod.Presentation" parent="Base.Theme.KeyMod" />
 </resources>

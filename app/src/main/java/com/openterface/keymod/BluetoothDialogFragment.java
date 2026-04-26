@@ -164,8 +164,10 @@ public class BluetoothDialogFragment extends DialogFragment {
                 }
                 TextView textView = convertView.findViewById(android.R.id.text1);
                 textView.setText(item.title);
-                textView.setTextSize(18);
+                textView.setTextSize(14);
                 textView.setTypeface(null, android.graphics.Typeface.BOLD);
+                textView.setTextColor(ContextCompat.getColor(getContext(), R.color.text_secondary));
+                convertView.setBackgroundColor(ContextCompat.getColor(getContext(), R.color.bluetooth_surface));
                 convertView.setEnabled(false);
                 convertView.setOnClickListener(null);
             } else {

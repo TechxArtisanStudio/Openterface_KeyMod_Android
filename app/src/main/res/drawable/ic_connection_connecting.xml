@@ -1,4 +1,4 @@
-<!-- Connection status icon - Connecting (blue antenna, faded waves) -->
+<!-- Connection status icon - Connecting (accent antenna, faded waves) -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -6,12 +6,12 @@
     android:viewportHeight="24">
     <!-- Antenna base/stem -->
     <path
-        android:fillColor="#FF9800"
+        android:fillColor="?attr/colorPrimary"
         android:pathData="M12,14 L11,22 L13,22 Z"/>
     <!-- Inner wave (faded) -->
     <path
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#FF9800"
+        android:strokeColor="?attr/colorPrimary"
         android:strokeWidth="1.8"
         android:strokeLineCap="round"
         android:strokeAlpha="0.5"
@@ -19,13 +19,13 @@
     <!-- Outer wave (faded) -->
     <path
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#FF9800"
+        android:strokeColor="?attr/colorPrimary"
         android:strokeWidth="1.8"
         android:strokeLineCap="round"
         android:strokeAlpha="0.5"
         android:pathData="M5.5,8.5 A9,9 0 0 0 12,17 A9,9 0 0 0 18.5,8.5"/>
     <!-- Center dot -->
     <path
-        android:fillColor="#FF9800"
+        android:fillColor="?attr/colorPrimary"
         android:pathData="M12,13 m-1.5,0 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0"/>
 </vector>

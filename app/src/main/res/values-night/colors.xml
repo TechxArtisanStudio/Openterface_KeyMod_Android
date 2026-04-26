@@ -9,15 +9,20 @@
     <color name="divider">#FF3A3A3C</color>
     <color name="text_primary">#FFFFFFFF</color>
     <color name="text_secondary">#FF8E8E93</color>
+    <color name="header_connection_idle">#FF8E8E93</color>
 
     <!-- Voice Input Colors -->
     <color name="voice_input_field_background">#FF2C2C2E</color>
     <color name="voice_input_instruction_background">#FF1F2B38</color>
 
+    <!-- Bluetooth dialogs -->
+    <color name="bluetooth_dialog_bg">#FF121212</color>
+    <color name="bluetooth_surface">#FF1E1E1E</color>
+
     <!-- Keyboard Colors (Dark) -->
     <color name="key_bg_normal">#FF3A3A3C</color>
     <color name="key_bg_function">#FF4A4A4E</color>
-    <color name="key_bg_pressed">#FF6A7EA3</color>
+    <color name="key_bg_pressed">#FF6B3A0A</color>
     <color name="key_border">#FF5A5A5F</color>
     <color name="key_text">#FFFFFFFF</color>
 
@@ -25,10 +30,13 @@
     <color name="presentation_bg">#FF16192B</color>
     <color name="presentation_card_bg">#FF1E2236</color>
     <color name="presentation_text_primary">#FFFFFFFF</color>
+    <color name="presentation_button_content">#FFFFFFFF</color>
     <color name="presentation_text_secondary">#FF9BA3C5</color>
     <color name="presentation_text_muted">#FF5C6380</color>
+    <color name="presentation_timer_header_on_fill">#FFFFFFFF</color>
+    <color name="presentation_timer_status_on_fill">#FFE7ECFF</color>
     <color name="presentation_progress_empty">#FF3A3F57</color>
     <color name="presentation_card_pressed">#FF2A2F45</color>
-    <color name="presentation_list_button_bg">#FFE65100</color>
-    <color name="presentation_list_button_pressed">#FFBF360C</color>
+
+    <color name="color_presentation">#FFCE93D8</color>
 </resources>

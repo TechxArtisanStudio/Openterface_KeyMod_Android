@@ -10,10 +10,12 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
 
 /**
- * Launch Panel - Mode selection screen as app entry point
- * Matches iOS LaunchPanelView.swift functionality
+ * Welcome & Guide screen (user-facing name): mode picker, remember choice, and tutorial link.
+ * Entry point activity; matches iOS LaunchPanelView.swift functionality.
  */
 public class LaunchPanelActivity extends AppCompatActivity {
 
@@ -49,7 +51,9 @@ public class LaunchPanelActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        ThemeManager.applyTheme(this);
         super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
 
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
@@ -63,6 +67,8 @@ public class LaunchPanelActivity extends AppCompatActivity {
         }
 
         setContentView(R.layout.activity_launch_panel);
+        // Keep status bar neutral on launch panel (avoid accent-colored top bar on some OEM skins).
+        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.background_light));
 
         initializeViews();
         setupClickListeners();

@@ -17,7 +17,7 @@
 ### Scene 2: Portrait Mode Demo (0:05 - 0:20)
 **Visual:** Phone in portrait orientation
 **Show:**
-- Launch panel with 2×3 grid layout
+- Welcome & Guide screen with 2×3 grid layout
 - Title at top
 - 6 mode cards in 2 columns
 - User taps "Gamepad" card
@@ -34,7 +34,7 @@
 ### Scene 4: Landscape Mode Demo (0:25 - 0:40)
 **Visual:** Phone in landscape orientation
 **Show:**
-- Launch panel with 3×2 grid layout
+- Welcome & Guide screen with 3×2 grid layout
 - Title on left, cards on right
 - 6 mode cards in 3 columns
 - User taps different mode cards

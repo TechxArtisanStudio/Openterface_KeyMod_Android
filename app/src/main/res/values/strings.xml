@@ -1,5 +1,17 @@
 <resources>
     <string name="app_name">KeyMod</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_tab_general">General</string>
+    <string name="settings_tab_voice">Voice</string>
+    <string name="settings_tab_ai">AI</string>
+    <string name="settings_tab_history">History</string>
+
+    <!-- Welcome & Guide (mode picker + tutorial); opened from launcher or side menu -->
+    <string name="nav_welcome_guide">Welcome &amp; Guide</string>
+    <string name="nav_welcome_guide_content_description">Welcome screen, mode picker, and tutorial</string>
+    <string name="launch_panel_subtitle">Choose your preferred mode, or open the tutorial below.</string>
+    <string name="launch_panel_land_subtitle">Choose a mode, or open the tutorial below.</string>
+    <string name="show_tutorial_link">Show tutorial</string>
     <string name="PrtSc">PrtSc</string>
     <string name="ScrLk">ScrLk</string>
     <string name="Pause">Pause</string>
@@ -207,6 +219,9 @@
     <string name="close">Close</string>
     <string name="connection">Connection</string>
     <string name="menu">Menu</string>
+    <string name="bluetooth_settings_title">Bluetooth Settings</string>
+    <string name="scan_for_devices">Scan for Devices</string>
+    <string name="bluetooth_on_off">Bluetooth On/Off</string>
     
     <!-- Mode Selection Strings -->
     <string name="mode_keyboard">Keyboard Mode</string>
@@ -227,9 +242,15 @@
     <string name="pace_ok">OK</string>
     <string name="next">NEXT</string>
     <string name="previous">PREV</string>
-    <string name="black_screen">BLACK SCREEN</string>
-    <string name="play">PLAY</string>
-    <string name="stop">STOP</string>
+    <string name="hide_screen">HIDE SCREEN</string>
+    <string name="show_screen">SHOW SCREEN</string>
+    <string name="play">PRESENT</string>
+    <string name="first_slide">FIRST SLIDE</string>
+    <string name="first_slide_multiline">FIRST\nSLIDE</string>
+    <string name="last_slide">LAST SLIDE</string>
+    <string name="hide_screen_multiline">HIDE\nSCREEN</string>
+    <string name="show_screen_multiline">SHOW\nSCREEN</string>
+    <string name="stop">EXIT</string>
     <string name="laser">SWITCH APP</string>
     <string name="pointer">TOUCHPAD</string>
     <string name="list">List</string>
@@ -237,4 +258,24 @@
     <string name="timer_start">Start</string>
     <string name="timer_reset">Reset</string>
     <string name="timer_pause">Pause</string>
+    <string name="timer_settings_minutes_label">Duration</string>
+    <string name="timer_settings_minutes_hint">Minutes</string>
+    <string name="timer_settings_quick_select_label">Quick Select</string>
+    <string name="timer_preset_5">5</string>
+    <string name="timer_preset_10">10</string>
+    <string name="timer_preset_15">15</string>
+    <string name="timer_preset_20">20</string>
+    <string name="timer_preset_30">30</string>
+    <string name="timer_preset_60">60</string>
+    <string name="timer_settings_mode_label">Mode</string>
+    <string name="timer_mode_countdown">Countdown</string>
+    <string name="timer_mode_countup">Count Up</string>
+    <string name="timer_settings_gesture_hint">Tip: Double-tap the timer card to reset time.</string>
+
+    <string name="target_os_picker_title">Target OS</string>
+    <string name="target_os_header_cd">Target operating system</string>
+    <string name="target_os_header_cd_selected">Target OS: %1$s</string>
+    <string name="target_os_macos">macOS</string>
+    <string name="target_os_windows">Windows</string>
+    <string name="target_os_linux">Linux</string>
 </resources>

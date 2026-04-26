@@ -38,6 +38,18 @@
 
     </LinearLayout>
 
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:scrollbars="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
     <!-- Navigation Items -->
     <LinearLayout
         android:id="@+id/nav_keyboard_mouse"
@@ -59,13 +71,47 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@drawable/keyboard_mouse"
-            android:tint="@color/card_selected_bg" />
+            android:tint="?attr/colorPrimary" />
 
         <TextView
             android:id="@+id/nav_text_keyboard_mouse"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Keyboard &amp; Mouse"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:layout_marginStart="12dp" />
+
+    </LinearLayout>
+
+    <!-- Presentation Mode -->
+    <LinearLayout
+        android:id="@+id/nav_presentation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp"
+        android:background="@drawable/nav_item_background_selector"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/nav_icon_presentation"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/ic_presentation"
+            android:tint="?attr/colorPrimary" />
+
+        <TextView
+            android:id="@+id/nav_text_presentation"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Presentation"
             android:textSize="16sp"
             android:textColor="@color/text_primary"
             android:layout_marginStart="12dp" />
@@ -92,7 +138,7 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@drawable/gamepad"
-            android:tint="@color/card_selected_bg" />
+            android:tint="?attr/colorPrimary" />
 
         <TextView
             android:id="@+id/nav_text_gamepad"
@@ -125,7 +171,7 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@drawable/numpad"
-            android:tint="@color/card_selected_bg" />
+            android:tint="?attr/colorPrimary" />
 
         <TextView
             android:id="@+id/nav_text_numpad"
@@ -158,7 +204,7 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@drawable/three_dots"
-            android:tint="@color/card_selected_bg" />
+            android:tint="?attr/colorPrimary" />
 
         <TextView
             android:id="@+id/nav_text_shortcuts"
@@ -191,7 +237,7 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@drawable/macros"
-            android:tint="@color/card_selected_bg" />
+            android:tint="?attr/colorPrimary" />
 
         <TextView
             android:id="@+id/nav_text_macros"
@@ -224,7 +270,7 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@drawable/voice"
-            android:tint="@color/card_selected_bg" />
+            android:tint="?attr/colorPrimary" />
 
         <TextView
             android:id="@+id/nav_text_voice"
@@ -237,9 +283,9 @@
 
     </LinearLayout>
 
-    <!-- Presentation Mode -->
+    <!-- Settings (Material gear icon; row matches mode items above) -->
     <LinearLayout
-        android:id="@+id/nav_presentation"
+        android:id="@+id/settings_button"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
@@ -251,136 +297,43 @@
         android:layout_marginBottom="2dp"
         android:background="@drawable/nav_item_background_selector"
         android:clickable="true"
-        android:focusable="true">
+        android:focusable="true"
+        android:contentDescription="@string/settings_title">
 
         <ImageView
-            android:id="@+id/nav_icon_presentation"
+            android:id="@+id/nav_icon_settings"
             android:layout_width="20dp"
             android:layout_height="20dp"
-            android:src="@drawable/ic_presentation"
-            android:tint="@color/card_selected_bg" />
+            android:src="@drawable/ic_settings"
+            android:importantForAccessibility="no"
+            android:tint="?attr/colorPrimary" />
 
         <TextView
-            android:id="@+id/nav_text_presentation"
+            android:id="@+id/nav_text_settings"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Presentation"
+            android:text="@string/settings_title"
             android:textSize="16sp"
             android:textColor="@color/text_primary"
             android:layout_marginStart="12dp" />
 
     </LinearLayout>
 
-    <!-- Spacer -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-    <!-- Divider -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/divider"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="8dp" />
-
-    <!-- Target OS selector -->
-    <LinearLayout
-        android:id="@+id/target_os_section"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingBottom="4dp">
-
-        <TextView
-            android:id="@+id/target_os_label"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Target OS"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_secondary"
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingBottom="8dp">
-
-        <ImageButton
-            android:id="@+id/nav_os_macos_button"
-            android:layout_width="48dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Target macOS"
-            android:padding="8dp"
-            android:src="@drawable/ic_os_macos"
-            android:tint="@color/text_secondary" />
-
-        <ImageButton
-            android:id="@+id/nav_os_windows_button"
-            android:layout_width="48dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Target Windows"
-            android:padding="8dp"
-            android:src="@drawable/ic_os_windows"
-            android:tint="@color/text_secondary" />
-
-        <ImageButton
-            android:id="@+id/nav_os_linux_button"
-            android:layout_width="48dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Target Linux"
-            android:padding="8dp"
-            android:src="@drawable/ic_os_linux"
-            android:tint="@color/text_secondary" />
-
-    </LinearLayout>
-    </LinearLayout>
-
-    <!-- LaunchPad Button (returns to LaunchPanel) -->
+    <!-- Welcome & Guide (LaunchPanelActivity) -->
     <Button
         android:id="@+id/choose_mode_button"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="LaunchPad"
+        android:text="@string/nav_welcome_guide"
+        android:contentDescription="@string/nav_welcome_guide_content_description"
         android:textSize="14sp"
-        android:textColor="@color/card_selected_bg"
+        android:textColor="?attr/colorPrimary"
         android:padding="@dimen/sidebar_item_padding"
         android:layout_marginStart="8dp"
         android:layout_marginEnd="8dp"
         android:layout_marginBottom="4dp"
         android:background="?attr/selectableItemBackground"
         android:gravity="start|center_vertical"
-        android:drawablePadding="@dimen/spacing_small"
-        style="?android:attr/borderlessButtonStyle" />
-
-    <!-- Settings Button -->
-    <Button
-        android:id="@+id/settings_button"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Settings"
-        android:textSize="14sp"
-        android:textColor="@color/text_primary"
-        android:padding="@dimen/sidebar_item_padding"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="4dp"
-        android:background="?attr/selectableItemBackground"
-        android:gravity="start|center_vertical"
-        android:drawableStart="@drawable/ic_settings"
         android:drawablePadding="@dimen/spacing_small"
         style="?android:attr/borderlessButtonStyle" />
 
@@ -397,6 +350,9 @@
         android:paddingTop="4dp"
         android:paddingBottom="16dp"
         android:gravity="center" />
+
+        </LinearLayout>
+    </ScrollView>
 
 </LinearLayout>
 
