@@ -809,7 +809,7 @@ public class CustomKeyboardView extends LinearLayout {
                         final float downRawX = event.getRawX();
                         final float downRawY = event.getRawY();
                         final Runnable openAlternates = () -> showAlternatesPopup(v, key, downRawX);
-                        v.setTag(openAlternates);
+                        v.setTag(R.id.tag_custom_keyboard_pending_alternates, openAlternates);
                         longPressHandler.postDelayed(openAlternates, ALT_LONG_PRESS_TIMEOUT_MS);
                     }
                     return false;
@@ -823,10 +823,11 @@ public class CustomKeyboardView extends LinearLayout {
                 }
                 case MotionEvent.ACTION_UP: {
                     v.setPressed(false);
-                    Runnable pending = (Runnable) v.getTag();
-                    if (pending != null) {
+                    Object pendingObj = v.getTag(R.id.tag_custom_keyboard_pending_alternates);
+                    if (pendingObj instanceof Runnable) {
+                        Runnable pending = (Runnable) pendingObj;
                         longPressHandler.removeCallbacks(pending);
-                        v.setTag(null);
+                        v.setTag(R.id.tag_custom_keyboard_pending_alternates, null);
                     }
                     if (isAlternatePopupVisible()) {
                         commitCurrentAlternateSelection();
@@ -843,10 +844,11 @@ public class CustomKeyboardView extends LinearLayout {
                 }
                 case MotionEvent.ACTION_CANCEL: {
                     v.setPressed(false);
-                    Runnable pending = (Runnable) v.getTag();
-                    if (pending != null) {
+                    Object pendingCancel = v.getTag(R.id.tag_custom_keyboard_pending_alternates);
+                    if (pendingCancel instanceof Runnable) {
+                        Runnable pending = (Runnable) pendingCancel;
                         longPressHandler.removeCallbacks(pending);
-                        v.setTag(null);
+                        v.setTag(R.id.tag_custom_keyboard_pending_alternates, null);
                     }
                     if (isAlternatePopupVisible()) {
                         dismissAlternatesPopup();
@@ -971,7 +973,7 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private boolean shouldRepeatOnLongPress(Key key) {
-        return key != null && (key.isRepeatable || isArrowKey(key));
+        return key != null && (key.isRepeatable || isArrowKey(key) || isBackspaceKey(key));
     }
 
     private boolean isArrowKey(Key key) {
@@ -1876,11 +1878,11 @@ public class CustomKeyboardView extends LinearLayout {
         int primaryModifier = "macos".equals(getTargetOs()) ? MOD_WIN : MOD_CTRL;
         List<ExtraGridKey> gridKeys = new ArrayList<>();
 
-        // Row 1 (was row 3)
-        gridKeys.add(new ExtraGridKey(new Key("ALL", "", 0x04, "04", 25f, R.drawable.select_all_24, 0f, false, false, primaryModifier, false), 0, 0, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("COPY", "", 0x06, "06", 25f, R.drawable.content_copy_24, 0f, false, false, primaryModifier, false), 0, 2, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("CUT", "", 0x1B, "1B", 25f, R.drawable.content_cut_24, 0f, false, false, primaryModifier, false), 0, 4, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("PASTE", "", 0x19, "19", 25f, R.drawable.content_paste_24, 0f, false, false, primaryModifier, false), 0, 6, 1, 2));
+        // Row 1: CUT, PASTE, COPY, ALL (left-to-right)
+        gridKeys.add(new ExtraGridKey(new Key("CUT", "", 0x1B, "1B", 25f, R.drawable.content_cut_24, 0f, false, false, primaryModifier, false), 0, 0, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("PASTE", "", 0x19, "19", 25f, R.drawable.content_paste_24, 0f, false, false, primaryModifier, false), 0, 2, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("COPY", "", 0x06, "06", 25f, R.drawable.content_copy_24, 0f, false, false, primaryModifier, false), 0, 4, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("ALL", "", 0x04, "04", 25f, R.drawable.select_all_24, 0f, false, false, primaryModifier, false), 0, 6, 1, 2));
 
         // Row 2 (was row 4): ESC (Fn → NumLock), # (Fn → |), Undo (Fn → Redo), Backspace
         gridKeys.add(new ExtraGridKey(new Key("ESC", "", 0x29, "29", 25f, 0, 0f, false), 1, 0, 1, 2));
@@ -1891,14 +1893,14 @@ public class CustomKeyboardView extends LinearLayout {
         // Row 3 (was row 5)
         gridKeys.add(new ExtraGridKey(new Key("/", "", 0x54, "54", 25f, 0, 0f, false), 2, 0, 1, 2));
         gridKeys.add(new ExtraGridKey(new Key("*", "", 0x55, "55", 25f, 0, 0f, false), 2, 2, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("-", "", 0x56, "56", 25f, 0, 0f, false), 2, 4, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("+", "", 0x57, "57", 25f, 0, 0f, false), 2, 6, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("=", "", 0x67, "67", 25f, 0, 0f, false), 2, 4, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("-", "", 0x56, "56", 25f, 0, 0f, false), 2, 6, 1, 2));
 
         // Row 4 (was row 6)
         gridKeys.add(new ExtraGridKey(new Key("7", "", 0x5F, "5F", 25f, 0, 0f, false), 3, 0, 1, 2));
         gridKeys.add(new ExtraGridKey(new Key("8", "", 0x60, "60", 25f, 0, 0f, false), 3, 2, 1, 2));
         gridKeys.add(new ExtraGridKey(new Key("9", "", 0x61, "61", 25f, 0, 0f, false), 3, 4, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("=", "", 0x67, "67", 25f, 0, 0f, false), 3, 6, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("+", "", 0x57, "57", 25f, 0, 0f, false), 3, 6, 1, 2));
 
         // Row 5 (was row 7)
         gridKeys.add(new ExtraGridKey(new Key("4", "", 0x5C, "5C", 25f, 0, 0f, false), 4, 0, 1, 2));
@@ -1948,25 +1950,29 @@ public class CustomKeyboardView extends LinearLayout {
                 iconButton.setImageResource(entry.key.iconResId);
                 iconButton.setColorFilter(resolveThemeTextColor());
                 iconButton.setLayoutParams(params);
-                iconButton.setTag(entry.key);
+                iconButton.setTag(R.id.tag_custom_keyboard_extra_cell_key, entry.key);
                 if (entry.key.code == KEY_EXTRA_NUMPAD_FN) {
                     iconButton.setContentDescription("Fn");
                     extraNumpadFnButton = iconButton;
                     iconButton.setSelected(extraNumpadFnLocked);
                 }
-                iconButton.setOnClickListener(v -> handleKeyPress(entry.key));
-                iconButton.setOnTouchListener((v, event) -> {
-                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        performKeyHapticFeedback(v);
-                    }
-                    if (event.getAction() == MotionEvent.ACTION_UP) {
-                        repeatHandler.postDelayed(() -> {
-                            sendReleaseData();
-                            Log.d(TAG, "Sent key release for extra key: " + entry.key.label);
-                        }, 30);
-                    }
-                    return false;
-                });
+                if (shouldRepeatOnLongPress(entry.key)) {
+                    attachKeyListeners(iconButton, entry.key);
+                } else {
+                    iconButton.setOnClickListener(v -> handleKeyPress(entry.key));
+                    iconButton.setOnTouchListener((v, event) -> {
+                        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                            performKeyHapticFeedback(v);
+                        }
+                        if (event.getAction() == MotionEvent.ACTION_UP) {
+                            repeatHandler.postDelayed(() -> {
+                                sendReleaseData();
+                                Log.d(TAG, "Sent key release for extra key: " + entry.key.label);
+                            }, 30);
+                        }
+                        return false;
+                    });
+                }
                 gridLayout.addView(iconButton);
             } else {
                 Button textButton = new Button(getContext());
@@ -1977,22 +1983,26 @@ public class CustomKeyboardView extends LinearLayout {
                 textButton.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
                 textButton.setText(entry.key.label);
                 textButton.setTextColor(resolveThemeTextColor());
-                textButton.setTag(entry.key);
+                textButton.setTag(R.id.tag_custom_keyboard_extra_cell_key, entry.key);
                 styleExtraNumpadGridKeyButton(textButton, entry.key.label);
                 textButton.setLayoutParams(params);
-                textButton.setOnClickListener(v -> handleKeyPress(entry.key));
-                textButton.setOnTouchListener((v, event) -> {
-                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        performKeyHapticFeedback(v);
-                    }
-                    if (event.getAction() == MotionEvent.ACTION_UP) {
-                        repeatHandler.postDelayed(() -> {
-                            sendReleaseData();
-                            Log.d(TAG, "Sent key release for extra key: " + entry.key.label);
-                        }, 30);
-                    }
-                    return false;
-                });
+                if (shouldRepeatOnLongPress(entry.key)) {
+                    attachKeyListeners(textButton, entry.key);
+                } else {
+                    textButton.setOnClickListener(v -> handleKeyPress(entry.key));
+                    textButton.setOnTouchListener((v, event) -> {
+                        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                            performKeyHapticFeedback(v);
+                        }
+                        if (event.getAction() == MotionEvent.ACTION_UP) {
+                            repeatHandler.postDelayed(() -> {
+                                sendReleaseData();
+                                Log.d(TAG, "Sent key release for extra key: " + entry.key.label);
+                            }, 30);
+                        }
+                        return false;
+                    });
+                }
                 gridLayout.addView(textButton);
             }
         }
@@ -2002,15 +2012,15 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     /**
-     * Row-height ratio for extra numpad grid (1-based UI rows 1–2 vs 3–7 map to row indices 0–1 vs 2–6):
-     * total(row0–row1) : total(row2–row6) = 1 : 5
-     * -> top two rows weight 0.5 each; lower rows weight 1.0 each.
+     * Extra numpad row heights: rows 0–2 (shortcuts, ESC row, operators / * = -) share the same compact
+     * weight so the operator row matches the two rows above; rows 3–6 (digits, Tab, 123+Enter, Fn row)
+     * use a larger weight so that block gets more of the vertical space.
      */
     private float getExtraGridRowSpanWeight(int row, int rowSpan) {
         float total = 0f;
         for (int i = 0; i < rowSpan; i++) {
             int r = row + i;
-            total += r <= 1 ? 0.5f : 1.0f;
+            total += r <= 2 ? 0.5f : 1.0f;
         }
         return total;
     }
@@ -2168,7 +2178,7 @@ public class CustomKeyboardView extends LinearLayout {
         }
         for (int i = 0; i < extraNumpadGrid.getChildCount(); i++) {
             View child = extraNumpadGrid.getChildAt(i);
-            Object tag = child.getTag();
+            Object tag = child.getTag(R.id.tag_custom_keyboard_extra_cell_key);
             if (!(tag instanceof Key)) {
                 continue;
             }
@@ -2522,6 +2532,7 @@ public class CustomKeyboardView extends LinearLayout {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         longPressHandler.removeCallbacksAndMessages(null);
+        stopRepeatingDelete();
         dismissAlternatesPopup();
         if (isServiceBound) {
             getContext().unbindService(serviceConnection);

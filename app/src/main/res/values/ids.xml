@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CustomKeyboardView: extra numpad cell Key (must not use default setTag for Runnable). -->
+    <item name="tag_custom_keyboard_extra_cell_key" type="id"/>
+    <!-- Pending alternates popup runnable for attachKeyListeners (separate from cell Key). -->
+    <item name="tag_custom_keyboard_pending_alternates" type="id"/>
+</resources>
