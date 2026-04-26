@@ -41,7 +41,9 @@
         android:layout_weight="1"
         android:fillViewport="true"
         android:scrollbars="vertical"
-        android:clipToPadding="false">
+        android:clipToPadding="false"
+        android:foreground="@drawable/launch_panel_mode_bottom_fade"
+        android:foregroundGravity="fill">
 
         <GridLayout
             android:layout_width="match_parent"
@@ -49,6 +51,7 @@
             android:columnCount="2"
             android:rowCount="4"
             android:padding="16dp"
+            android:paddingBottom="28dp"
             android:alignmentMode="alignMargins">
 
         <!-- Keyboard & Mouse Card -->
@@ -403,13 +406,16 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="4dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp"
         android:text="@string/show_tutorial_link"
         android:textSize="14sp"
         android:textStyle="bold"
         android:textColor="?attr/colorPrimary"
-        android:padding="8dp" />
+        android:paddingTop="6dp"
+        android:paddingBottom="3dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp" />
 
     <!-- Footer -->
     <LinearLayout

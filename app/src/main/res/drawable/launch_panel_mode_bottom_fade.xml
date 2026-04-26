@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bottom strip only: transparent toward scrolling content, solid background_light at bottom edge -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:gravity="bottom"
+        android:height="48dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="90"
+                android:startColor="@color/background_light"
+                android:endColor="@android:color/transparent" />
+        </shape>
+    </item>
+</layer-list>

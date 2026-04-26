@@ -2,6 +2,7 @@ package com.openterface.keymod;
 
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.res.Resources;
@@ -31,6 +32,7 @@ import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
@@ -406,12 +408,35 @@ public class CustomKeyboardView extends LinearLayout {
         return new Key("", "", keyCode, codeStr, 1f, icon, 0f, false, false, -1, true);
     }
 
+    /**
+     * View context is often a {@link android.view.ContextThemeWrapper}, not the activity itself.
+     */
+    @Nullable
+    private static AppCompatActivity unwrapAppCompatActivity(@Nullable Context context) {
+        Context c = context;
+        while (c != null) {
+            if (c instanceof AppCompatActivity) {
+                return (AppCompatActivity) c;
+            }
+            if (c instanceof ContextWrapper) {
+                Context base = ((ContextWrapper) c).getBaseContext();
+                if (base == c) {
+                    break;
+                }
+                c = base;
+            } else {
+                break;
+            }
+        }
+        return null;
+    }
+
     private void showTopModeSlotPicker(int slotIndex1Based) {
-        Context ctx = getContext();
-        if (!(ctx instanceof AppCompatActivity)) {
+        AppCompatActivity act = unwrapAppCompatActivity(getContext());
+        if (act == null) {
             return;
         }
-        AppCompatActivity act = (AppCompatActivity) ctx;
+        Context ctx = act;
         String[] modes = TopModeShortcutPrefs.getSelectableModes();
         CharSequence[] labels = TopModeShortcutPrefs.getModeLabels(ctx);
         String current = TopModeShortcutPrefs.getModeForSlot(ctx, slotIndex1Based);
@@ -2026,12 +2051,8 @@ public class CustomKeyboardView extends LinearLayout {
                 case MotionEvent.ACTION_MOVE:
                     float dx = event.getRawX() - startX[0];
                     float dy = event.getRawY() - startY[0];
-                    if (pendingModeLongPress[0] != null && modeSlotIndex > 0) {
-                        if (Math.max(Math.abs(dx), Math.abs(dy)) > touchSlop || isDragging[0]) {
-                            longPressHandler.removeCallbacks(pendingModeLongPress[0]);
-                            pendingModeLongPress[0] = null;
-                        }
-                    }
+                    // Do not cancel mode long-press on small movement (finger jitter); only cancel
+                    // when the user is clearly horizontal-swipe paging the strip.
                     if (!isDragging[0] && Math.abs(dx) > touchSlop && Math.abs(dx) > Math.abs(dy)) {
                         isDragging[0] = true;
                         if (pendingModeLongPress[0] != null) {
