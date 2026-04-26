@@ -49,6 +49,7 @@ public class CustomKeyboardView extends LinearLayout {
     private static final float TOP_PANEL_ROW_WEIGHT = 0.8f;
     private static final float TOP_PANEL_TOTAL_WEIGHT = TOP_PANEL_ROWS * TOP_PANEL_ROW_WEIGHT;
     private static final int KEY_MODE_FN = 0xF005;
+    private static final int KEY_NOOP_PLACEHOLDER = -1;
     private static final int MOD_CTRL = 1;
     private static final int MOD_SHIFT = 2;
     private static final int MOD_ALT = 4;
@@ -1396,22 +1397,8 @@ public class CustomKeyboardView extends LinearLayout {
 
     private void rebuildTopShortcutPanels() {
         topShortcutPanels.clear();
-        topShortcutPanels.add(new TopShortcutPanel("Standard", buildStandardTopPanelKeys()));
-
-        if (shortcutProfileManager == null) {
-            return;
-        }
-
-        ShortcutProfileManager.ShortcutProfile defaultProfile = shortcutProfileManager.getProfileById("default");
-        addProfilePanels(defaultProfile, "Default");
-
-        List<ShortcutProfileManager.ShortcutProfile> allProfiles = shortcutProfileManager.getAllProfiles();
-        for (ShortcutProfileManager.ShortcutProfile profile : allProfiles) {
-            if (profile == null || "default".equals(profile.id)) {
-                continue;
-            }
-            addProfilePanels(profile, profile.name);
-        }
+        topShortcutPanels.add(new TopShortcutPanel("Standard 1/2", buildStandardTopPanelPage1Keys()));
+        topShortcutPanels.add(new TopShortcutPanel("Standard 2/2", buildStandardTopPanelPage2Keys()));
     }
 
     private void addProfilePanels(ShortcutProfileManager.ShortcutProfile profile, String panelName) {
@@ -1463,7 +1450,7 @@ public class CustomKeyboardView extends LinearLayout {
         }
     }
 
-    private List<Key> buildStandardTopPanelKeys() {
+    private List<Key> buildStandardTopPanelPage1Keys() {
         List<Key> keys = new ArrayList<>(TOP_PANEL_PAGE_SIZE);
         int primaryModifier = "macos".equals(getTargetOs()) ? MOD_WIN : MOD_CTRL;
         keys.add(new Key("ALL",    "", 0x04, "04", 1f, R.drawable.select_all_24, 0f, false, false, primaryModifier, true));
@@ -1481,6 +1468,25 @@ public class CustomKeyboardView extends LinearLayout {
         keys.add(new Key("LEFT",   "", 0x50, "50", 1f, R.drawable.keyboard_arrow_left_24, 0f, false, false, -1, true));
         keys.add(new Key("DOWN",   "", 0x51, "51", 1f, R.drawable.keyboard_arrow_down_24, 0f, false, false, -1, true));
         keys.add(new Key("RIGHT",  "", 0x4F, "4F", 1f, R.drawable.keyboard_arrow_right_24, 0f, false, false, -1, true));
+        return keys;
+    }
+
+    private List<Key> buildStandardTopPanelPage2Keys() {
+        List<Key> keys = new ArrayList<>(TOP_PANEL_PAGE_SIZE);
+        keys.add(new Key("HOME", "", 0x4A, "4A", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("END",  "", 0x4D, "4D", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PGUP", "", 0x4B, "4B", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PGDN", "", 0x4E, "4E", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH1",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH2",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH3",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH4",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH5",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH6",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH7",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH8",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH9",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH10", "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
         return keys;
     }
 
@@ -1968,6 +1974,10 @@ public class CustomKeyboardView extends LinearLayout {
 
     private void handleKeyPress(Key key) {
         Log.d(TAG, "Key pressed: label=" + key.label + ", code=" + key.code);
+
+        if (key.code == KEY_NOOP_PLACEHOLDER) {
+            return;
+        }
 
         if (key.shortcutModifiers >= 0) {
             sendShortcutWithModifiers(key.shortcutModifiers, key.code);
