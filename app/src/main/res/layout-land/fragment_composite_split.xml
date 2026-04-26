@@ -4,39 +4,38 @@
     android:id="@+id/split_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
+    android:orientation="horizontal"
     android:background="@color/background_light">
 
-    <!-- Shared top scrolling panel: weight 12 vs 20 below matches full-keyboard 2.4 : 4 row weights -->
-    <FrameLayout
-        android:id="@+id/split_top_panel"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="12"/>
-
-    <!-- Main content: Left Keyboard | Touchpad | Right Keyboard -->
+    <!-- Left column: top shortcuts + left keyboard -->
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="20"
-        android:orientation="horizontal">
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical">
 
-        <!-- Left Keyboard -->
+        <FrameLayout
+            android:id="@+id/split_top_left"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="10" />
+
         <com.openterface.keymod.CustomKeyboardView
             android:id="@+id/keyboard_view_left"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="22"
             android:keyBackground="@drawable/key_background"
             android:theme="@style/ButtonTheme"/>
+    </LinearLayout>
 
-        <!-- Touchpad Section (center) -->
-        <LinearLayout
-            android:id="@+id/touchpad_section"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1.2"
-            android:orientation="horizontal">
+    <!-- Touchpad column stays full-height to remove center top blank strip -->
+    <LinearLayout
+        android:id="@+id/touchpad_section"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1.2"
+        android:orientation="horizontal">
 
             <FrameLayout
                 android:layout_width="0dp"
@@ -79,9 +78,9 @@
                     android:padding="8dp"
                     android:background="@android:color/transparent"
                     android:textColor="@color/text_primary"
-                    android:textSize="16sp"
+                    android:textSize="13sp"
                     android:letterSpacing="0.01"
-                    android:lineSpacingMultiplier="1.34"
+                    android:lineSpacingMultiplier="1.22"
                     android:scrollbars="none" />
 
                 <ImageButton
@@ -117,17 +116,28 @@
 
             </LinearLayout>
 
-        </LinearLayout>
+    </LinearLayout>
 
-        <!-- Right Keyboard -->
+    <!-- Right column: top shortcuts + right keyboard -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <FrameLayout
+            android:id="@+id/split_top_right"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="10" />
+
         <com.openterface.keymod.CustomKeyboardView
             android:id="@+id/keyboard_view_right"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="22"
             android:keyBackground="@drawable/key_background"
             android:theme="@style/ButtonTheme"/>
-
     </LinearLayout>
 
 </LinearLayout>

@@ -7,12 +7,12 @@
     android:orientation="vertical"
     android:background="@color/background_light">
 
-    <!-- Touchpad Section (top, flexible height) -->
+    <!-- Touchpad Section (top, expanded height for better gesture room) -->
     <LinearLayout
         android:id="@+id/touchpad_section"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_weight="1.25"
         android:orientation="vertical">
 
         <!-- TouchPad with footer hint overlay -->
@@ -95,12 +95,12 @@
 
     </LinearLayout>
 
-    <!-- Keyboard Section (bottom, larger share so all rows fit) -->
+    <!-- Keyboard Section (bottom, slightly reduced so touchpad reaches closer to top bar) -->
     <com.openterface.keymod.CustomKeyboardView
         android:id="@+id/keyboard_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="2.4"
+        android:layout_weight="2.15"
         android:keyBackground="@drawable/key_background"
         android:theme="@style/ButtonTheme"/>
 

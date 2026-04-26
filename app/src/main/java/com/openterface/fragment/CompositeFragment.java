@@ -440,7 +440,9 @@ public class CompositeFragment extends Fragment {
 
     private void setupSplitViews(View view) {
         splitRoot = view.findViewById(R.id.split_root);
-        FrameLayout topPanelContainer = view.findViewById(R.id.split_top_panel);
+        View topPanelContainer = view.findViewById(R.id.split_top_panel);
+        FrameLayout splitTopLeft = view.findViewById(R.id.split_top_left);
+        FrameLayout splitTopRight = view.findViewById(R.id.split_top_right);
         keyboardViewLeft = view.findViewById(R.id.keyboard_view_left);
         keyboardViewRight = view.findViewById(R.id.keyboard_view_right);
         splitTouchpadSection = view.findViewById(R.id.touchpad_section);
@@ -468,10 +470,16 @@ public class CompositeFragment extends Fragment {
             // Register for OS change updates
             registerKeyboardOsListener(keyboardViewLeft);
             // Create shared top panel from the left keyboard
-            if (topPanelContainer != null) {
+            if (splitTopLeft != null && splitTopRight != null) {
+                keyboardViewLeft.createSplitLandscapeTopPanel(
+                        splitTopLeft,
+                        null,
+                        splitTopRight
+                );
+            } else if (topPanelContainer instanceof FrameLayout) {
                 View topPanel = keyboardViewLeft.createTopPanel();
                 if (topPanel != null) {
-                    topPanelContainer.addView(topPanel);
+                    ((FrameLayout) topPanelContainer).addView(topPanel);
                 }
             }
         }
