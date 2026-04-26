@@ -239,6 +239,7 @@
     <string name="compose_text_hint">Type or paste text (ASCII only). Tap Send to type it on the target.</string>
     <string name="compose_ascii_warning">Non-ASCII characters are not supported for HID send. Remove them to enable Send.</string>
     <string name="compose_clear">Clear</string>
+    <string name="compose_touchpad">Touchpad</string>
     <string name="compose_send">Send</string>
     <string name="compose_stop">Stop</string>
     <string name="compose_char_count">%1$d / %2$d</string>

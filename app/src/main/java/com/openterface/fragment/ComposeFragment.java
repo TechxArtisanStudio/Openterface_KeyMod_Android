@@ -25,6 +25,7 @@ import com.openterface.keymod.CustomKeyboardView;
 import com.openterface.keymod.MainActivity;
 import com.openterface.keymod.R;
 import com.openterface.keymod.util.HidTextKeystrokeSender;
+import com.openterface.keymod.util.PopOutTouchPadDialog;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 
 import java.util.ArrayList;
@@ -45,6 +46,7 @@ public class ComposeFragment extends Fragment {
     private TextView asciiWarning;
     private TextView charCount;
     private Button clearButton;
+    private Button touchpadButton;
     private Button sendButton;
     private CustomKeyboardView keyboardView;
 
@@ -52,6 +54,8 @@ public class ComposeFragment extends Fragment {
     private final ExecutorService sendExecutor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean cancelSend = new AtomicBoolean(false);
     private volatile boolean sending = false;
+
+    private PopOutTouchPadDialog composeTouchPad;
 
     private final List<MainActivity.OnTargetOsChangeListener> osChangeListeners = new ArrayList<>();
 
@@ -64,6 +68,7 @@ public class ComposeFragment extends Fragment {
         asciiWarning = view.findViewById(R.id.compose_ascii_warning);
         charCount = view.findViewById(R.id.compose_char_count);
         clearButton = view.findViewById(R.id.compose_clear_button);
+        touchpadButton = view.findViewById(R.id.compose_touchpad_button);
         sendButton = view.findViewById(R.id.compose_send_button);
         keyboardView = view.findViewById(R.id.compose_keyboard_view);
 
@@ -87,6 +92,15 @@ public class ComposeFragment extends Fragment {
             });
         }
         sendButton.setOnClickListener(v -> onSendOrStopClicked());
+
+        if (touchpadButton != null) {
+            touchpadButton.setOnClickListener(v -> {
+                if (composeTouchPad == null) {
+                    composeTouchPad = new PopOutTouchPadDialog(this, false);
+                }
+                composeTouchPad.show();
+            });
+        }
 
         body.addTextChangedListener(new TextWatcher() {
             @Override
@@ -142,10 +156,15 @@ public class ComposeFragment extends Fragment {
             }
         }
         osChangeListeners.clear();
+        if (composeTouchPad != null) {
+            composeTouchPad.dismissIfShowing();
+            composeTouchPad = null;
+        }
         body = null;
         asciiWarning = null;
         charCount = null;
         clearButton = null;
+        touchpadButton = null;
         sendButton = null;
         keyboardView = null;
         super.onDestroyView();
@@ -268,6 +287,12 @@ public class ComposeFragment extends Fragment {
             boolean canSend = connected && !bad && !t.isEmpty();
             sendButton.setEnabled(canSend);
             sendButton.setAlpha(canSend ? 1f : 0.45f);
+        }
+
+        // Touchpad stays tappable regardless of connection; PopOutTouchPadDialog handles offline.
+        if (touchpadButton != null) {
+            touchpadButton.setEnabled(true);
+            touchpadButton.setAlpha(1f);
         }
     }
 }
