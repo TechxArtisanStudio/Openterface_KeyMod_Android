@@ -19,31 +19,57 @@ public final class TouchPadTipsFormatter {
 
     private TouchPadTipsFormatter() {}
 
-    /** Title + drag line only (shown on the touchpad surface). */
-    public static CharSequence buildCompact(Context context, boolean dragModeOn) {
+    /**
+     * Three-line status: title, logical mouse buttons / drag lock, and live touch surface activity.
+     */
+    public static CharSequence buildCompact(Context context, boolean dragModeOn, TouchPadPointerPhase pointerPhase) {
         String title = context.getString(R.string.touch_pad_title);
-        String drag = dragModeOn
-                ? context.getString(R.string.touch_pad_drag_on)
-                : context.getString(R.string.touch_pad_drag_off);
-        String full = title + "\n" + drag;
+        String mouse = context.getString(
+                dragModeOn ? R.string.touch_pad_status_buttons_drag : R.string.touch_pad_status_buttons_up);
+        String touch;
+        switch (pointerPhase) {
+            case MOVE:
+                touch = context.getString(R.string.touch_pad_status_touch_move);
+                break;
+            case SCROLL:
+                touch = context.getString(R.string.touch_pad_status_touch_scroll);
+                break;
+            default:
+                touch = context.getString(R.string.touch_pad_status_touch_idle);
+                break;
+        }
+
+        String full = title + "\n" + mouse + "\n" + touch;
         SpannableStringBuilder ssb = new SpannableStringBuilder(full);
+        int primary = ContextCompat.getColor(context, R.color.text_primary);
+        int secondary = ContextCompat.getColor(context, R.color.text_secondary);
+        int accent = ContextCompat.getColor(context, R.color.primary);
 
         int titleEnd = title.length();
         ssb.setSpan(new StyleSpan(Typeface.BOLD), 0, titleEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        ssb.setSpan(
-                new ForegroundColorSpan(ContextCompat.getColor(context, R.color.text_primary)),
-                0,
-                titleEnd,
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        ssb.setSpan(new ForegroundColorSpan(primary), 0, titleEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         ssb.setSpan(new RelativeSizeSpan(1.08f), 0, titleEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
-        int dragStart = titleEnd + 1;
-        int dragEnd = dragStart + drag.length();
-        int dragColor = dragModeOn
-                ? ContextCompat.getColor(context, R.color.primary)
-                : ContextCompat.getColor(context, R.color.text_secondary);
-        ssb.setSpan(new ForegroundColorSpan(dragColor), dragStart, dragEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        ssb.setSpan(new StyleSpan(Typeface.BOLD), dragStart, dragEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        int mouseStart = titleEnd + 1;
+        int mouseEnd = mouseStart + mouse.length();
+        ssb.setSpan(new StyleSpan(Typeface.BOLD), mouseStart, mouseEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        ssb.setSpan(
+                new ForegroundColorSpan(dragModeOn ? accent : secondary),
+                mouseStart,
+                mouseEnd,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        int touchStart = mouseEnd + 1;
+        int touchEnd = touchStart + touch.length();
+        boolean touchActive = pointerPhase != TouchPadPointerPhase.IDLE;
+        if (touchActive) {
+            ssb.setSpan(new StyleSpan(Typeface.BOLD), touchStart, touchEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        ssb.setSpan(
+                new ForegroundColorSpan(touchActive ? primary : secondary),
+                touchStart,
+                touchEnd,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
         return ssb;
     }

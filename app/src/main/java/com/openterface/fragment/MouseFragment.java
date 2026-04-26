@@ -5,7 +5,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -20,6 +22,7 @@ import com.openterface.keymod.BluetoothService;
 import com.openterface.keymod.R;
 import com.openterface.keymod.TouchPadView;
 import com.openterface.keymod.util.TouchPadHelpOverlay;
+import com.openterface.keymod.util.TouchPadPointerPhase;
 import com.openterface.keymod.util.TouchPadTipsFormatter;
 import com.openterface.target.CH9329MSKBMap;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
@@ -36,6 +39,15 @@ public class MouseFragment extends Fragment {
     private BluetoothService bluetoothService;
     private boolean isServiceBound;
     private boolean isDragMode = false;
+
+    private static final long POINTER_IDLE_AFTER_MS = 400L;
+    private final Handler tipHandler = new Handler(Looper.getMainLooper());
+    private TouchPadPointerPhase pointerPhase = TouchPadPointerPhase.IDLE;
+    private final Runnable pointerIdleRunnable =
+            () -> {
+                pointerPhase = TouchPadPointerPhase.IDLE;
+                updateTouchPadTips();
+            };
 
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         @Override
@@ -129,7 +141,23 @@ public class MouseFragment extends Fragment {
 
     private void updateTouchPadTips() {
         if (touchPadTips == null) return;
-        touchPadTips.setText(TouchPadTipsFormatter.buildCompact(requireContext(), isDragMode));
+        touchPadTips.setText(
+                TouchPadTipsFormatter.buildCompact(requireContext(), isDragMode, pointerPhase));
+    }
+
+    private void notePointerPhase(TouchPadPointerPhase phase) {
+        tipHandler.removeCallbacks(pointerIdleRunnable);
+        pointerPhase = phase;
+        updateTouchPadTips();
+        if (phase != TouchPadPointerPhase.IDLE) {
+            tipHandler.postDelayed(pointerIdleRunnable, POINTER_IDLE_AFTER_MS);
+        }
+    }
+
+    private void clearPointerPhaseForFingerUp() {
+        tipHandler.removeCallbacks(pointerIdleRunnable);
+        pointerPhase = TouchPadPointerPhase.IDLE;
+        updateTouchPadTips();
     }
 
     private void sendMouseButtonState(int buttonMask) {
@@ -307,9 +335,10 @@ public class MouseFragment extends Fragment {
                 @Override
                 public void onTouchMove(float startX, float startY, float lastX, float lastY) {
                     if (lastX == 0 && lastY == 0) {
-                        // 2-finger scroll sentinel from TouchPadView
+                        notePointerPhase(TouchPadPointerPhase.SCROLL);
                         sendScrollData((int) startX, (int) startY);
                     } else {
+                        notePointerPhase(TouchPadPointerPhase.MOVE);
                         sendHexRelData(startX, startY, lastX, lastY);
                     }
                 }
@@ -387,6 +416,7 @@ public class MouseFragment extends Fragment {
 
                 @Override
                 public void onTouchRelease() {
+                    clearPointerPhaseForFingerUp();
                     // Match iOS behavior: release only when drag mode is off.
                     if (!isDragMode) {
                         releaseAllMSData();
@@ -408,6 +438,7 @@ public class MouseFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
+        tipHandler.removeCallbacks(pointerIdleRunnable);
         super.onDestroyView();
         TouchPadHelpOverlay.clear(touchPadHelpOverlay);
         setDragMode(false);
