@@ -705,7 +705,8 @@ public class CompositeFragment extends Fragment {
                     0, ViewGroup.LayoutParams.MATCH_PARENT, 1.0f));
 
             toggleHandle.setLayoutParams(new LinearLayout.LayoutParams(
-                    dpToPx(36), ViewGroup.LayoutParams.MATCH_PARENT));
+                    getResources().getDimensionPixelSize(R.dimen.toggle_handle_width_landscape),
+                    ViewGroup.LayoutParams.MATCH_PARENT));
             toggleHandle.setGravity(android.view.Gravity.CENTER);
 
             keyboardView.setLayoutParams(new LinearLayout.LayoutParams(
@@ -721,7 +722,8 @@ public class CompositeFragment extends Fragment {
                     ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.5f));
 
             toggleHandle.setLayoutParams(new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(44)));
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    getResources().getDimensionPixelSize(R.dimen.toggle_handle_height)));
             toggleHandle.setGravity(android.view.Gravity.CENTER);
 
             keyboardView.setLayoutParams(new LinearLayout.LayoutParams(

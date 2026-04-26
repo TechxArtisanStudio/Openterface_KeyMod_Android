@@ -37,6 +37,10 @@
     <dimen name="touchpad_elevation">2dp</dimen>
     <dimen name="touchpad_help_overlay_shift_up">-28dp</dimen>
     <dimen name="touchpad_help_overlay_shift_up_split">-20dp</dimen>
+
+    <!-- Toggle handle between touchpad and keyboard (portrait = height, landscape = narrow axis) -->
+    <dimen name="toggle_handle_height">28dp</dimen>
+    <dimen name="toggle_handle_width_landscape">24dp</dimen>
     
     <!-- Card -->
     <dimen name="card_corner_radius">12dp</dimen>

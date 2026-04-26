@@ -78,7 +78,7 @@
     <LinearLayout
         android:id="@+id/toggle_handle"
         android:layout_width="match_parent"
-        android:layout_height="44dp"
+        android:layout_height="@dimen/toggle_handle_height"
         android:gravity="center"
         android:background="@color/background_light"
         android:clickable="true"
