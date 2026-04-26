@@ -5,7 +5,6 @@
     <dimen name="header_padding">4dp</dimen>
     <dimen name="header_title_size">16sp</dimen>
 
-    <!-- Split + narrow center touchpad: smaller help card, tighter cap for scroll -->
-    <dimen name="touchpad_help_overlay_max_height_split">168dp</dimen>
-    <dimen name="touchpad_help_overlay_split_text_size">11sp</dimen>
+    <!-- Split + narrow center column: cap hint width so wrap matches portrait-style bubble -->
+    <dimen name="touchpad_help_overlay_max_width_split">256dp</dimen>
 </resources>
