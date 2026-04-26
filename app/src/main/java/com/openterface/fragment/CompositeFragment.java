@@ -66,6 +66,8 @@ public class CompositeFragment extends Fragment {
     private View toggleHandlePill;
     private TextView touchPadTips;
     private TextView touchPadHelpOverlay;
+    /** Normal layout only; null while split layout is shown. */
+    private View touchPadInfoButton;
     /** Split mode views */
     private View splitRoot;
     private CustomKeyboardView keyboardViewLeft;
@@ -334,8 +336,28 @@ public class CompositeFragment extends Fragment {
 
     private void updateTouchPadTips() {
         if (touchPadTips == null) return;
+        // Portrait numpad: keep title + live button/touch status only (no gesture-tutorial overlay access).
         touchPadTips.setText(
                 TouchPadTipsFormatter.buildCompact(requireContext(), isDragMode, pointerPhase));
+    }
+
+    /** Portrait keyboard-only strip: touchpad + numpad; gesture help UI is suppressed. */
+    private boolean isPortraitNumpadTouchpadMode() {
+        if (getResources().getConfiguration().orientation != Configuration.ORIENTATION_PORTRAIT) {
+            return false;
+        }
+        return displayMode == DisplayMode.KEYBOARD;
+    }
+
+    private void applyPortraitNumpadTouchpadChrome() {
+        boolean numpad = isPortraitNumpadTouchpadMode();
+        if (touchPadInfoButton != null) {
+            touchPadInfoButton.setVisibility(numpad ? View.GONE : View.VISIBLE);
+        }
+        if (numpad && touchPadHelpOverlay != null) {
+            TouchPadHelpOverlay.hideImmediately(touchPadHelpOverlay);
+        }
+        updateTouchPadTips();
     }
 
     private void updateSplitTouchPadTips() {
@@ -546,13 +568,18 @@ public class CompositeFragment extends Fragment {
             keyboardView.setPort(port);
         }
 
-        setupTouchPad(touchPad, touchPadTips, normalView.findViewById(R.id.touchPadInfo));
+        setupTouchPad(touchPad, touchPadTips, touchPadInfoButton);
 
         // Register keyboard view for OS change updates
         registerKeyboardOsListener(keyboardView);
 
         if (savedInstanceState == null && touchPad != null) {
-            touchPad.post(() -> TouchPadHelpOverlay.show(helpOverlayForPad(touchPad)));
+            touchPad.post(() -> {
+                if (isPortraitNumpadTouchpadMode()) {
+                    return;
+                }
+                TouchPadHelpOverlay.show(helpOverlayForPad(touchPad));
+            });
         }
 
         return contentContainer;
@@ -610,6 +637,7 @@ public class CompositeFragment extends Fragment {
         toggleHandlePill = view.findViewById(R.id.toggle_handle_pill);
         touchPadTips = view.findViewById(R.id.touchPadTips);
         touchPadHelpOverlay = view.findViewById(R.id.touchPadHelpOverlay);
+        touchPadInfoButton = view.findViewById(R.id.touchPadInfo);
         setupBottomWashOverlays();
         updateTouchPadTips();
     }
@@ -854,9 +882,14 @@ public class CompositeFragment extends Fragment {
         // Ensure we have the normal layout
         ensureNormalLayout();
 
+        boolean isPortrait =
+                getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT;
         if (touchpadSection != null) {
-            touchpadSection.setVisibility(
-                displayMode != DisplayMode.KEYBOARD ? View.VISIBLE : View.GONE);
+            // Portrait keyboard-only (numpad): show touchpad above grid; landscape KEYBOARD stays touchpad-off.
+            boolean showTouchpad =
+                    (isPortrait || displayMode != DisplayMode.KEYBOARD)
+                            && displayMode != DisplayMode.TOUCHPAD;
+            touchpadSection.setVisibility(showTouchpad ? View.VISIBLE : View.GONE);
         }
         if (keyboardView != null) {
             keyboardView.setVisibility(
@@ -865,6 +898,8 @@ public class CompositeFragment extends Fragment {
             keyboardView.reloadForCurrentOrientation();
             keyboardView.setShowExtraPortraitKeys(displayMode == DisplayMode.KEYBOARD);
         }
+
+        applyPortraitNumpadTouchpadChrome();
     }
 
     private void ensureSplitLayout() {
@@ -912,7 +947,7 @@ public class CompositeFragment extends Fragment {
             if (keyboardView != null && port != null) {
                 keyboardView.setPort(port);
             }
-            setupTouchPad(touchPad, touchPadTips, normalView.findViewById(R.id.touchPadInfo));
+            setupTouchPad(touchPad, touchPadTips, touchPadInfoButton);
         }
         applyOrientationLayout();
     }
@@ -943,8 +978,13 @@ public class CompositeFragment extends Fragment {
         } else {
             rootLayout.setOrientation(LinearLayout.VERTICAL);
 
+            // Portrait numpad + touchpad: touchpad : numpad (keyboard strip) = 1 : 4.
+            // Portrait BOTH (full keyboard): keep previous 1.5 : 1.0 balance.
+            float touchpadWeight = displayMode == DisplayMode.KEYBOARD ? 1f : 1.5f;
+            float keyboardWeight = displayMode == DisplayMode.KEYBOARD ? 4f : 1.0f;
+
             touchpadSection.setLayoutParams(new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.5f));
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, touchpadWeight));
 
             toggleHandle.setLayoutParams(new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -952,7 +992,7 @@ public class CompositeFragment extends Fragment {
             toggleHandle.setGravity(android.view.Gravity.CENTER);
 
             keyboardView.setLayoutParams(new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f));
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, keyboardWeight));
 
             if (toggleHandlePill != null) {
                 toggleHandlePill.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(40), dpToPx(4)));

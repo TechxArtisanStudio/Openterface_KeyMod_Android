@@ -41,6 +41,17 @@ public final class TouchPadHelpOverlay {
         }
     }
 
+    /**
+     * Instantly removes the gesture help overlay (no fade). Use when switching UI modes where the
+     * tutorial text must not linger (e.g. portrait numpad + touchpad).
+     */
+    public static void hideImmediately(TextView overlay) {
+        if (overlay == null) return;
+        cancelAnimation(overlay);
+        overlay.setAlpha(0f);
+        overlay.setVisibility(View.GONE);
+    }
+
     public static void show(TextView overlay) {
         if (overlay == null) return;
         cancelAnimation(overlay);

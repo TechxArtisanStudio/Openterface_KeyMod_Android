@@ -711,6 +711,12 @@ public class CustomKeyboardView extends LinearLayout {
             currentKeys = splitKeys;
         }
 
+        // Portrait numpad-only: fragment shows touchpad; render extra grid without QWERTY rows.
+        if (showExtraPortraitKeys && !isLandscape(getContext()) && splitPart == SPLIT_NONE) {
+            addExtraPortraitKeys();
+            return;
+        }
+
         // In fullscreen keyboard mode, hide arrow keys from the main keyboard area.
         // Direction keys are provided by the extra middle panel in this mode.
         if (showExtraPortraitKeys) {
@@ -2524,8 +2530,9 @@ public class CustomKeyboardView extends LinearLayout {
             case 0x54: return new FnMapping("$", 0x21, MOD_SHIFT);
             case 0x55: return new FnMapping("¥", 0x1C, MOD_ALT);
             case 0x56: return new FnMapping("€", 0x1F, MOD_ALT | MOD_SHIFT);
-            case 0x57: return new FnMapping("£", 0x20, MOD_ALT);
-            case 0x67: return new FnMapping("%", 0x22, MOD_SHIFT);
+            // Fn layer: + ↔ = show % vs £ (swapped vs earlier mapping)
+            case 0x57: return new FnMapping("%", 0x22, MOD_SHIFT);
+            case 0x67: return new FnMapping("£", 0x20, MOD_ALT);
             case 0x62: return new FnMapping("000", 0x62, 0);
             case 0x60: return new FnMapping("UP", 0x52, 0, R.drawable.keyboard_arrow_up_24);
             case 0x5C: return new FnMapping("LEFT", 0x50, 0, R.drawable.keyboard_arrow_left_24);
