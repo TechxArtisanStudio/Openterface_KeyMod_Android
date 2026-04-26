@@ -41,7 +41,9 @@
         android:layout_weight="1"
         android:fillViewport="true"
         android:scrollbars="vertical"
-        android:clipToPadding="false">
+        android:clipToPadding="false"
+        android:requiresFadingEdge="vertical"
+        android:fadingEdgeLength="22dp">
 
         <GridLayout
             android:layout_width="match_parent"
@@ -49,6 +51,7 @@
             android:columnCount="2"
             android:rowCount="4"
             android:padding="16dp"
+            android:paddingBottom="24dp"
             android:alignmentMode="alignMargins">
 
         <!-- Keyboard & Mouse Card -->
