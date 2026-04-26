@@ -31,9 +31,12 @@ import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
+import com.openterface.keymod.util.TopModeShortcutPrefs;
 import com.openterface.target.CH9329MSKBMap;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 
@@ -69,6 +72,10 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int KEY_MODE_FN = 0xF005;
     /** Local Fn latch for keyboard-only extra numpad grid (does not affect global QWERTY Fn layer). */
     private static final int KEY_EXTRA_NUMPAD_FN = 0xF006;
+    /** Top strip PH1–PH3: tap switches app mode; long-press picks mode (saved per slot). */
+    private static final int KEY_TOP_MODE_SLOT_1 = 0xF007;
+    private static final int KEY_TOP_MODE_SLOT_2 = 0xF008;
+    private static final int KEY_TOP_MODE_SLOT_3 = 0xF009;
     private static final int KEY_NOOP_PLACEHOLDER = -1;
     private static final int MOD_CTRL = 1;
     private static final int MOD_SHIFT = 2;
@@ -95,6 +102,12 @@ public class CustomKeyboardView extends LinearLayout {
     private int splitPart = SPLIT_NONE;
     /** The paired keyboard view in split mode, for syncing modifier states */
     private CustomKeyboardView splitPartner;
+
+    public interface OnTopModeShortcutListener {
+        void onRequestSwitchToMode(String launchPanelMode);
+    }
+
+    private OnTopModeShortcutListener onTopModeShortcutListener;
     private List<List<Key>> lowerKeys;
     private UsbSerialPort port;
     private Handler repeatHandler = new Handler();
@@ -349,6 +362,75 @@ public class CustomKeyboardView extends LinearLayout {
     /** Set the paired keyboard view in split mode for syncing modifier states. */
     public void setSplitPartner(CustomKeyboardView partner) {
         splitPartner = partner;
+    }
+
+    public void setOnTopModeShortcutListener(OnTopModeShortcutListener listener) {
+        onTopModeShortcutListener = listener;
+    }
+
+    /** Rebuild top shortcut panels after PH slot mode prefs change (no full keyboard reload). */
+    public void refreshTopShortcutModeSlots() {
+        rebuildTopShortcutPanels();
+        if (splitPartner != null) {
+            splitPartner.rebuildTopShortcutPanels();
+        }
+        syncTopPanelViewportContent();
+    }
+
+    private static int topModeSlotIndexFromKeyCode(int code) {
+        if (code == KEY_TOP_MODE_SLOT_1) {
+            return 1;
+        }
+        if (code == KEY_TOP_MODE_SLOT_2) {
+            return 2;
+        }
+        if (code == KEY_TOP_MODE_SLOT_3) {
+            return 3;
+        }
+        return 0;
+    }
+
+    private static boolean isTopModeSlotKey(Key key) {
+        return key != null && topModeSlotIndexFromKeyCode(key.code) > 0;
+    }
+
+    private Key modeSlotKey(int slotIndex1Based) {
+        int keyCode = KEY_TOP_MODE_SLOT_1 + (slotIndex1Based - 1);
+        Context ctx = getContext();
+        int icon = R.drawable.keyboard_mouse;
+        if (ctx != null) {
+            String mode = TopModeShortcutPrefs.getModeForSlot(ctx, slotIndex1Based);
+            icon = TopModeShortcutPrefs.iconResForMode(mode);
+        }
+        String codeStr = Integer.toHexString(keyCode).toUpperCase();
+        return new Key("", "", keyCode, codeStr, 1f, icon, 0f, false, false, -1, true);
+    }
+
+    private void showTopModeSlotPicker(int slotIndex1Based) {
+        Context ctx = getContext();
+        if (!(ctx instanceof AppCompatActivity)) {
+            return;
+        }
+        AppCompatActivity act = (AppCompatActivity) ctx;
+        String[] modes = TopModeShortcutPrefs.getSelectableModes();
+        CharSequence[] labels = TopModeShortcutPrefs.getModeLabels(ctx);
+        String current = TopModeShortcutPrefs.getModeForSlot(ctx, slotIndex1Based);
+        int checked = 0;
+        for (int i = 0; i < modes.length; i++) {
+            if (modes[i].equals(current)) {
+                checked = i;
+                break;
+            }
+        }
+        new AlertDialog.Builder(act)
+                .setTitle(R.string.top_mode_slot_picker_title)
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    TopModeShortcutPrefs.setModeForSlot(act.getApplicationContext(), slotIndex1Based, modes[which]);
+                    refreshTopShortcutModeSlots();
+                    dialog.dismiss();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     /** Sync modifier lock states to the paired keyboard. */
@@ -1038,7 +1120,7 @@ public class CustomKeyboardView extends LinearLayout {
         if (key.code >= 0xE0 && key.code <= 0xE7) {
             return false;
         }
-        if (key.code >= 0xF001 && key.code <= 0xF006) {
+        if (key.code >= 0xF001 && key.code <= 0xF009) {
             return false;
         }
         if ("Space".equalsIgnoreCase(key.label) || "Enter".equalsIgnoreCase(key.label)) {
@@ -1737,17 +1819,17 @@ public class CustomKeyboardView extends LinearLayout {
         keys.add(new Key("CTRL",   "", 0xE0, "E0", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("ALT",    "", 0xE2, "E2", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("TAB",    "", 0x2B, "2B", 1f, R.drawable.keyboard_tab_24, 0f, false, false, -1, true));
-        keys.add(new Key("PH1",    "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH2",    "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH3",    "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(modeSlotKey(1));
+        keys.add(modeSlotKey(2));
+        keys.add(modeSlotKey(3));
         return keys;
     }
 
     private List<Key> buildStandardTopPanelPage2Keys() {
         List<Key> keys = new ArrayList<>(TOP_PANEL_PAGE_SIZE);
-        keys.add(new Key("PH1",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH2",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH3",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(modeSlotKey(1));
+        keys.add(modeSlotKey(2));
+        keys.add(modeSlotKey(3));
         keys.add(new Key("PH4",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("PH5",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("PH6",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
@@ -1843,6 +1925,14 @@ public class CustomKeyboardView extends LinearLayout {
                     ib.setPadding(0, 0, 0, 0);
                     ib.setImageResource(k.iconResId);
                     ib.setColorFilter(resolveThemeTextColor());
+                    if (isTopModeSlotKey(k)) {
+                        Context ctx = getContext();
+                        if (ctx != null) {
+                            int slot = topModeSlotIndexFromKeyCode(k.code);
+                            String mode = TopModeShortcutPrefs.getModeForSlot(ctx, slot);
+                            ib.setContentDescription(ctx.getString(TopModeShortcutPrefs.labelResForMode(mode)));
+                        }
+                    }
                     ib.setTag(k);
                     ib.setOnTouchListener(createTopPanelTouchListener(k));
                     rowLayout.addView(ib);
@@ -1906,22 +1996,48 @@ public class CustomKeyboardView extends LinearLayout {
         final float[] startX = new float[1];
         final float[] startY = new float[1];
         final boolean[] isDragging = new boolean[1];
+        final boolean[] longPressConsumed = new boolean[1];
+        final Runnable[] pendingModeLongPress = new Runnable[1];
         final int touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
         final int swipeThreshold = dpToPx(56);
+        final int modeSlotIndex = key != null ? topModeSlotIndexFromKeyCode(key.code) : 0;
 
         return (v, event) -> {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
+                    if (pendingModeLongPress[0] != null) {
+                        longPressHandler.removeCallbacks(pendingModeLongPress[0]);
+                        pendingModeLongPress[0] = null;
+                    }
+                    longPressConsumed[0] = false;
                     startX[0] = event.getRawX();
                     startY[0] = event.getRawY();
                     isDragging[0] = false;
                     cancelTopPanelAnimations();
+                    if (modeSlotIndex > 0) {
+                        pendingModeLongPress[0] = () -> {
+                            longPressConsumed[0] = true;
+                            showTopModeSlotPicker(modeSlotIndex);
+                            pendingModeLongPress[0] = null;
+                        };
+                        longPressHandler.postDelayed(pendingModeLongPress[0], ALT_LONG_PRESS_TIMEOUT_MS);
+                    }
                     return true;
                 case MotionEvent.ACTION_MOVE:
                     float dx = event.getRawX() - startX[0];
                     float dy = event.getRawY() - startY[0];
+                    if (pendingModeLongPress[0] != null && modeSlotIndex > 0) {
+                        if (Math.max(Math.abs(dx), Math.abs(dy)) > touchSlop || isDragging[0]) {
+                            longPressHandler.removeCallbacks(pendingModeLongPress[0]);
+                            pendingModeLongPress[0] = null;
+                        }
+                    }
                     if (!isDragging[0] && Math.abs(dx) > touchSlop && Math.abs(dx) > Math.abs(dy)) {
                         isDragging[0] = true;
+                        if (pendingModeLongPress[0] != null) {
+                            longPressHandler.removeCallbacks(pendingModeLongPress[0]);
+                            pendingModeLongPress[0] = null;
+                        }
                     }
                     if (isDragging[0] && hasAnyTopPanelMode()) {
                         updateTopPanelDrag(applyTopPanelEdgeResistance(dx));
@@ -1929,12 +2045,16 @@ public class CustomKeyboardView extends LinearLayout {
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                 case MotionEvent.ACTION_UP:
+                    if (pendingModeLongPress[0] != null) {
+                        longPressHandler.removeCallbacks(pendingModeLongPress[0]);
+                        pendingModeLongPress[0] = null;
+                    }
                     float totalDx = event.getRawX() - startX[0];
                     if (isDragging[0]) {
                         finishTopPanelSwipe(totalDx, swipeThreshold);
                         return true;
                     }
-                    if (event.getActionMasked() == MotionEvent.ACTION_UP && key != null) {
+                    if (event.getActionMasked() == MotionEvent.ACTION_UP && key != null && !longPressConsumed[0]) {
                         performKeyHapticFeedback(v);
                         v.performClick();
                         handleKeyPress(key);
@@ -2701,6 +2821,16 @@ public class CustomKeyboardView extends LinearLayout {
 
     private void handleKeyPress(Key key) {
         Log.d(TAG, "Key pressed: label=" + key.label + ", code=" + key.code);
+
+        int topSlot = topModeSlotIndexFromKeyCode(key.code);
+        if (topSlot > 0) {
+            Context ctx = getContext();
+            if (ctx != null && onTopModeShortcutListener != null) {
+                String mode = TopModeShortcutPrefs.getModeForSlot(ctx, topSlot);
+                onTopModeShortcutListener.onRequestSwitchToMode(mode);
+            }
+            return;
+        }
 
         if (key.code == KEY_NOOP_PLACEHOLDER) {
             return;

@@ -58,27 +58,45 @@
         <Button
             android:id="@+id/compose_clear_button"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:text="@string/compose_clear"
+            android:gravity="center"
+            android:text=""
+            android:drawableTop="@drawable/ic_compose_clear_24"
+            android:drawablePadding="0dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:contentDescription="@string/compose_clear"
             android:textAllCaps="false" />
 
         <Button
             android:id="@+id/compose_touchpad_button"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:text="@string/compose_touchpad"
+            android:gravity="center"
+            android:text=""
+            android:drawableTop="@drawable/ic_compose_touchpad_24"
+            android:drawablePadding="0dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:contentDescription="@string/compose_touchpad"
             android:textAllCaps="false" />
 
         <Button
             android:id="@+id/compose_send_button"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             android:layout_weight="3"
-            android:text="@string/compose_send"
+            android:gravity="center"
+            android:text=""
+            android:drawableTop="@drawable/ic_compose_send_24"
+            android:drawablePadding="0dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:contentDescription="@string/compose_send"
             android:textAllCaps="false" />
 
     </LinearLayout>

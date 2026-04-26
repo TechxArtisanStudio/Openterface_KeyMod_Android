@@ -249,6 +249,13 @@
     <string name="compose_cancelled">Send stopped.</string>
     <string name="compose_done">Finished sending.</string>
 
+    <!-- Top strip PH1–PH3: long-press mode picker -->
+    <string name="top_mode_slot_picker_title">Choose mode for this shortcut</string>
+    <string name="top_mode_label_keyboard_mouse">Keyboard &amp; Mouse</string>
+    <string name="top_mode_label_gamepad">Gamepad</string>
+    <string name="top_mode_label_shortcuts">Shortcuts</string>
+    <string name="top_mode_label_macros">Macros</string>
+
     <!-- Presentation Mode Strings -->
     <string name="presentation_mode">Presentation</string>
     <string name="slide_progress_label">PRESENTATION</string>

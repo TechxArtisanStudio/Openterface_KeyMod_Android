@@ -932,6 +932,11 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         transaction.commit();
     }
 
+    /** Switch primary content mode (same behavior as side nav). Used by top-strip PH shortcuts. */
+    public void switchToLaunchMode(String mode) {
+        handleLaunchMode(mode);
+    }
+
     /**
      * Handle launch mode from LaunchPanelActivity
      */

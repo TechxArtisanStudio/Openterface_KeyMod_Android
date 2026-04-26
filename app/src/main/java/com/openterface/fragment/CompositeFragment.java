@@ -572,6 +572,7 @@ public class CompositeFragment extends Fragment {
 
         // Register keyboard view for OS change updates
         registerKeyboardOsListener(keyboardView);
+        registerTopModeShortcutListener(keyboardView);
 
         if (savedInstanceState == null && touchPad != null) {
             touchPad.post(() -> {
@@ -628,6 +629,13 @@ public class CompositeFragment extends Fragment {
         ((MainActivity) requireActivity()).addOsChangeListener(listener);
     }
 
+    private void registerTopModeShortcutListener(CustomKeyboardView kbdView) {
+        if (kbdView == null || !(requireActivity() instanceof MainActivity)) {
+            return;
+        }
+        kbdView.setOnTopModeShortcutListener(mode -> ((MainActivity) requireActivity()).switchToLaunchMode(mode));
+    }
+
     private void setupNormalViews(View view) {
         rootLayout = view.findViewById(R.id.composite_root);
         keyboardView = view.findViewById(R.id.keyboard_view);
@@ -674,6 +682,7 @@ public class CompositeFragment extends Fragment {
             }
             // Register for OS change updates
             registerKeyboardOsListener(keyboardViewLeft);
+            registerTopModeShortcutListener(keyboardViewLeft);
             // Create shared top panel from the left keyboard
             if (splitTopLeft != null && splitTopRight != null) {
                 keyboardViewLeft.createSplitLandscapeTopPanel(
@@ -697,6 +706,7 @@ public class CompositeFragment extends Fragment {
             }
             // Register for OS change updates
             registerKeyboardOsListener(keyboardViewRight);
+            registerTopModeShortcutListener(keyboardViewRight);
         }
 
         setupTouchPad(splitTouchPad, splitTouchPadTips, view.findViewById(R.id.touchPadInfo));
@@ -947,6 +957,7 @@ public class CompositeFragment extends Fragment {
             if (keyboardView != null && port != null) {
                 keyboardView.setPort(port);
             }
+            registerTopModeShortcutListener(keyboardView);
             setupTouchPad(touchPad, touchPadTips, touchPadInfoButton);
         }
         applyOrientationLayout();

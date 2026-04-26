@@ -18,6 +18,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.widget.TextViewCompat;
 import androidx.fragment.app.Fragment;
 
 import com.openterface.keymod.ConnectionManager;
@@ -80,6 +81,10 @@ public class ComposeFragment extends Fragment {
                 keyboardView.setPort(port);
             }
             registerKeyboardOsListener(keyboardView);
+            if (getActivity() instanceof MainActivity) {
+                keyboardView.setOnTopModeShortcutListener(mode ->
+                        ((MainActivity) getActivity()).switchToLaunchMode(mode));
+            }
         }
 
         if (clearButton != null) {
@@ -279,11 +284,15 @@ public class ComposeFragment extends Fragment {
         }
 
         if (sending) {
-            sendButton.setText(R.string.compose_stop);
+            TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    sendButton, 0, R.drawable.ic_compose_stop_24, 0, 0);
+            sendButton.setContentDescription(getString(R.string.compose_stop));
             sendButton.setEnabled(true);
             sendButton.setAlpha(1f);
         } else {
-            sendButton.setText(R.string.compose_send);
+            TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    sendButton, 0, R.drawable.ic_compose_send_24, 0, 0);
+            sendButton.setContentDescription(getString(R.string.compose_send));
             boolean canSend = connected && !bad && !t.isEmpty();
             sendButton.setEnabled(canSend);
             sendButton.setAlpha(canSend ? 1f : 0.45f);
