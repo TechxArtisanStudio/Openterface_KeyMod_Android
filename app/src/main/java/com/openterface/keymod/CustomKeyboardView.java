@@ -1860,15 +1860,15 @@ public class CustomKeyboardView extends LinearLayout {
         gridKeys.add(new ExtraGridKey(new Key("PGDN", "", 0x4E, "4E", 25f, 0, 0f, false), 1, 6, 1, 2));
 
         // Row 3
-        gridKeys.add(new ExtraGridKey(new Key("COPY", "", 0x06, "06", 25f, R.drawable.content_copy_24, 0f, false, false, primaryModifier, false), 2, 0, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("CUT", "", 0x1B, "1B", 25f, R.drawable.content_cut_24, 0f, false, false, primaryModifier, false), 2, 2, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("PASTE", "", 0x19, "19", 25f, R.drawable.content_paste_24, 0f, false, false, primaryModifier, false), 2, 4, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("UNDO", "", 0x1D, "1D", 25f, R.drawable.undo_24, 0f, false, false, primaryModifier, false), 2, 6, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("ALL", "", 0x04, "04", 25f, R.drawable.select_all_24, 0f, false, false, primaryModifier, false), 2, 0, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("COPY", "", 0x06, "06", 25f, R.drawable.content_copy_24, 0f, false, false, primaryModifier, false), 2, 2, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("CUT", "", 0x1B, "1B", 25f, R.drawable.content_cut_24, 0f, false, false, primaryModifier, false), 2, 4, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("PASTE", "", 0x19, "19", 25f, R.drawable.content_paste_24, 0f, false, false, primaryModifier, false), 2, 6, 1, 2));
 
         // Row 4
         gridKeys.add(new ExtraGridKey(new Key("ESC", "", 0x29, "29", 25f, 0, 0f, false), 3, 0, 1, 2));
         gridKeys.add(new ExtraGridKey(new Key("SAVE", "", 0x16, "16", 25f, R.drawable.save_24, 0f, false, false, primaryModifier, false), 3, 2, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("ALL", "", 0x04, "04", 25f, R.drawable.select_all_24, 0f, false, false, primaryModifier, false), 3, 4, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("UNDO", "", 0x1D, "1D", 25f, R.drawable.undo_24, 0f, false, false, primaryModifier, false), 3, 4, 1, 2));
         gridKeys.add(new ExtraGridKey(new Key("DEL", "", 0x4C, "4C", 25f, 0, 0f, false), 3, 6, 1, 2));
 
         // Row 5
@@ -1910,7 +1910,7 @@ public class CustomKeyboardView extends LinearLayout {
         gridLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, 8.1f));
 
         for (ExtraGridKey entry : gridKeys) {
-            GridLayout.Spec rowSpec = GridLayout.spec(entry.row, entry.rowSpan, (float) entry.rowSpan);
+            GridLayout.Spec rowSpec = GridLayout.spec(entry.row, entry.rowSpan, getExtraGridRowSpanWeight(entry.row, entry.rowSpan));
             GridLayout.Spec colSpec = GridLayout.spec(entry.col, entry.colSpan, (float) entry.colSpan);
             GridLayout.LayoutParams params = new GridLayout.LayoutParams(rowSpec, colSpec);
             params.width = 0;
@@ -1997,6 +1997,20 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         addView(gridLayout);
+    }
+
+    /**
+     * Row-height ratio target for extra grid:
+     * total(Row1-Row4) : total(Row5-Row9) = 1 : 2
+     * -> top rows weight=1.0 each, bottom rows weight=1.6 each.
+     */
+    private float getExtraGridRowSpanWeight(int row, int rowSpan) {
+        float total = 0f;
+        for (int i = 0; i < rowSpan; i++) {
+            int r = row + i;
+            total += r <= 3 ? 1.0f : 1.6f;
+        }
+        return total;
     }
 
     public static byte[] hexStringToByteArray(String ByteData) {
