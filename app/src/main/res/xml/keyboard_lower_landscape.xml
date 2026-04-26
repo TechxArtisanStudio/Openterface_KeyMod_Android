@@ -45,7 +45,7 @@
     </Row>
 
     <Row>
-        <Key android:codes="F001" android:keyLabel="@string/Symbols_123" android:keyWidth="15%p"/>
+        <Key android:codes="F005" android:keyLabel="Fn" android:keyWidth="15%p"/>
         <Key android:codes="36" android:keyLabel="," custom:keySymbolLabel=";" custom:keyAlternates="-,:" custom:keyCornerHint="-" android:keyWidth="10%p"/>
         <Key android:codes="E3" android:keyLabel="@string/Win" android:keyWidth="10%p"/>
         <Key android:codes="2C" android:keyLabel="@string/Space_Button" android:keyWidth="40%p"/>
