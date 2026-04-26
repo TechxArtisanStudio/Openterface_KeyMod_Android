@@ -358,10 +358,10 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         FrameLayout viewport = new FrameLayout(getContext());
-        int rowHeightPx = splitPart != SPLIT_NONE ? dpToPx(22) : dpToPx(24);
-        int panelHeight = rowHeightPx * 2;
-        viewport.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, panelHeight));
+        // Height comes from parent split_top_panel (weighted vs main row — same 2.4:4 ratio as
+        // TOP_PANEL_TOTAL_WEIGHT : letter rows in full landscape keyboard).
+        viewport.setLayoutParams(new FrameLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
         previousTopPanelContainer = createTopShortcutPanelView();
         activeTopPanelContainer = createTopShortcutPanelView();

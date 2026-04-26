@@ -48,8 +48,9 @@ public final class TouchPadHelpOverlay {
         overlay.setText(TouchPadTipsFormatter.buildGestureHelpOverlayText(overlay.getContext()));
         overlay.scrollTo(0, 0);
         overlay.setMovementMethod(new ScrollingMovementMethod());
-        overlay.setVerticalScrollBarEnabled(true);
-        overlay.setScrollbarFadingEnabled(false);
+        // Do not enable drawing of vertical scrollbars: on some OEM themes (e.g. MIUI) the
+        // scrollbar drawables stay null and View.onDrawScrollBars NPEs when mutating them.
+        overlay.setVerticalScrollBarEnabled(false);
         overlay.setVisibility(View.VISIBLE);
         overlay.setAlpha(0f);
         overlay.animate()

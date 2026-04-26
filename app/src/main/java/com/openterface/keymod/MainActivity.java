@@ -12,6 +12,7 @@ import android.graphics.drawable.Drawable;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -317,8 +318,16 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         filter.addAction(ACTION_USB_PERMISSION);
-        registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        registerReceiver(usbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION), Context.RECEIVER_NOT_EXPORTED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            registerReceiver(
+                    usbPermissionReceiver,
+                    new IntentFilter(ACTION_USB_PERMISSION),
+                    Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(usbReceiver, filter);
+            registerReceiver(usbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION));
+        }
         receiversRegistered = true;
     }
 

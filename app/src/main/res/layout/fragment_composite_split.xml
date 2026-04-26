@@ -7,17 +7,18 @@
     android:orientation="vertical"
     android:background="@color/background_light">
 
-    <!-- Shared top scrolling panel -->
+    <!-- Shared top scrolling panel: same vertical ratio as full landscape keyboard (2.4 : 4 → 12 : 20) -->
     <FrameLayout
         android:id="@+id/split_top_panel"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:layout_height="0dp"
+        android:layout_weight="12"/>
 
     <!-- Main content: stacked keyboards and touchpad for portrait -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_weight="20"
         android:orientation="vertical">
 
         <!-- Left Keyboard -->
@@ -84,9 +85,7 @@
                     android:textColor="@color/text_primary"
                     android:textSize="@dimen/touchpad_help_overlay_split_text_size"
                     android:lineSpacingMultiplier="1.22"
-                    android:scrollbars="vertical"
-                    android:scrollbarStyle="outsideOverlay"
-                    android:fadeScrollbars="false"
+                    android:scrollbars="none"
                     android:elevation="6dp"
                     android:breakStrategy="balanced" />
 
