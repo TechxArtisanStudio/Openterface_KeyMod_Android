@@ -1,0 +1,109 @@
+package com.openterface.keymod.util;
+
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.animation.PathInterpolator;
+import android.widget.TextView;
+
+import androidx.annotation.Nullable;
+
+import com.openterface.keymod.TouchPadView;
+
+/**
+ * Gesture help on the touchpad: soft fade in; fade out when the pad is tapped or the info icon is toggled.
+ */
+public final class TouchPadHelpOverlay {
+
+    private static final int FADE_IN_MS = 560;
+    private static final int FADE_OUT_MS = 700;
+
+    private static final PathInterpolator FADE_IN_INTERP = new PathInterpolator(0.22f, 1f, 0.36f, 1f);
+    private static final PathInterpolator FADE_OUT_INTERP = new PathInterpolator(0.4f, 0f, 0.2f, 1f);
+
+    private TouchPadHelpOverlay() {}
+
+    public static void onInfoPressed(TextView overlay) {
+        if (overlay == null) return;
+        if (overlay.getVisibility() == View.VISIBLE && overlay.getAlpha() > 0.05f) {
+            cancelAnimation(overlay);
+            fadeOutAndHide(overlay);
+        } else {
+            show(overlay);
+        }
+    }
+
+    /** Fade out if the hint is showing (e.g. user touched the touchpad or the hint text). */
+    public static void dismissIfVisible(TextView overlay) {
+        if (overlay == null) return;
+        if (overlay.getVisibility() == View.VISIBLE && overlay.getAlpha() > 0.05f) {
+            cancelAnimation(overlay);
+            fadeOutAndHide(overlay);
+        }
+    }
+
+    public static void show(TextView overlay) {
+        if (overlay == null) return;
+        cancelAnimation(overlay);
+        overlay.setText(TouchPadTipsFormatter.buildGestureHelpOverlayText(overlay.getContext()));
+        overlay.setVisibility(View.VISIBLE);
+        overlay.setAlpha(0f);
+        overlay.animate()
+                .alpha(1f)
+                .setDuration(FADE_IN_MS)
+                .setInterpolator(FADE_IN_INTERP)
+                .withLayer()
+                .start();
+    }
+
+    public static void clear(TextView overlay) {
+        if (overlay != null) {
+            cancelAnimation(overlay);
+        }
+    }
+
+    /**
+     * Any {@link MotionEvent#ACTION_DOWN} on the pad, footer tips, or the hint text dismisses the hint.
+     */
+    public static void wireDismissTouchTargets(
+            @Nullable TouchPadView pad, @Nullable TextView tips, @Nullable TextView help) {
+        if (help == null) return;
+        help.setOnTouchListener((v, e) -> {
+            if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                dismissIfVisible(help);
+                return true;
+            }
+            return false;
+        });
+        if (tips != null) {
+            tips.setOnTouchListener((v, e) -> {
+                if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    dismissIfVisible(help);
+                }
+                return false;
+            });
+        }
+        if (pad != null) {
+            pad.setOnTouchListener((v, e) -> {
+                if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    dismissIfVisible(help);
+                }
+                return false;
+            });
+        }
+    }
+
+    private static void cancelAnimation(TextView overlay) {
+        overlay.animate().cancel();
+    }
+
+    private static void fadeOutAndHide(TextView overlay) {
+        cancelAnimation(overlay);
+        overlay.animate()
+                .alpha(0f)
+                .setDuration(FADE_OUT_MS)
+                .setInterpolator(FADE_OUT_INTERP)
+                .withLayer()
+                .withEndAction(() -> overlay.setVisibility(View.GONE))
+                .start();
+    }
+}

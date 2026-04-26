@@ -35,6 +35,8 @@
     <!-- Touchpad -->
     <dimen name="touchpad_corner_radius">12dp</dimen>
     <dimen name="touchpad_elevation">2dp</dimen>
+    <dimen name="touchpad_help_overlay_shift_up">-28dp</dimen>
+    <dimen name="touchpad_help_overlay_shift_up_split">-20dp</dimen>
     
     <!-- Card -->
     <dimen name="card_corner_radius">12dp</dimen>

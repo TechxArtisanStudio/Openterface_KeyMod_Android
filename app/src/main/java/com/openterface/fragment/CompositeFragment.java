@@ -24,6 +24,8 @@ import com.openterface.keymod.CustomKeyboardView;
 import com.openterface.keymod.MainActivity;
 import com.openterface.keymod.R;
 import com.openterface.keymod.TouchPadView;
+import com.openterface.keymod.util.TouchPadHelpOverlay;
+import com.openterface.keymod.util.TouchPadTipsFormatter;
 import com.openterface.target.CH9329MSKBMap;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 
@@ -41,6 +43,7 @@ public class CompositeFragment extends Fragment {
     private LinearLayout toggleHandle;
     private View toggleHandlePill;
     private TextView touchPadTips;
+    private TextView touchPadHelpOverlay;
     /** Split mode views */
     private View splitRoot;
     private CustomKeyboardView keyboardViewLeft;
@@ -48,6 +51,7 @@ public class CompositeFragment extends Fragment {
     private ViewGroup splitTouchpadSection;
     private TouchPadView splitTouchPad;
     private TextView splitTouchPadTips;
+    private TextView splitTouchPadHelpOverlay;
     /** Container to swap between normal and split layouts */
     private FrameLayout contentContainer;
     /** Track registered keyboard views for OS change listener cleanup */
@@ -157,28 +161,12 @@ public class CompositeFragment extends Fragment {
 
     private void updateTouchPadTips() {
         if (touchPadTips == null) return;
-        String status = isDragMode ? "Drag Mode ON" : "Drag Mode OFF";
-        String tips = "Touch Pad\n"
-                + status + "\n"
-                + "Single tap -> Click\n"
-                + "Double tap -> Double click\n"
-                + "Two finger tap -> Right click\n"
-                + "Two finger drag -> Scroll\n"
-                + "Long press -> Toggle drag mode";
-        touchPadTips.setText(tips);
+        touchPadTips.setText(TouchPadTipsFormatter.buildCompact(requireContext(), isDragMode));
     }
 
     private void updateSplitTouchPadTips() {
         if (splitTouchPadTips == null) return;
-        String status = isDragMode ? "Drag Mode ON" : "Drag Mode OFF";
-        String tips = "Touch Pad\n"
-                + status + "\n"
-                + "Single tap -> Click\n"
-                + "Double tap -> Double click\n"
-                + "Two finger tap -> Right click\n"
-                + "Two finger drag -> Scroll\n"
-                + "Long press -> Toggle drag mode";
-        splitTouchPadTips.setText(tips);
+        splitTouchPadTips.setText(TouchPadTipsFormatter.buildCompact(requireContext(), isDragMode));
     }
 
     private void sendMouseButtonState(int buttonMask) {
@@ -365,10 +353,14 @@ public class CompositeFragment extends Fragment {
             keyboardView.setPort(port);
         }
 
-        setupTouchPad(touchPad, touchPadTips);
+        setupTouchPad(touchPad, touchPadTips, normalView.findViewById(R.id.touchPadInfo));
 
         // Register keyboard view for OS change updates
         registerKeyboardOsListener(keyboardView);
+
+        if (savedInstanceState == null && touchPad != null) {
+            touchPad.post(() -> TouchPadHelpOverlay.show(helpOverlayForPad(touchPad)));
+        }
 
         return contentContainer;
     }
@@ -383,6 +375,8 @@ public class CompositeFragment extends Fragment {
             osChangeListeners.clear();
         }
         setDragMode(false);
+        TouchPadHelpOverlay.clear(touchPadHelpOverlay);
+        TouchPadHelpOverlay.clear(splitTouchPadHelpOverlay);
         if (isServiceBound) {
             requireContext().unbindService(serviceConnection);
             isServiceBound = false;
@@ -406,6 +400,7 @@ public class CompositeFragment extends Fragment {
         toggleHandle = view.findViewById(R.id.toggle_handle);
         toggleHandlePill = view.findViewById(R.id.toggle_handle_pill);
         touchPadTips = view.findViewById(R.id.touchPadTips);
+        touchPadHelpOverlay = view.findViewById(R.id.touchPadHelpOverlay);
         updateTouchPadTips();
     }
 
@@ -417,6 +412,7 @@ public class CompositeFragment extends Fragment {
         splitTouchpadSection = view.findViewById(R.id.touchpad_section);
         splitTouchPad = view.findViewById(R.id.touchPad);
         splitTouchPadTips = view.findViewById(R.id.touchPadTips);
+        splitTouchPadHelpOverlay = view.findViewById(R.id.touchPadHelpOverlay);
         View splitToggleHandle = view.findViewById(R.id.toggle_handle);
 
         if (splitTouchPadTips != null) {
@@ -456,11 +452,21 @@ public class CompositeFragment extends Fragment {
             registerKeyboardOsListener(keyboardViewRight);
         }
 
-        setupTouchPad(splitTouchPad, splitTouchPadTips);
+        setupTouchPad(splitTouchPad, splitTouchPadTips, view.findViewById(R.id.touchPadInfo));
     }
 
-    private void setupTouchPad(TouchPadView pad, TextView tips) {
+    private TextView helpOverlayForPad(TouchPadView pad) {
+        if (pad != null && pad == splitTouchPad) {
+            return splitTouchPadHelpOverlay;
+        }
+        return touchPadHelpOverlay;
+    }
+
+    private void setupTouchPad(TouchPadView pad, TextView tips, View infoButton) {
         if (pad == null) return;
+        if (infoButton != null) {
+            infoButton.setOnClickListener(v -> TouchPadHelpOverlay.onInfoPressed(helpOverlayForPad(pad)));
+        }
         pad.setOnTouchPadListener(new TouchPadView.OnTouchPadListener() {
             @Override
             public void onTouchMove(float startX, float startY, float lastX, float lastY) {
@@ -546,6 +552,7 @@ public class CompositeFragment extends Fragment {
                 }
             }
         });
+        TouchPadHelpOverlay.wireDismissTouchTargets(pad, tips, helpOverlayForPad(pad));
     }
 
     private void cycleDisplayMode() {
@@ -585,6 +592,8 @@ public class CompositeFragment extends Fragment {
 
     private void ensureSplitLayout() {
         if (splitRoot == null) {
+            TouchPadHelpOverlay.clear(touchPadHelpOverlay);
+            touchPadHelpOverlay = null;
             View normal = contentContainer.getChildAt(0);
             if (normal != null) {
                 contentContainer.removeView(normal);
@@ -606,6 +615,8 @@ public class CompositeFragment extends Fragment {
 
     private void ensureNormalLayout() {
         if (splitRoot != null) {
+            TouchPadHelpOverlay.clear(splitTouchPadHelpOverlay);
+            splitTouchPadHelpOverlay = null;
             View split = contentContainer.getChildAt(0);
             if (split != null) {
                 contentContainer.removeView(split);
@@ -624,6 +635,7 @@ public class CompositeFragment extends Fragment {
             if (keyboardView != null && port != null) {
                 keyboardView.setPort(port);
             }
+            setupTouchPad(touchPad, touchPadTips, normalView.findViewById(R.id.touchPadInfo));
         }
         applyOrientationLayout();
     }

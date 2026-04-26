@@ -19,6 +19,8 @@ import androidx.fragment.app.Fragment;
 import com.openterface.keymod.BluetoothService;
 import com.openterface.keymod.R;
 import com.openterface.keymod.TouchPadView;
+import com.openterface.keymod.util.TouchPadHelpOverlay;
+import com.openterface.keymod.util.TouchPadTipsFormatter;
 import com.openterface.target.CH9329MSKBMap;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 
@@ -30,6 +32,7 @@ public class MouseFragment extends Fragment {
     private TouchPadView touchPad;
     public UsbSerialPort port;
     private TextView touchPadTips;
+    private TextView touchPadHelpOverlay;
     private BluetoothService bluetoothService;
     private boolean isServiceBound;
     private boolean isDragMode = false;
@@ -126,15 +129,7 @@ public class MouseFragment extends Fragment {
 
     private void updateTouchPadTips() {
         if (touchPadTips == null) return;
-        String status = isDragMode ? "Drag Mode ON" : "Drag Mode OFF";
-        String tips = "Touch Pad\n"
-                + status + "\n"
-                + "Single tap -> Click\n"
-                + "Double tap -> Double click\n"
-                + "Two finger tap -> Right click\n"
-                + "Two finger drag -> Scroll\n"
-                + "Long press -> Toggle drag mode";
-        touchPadTips.setText(tips);
+        touchPadTips.setText(TouchPadTipsFormatter.buildCompact(requireContext(), isDragMode));
     }
 
     private void sendMouseButtonState(int buttonMask) {
@@ -300,6 +295,12 @@ public class MouseFragment extends Fragment {
         touchPadTips = view.findViewById(R.id.touchPadTips);
         updateTouchPadTips();
 
+        touchPadHelpOverlay = view.findViewById(R.id.touchPadHelpOverlay);
+        View touchPadInfo = view.findViewById(R.id.touchPadInfo);
+        if (touchPadInfo != null) {
+            touchPadInfo.setOnClickListener(v -> TouchPadHelpOverlay.onInfoPressed(touchPadHelpOverlay));
+        }
+
         touchPad = view.findViewById(R.id.touchPad);
         if (touchPad != null) {
             touchPad.setOnTouchPadListener(new TouchPadView.OnTouchPadListener() {
@@ -392,6 +393,10 @@ public class MouseFragment extends Fragment {
                     }
                 }
             });
+            TouchPadHelpOverlay.wireDismissTouchTargets(touchPad, touchPadTips, touchPadHelpOverlay);
+            if (savedInstanceState == null) {
+                touchPad.post(() -> TouchPadHelpOverlay.show(touchPadHelpOverlay));
+            }
         }
 
         return view;
@@ -404,6 +409,7 @@ public class MouseFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        TouchPadHelpOverlay.clear(touchPadHelpOverlay);
         setDragMode(false);
         if (isServiceBound) {
             requireContext().unbindService(serviceConnection);

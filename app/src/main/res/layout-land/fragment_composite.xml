@@ -26,15 +26,50 @@
 
             <TextView
                 android:id="@+id/touchPadTips"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|center_horizontal"
+                android:gravity="center_horizontal"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="16dp"
+                android:background="@android:color/transparent"
+                android:text="@string/touch_pad_compact_initial"/>
+
+            <TextView
+                android:id="@+id/touchPadHelpOverlay"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:gravity="center"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp"
-                android:padding="12dp"
+                android:translationY="@dimen/touchpad_help_overlay_shift_up"
+                android:layout_marginStart="20dp"
+                android:layout_marginEnd="20dp"
+                android:maxWidth="340dp"
+                android:visibility="gone"
+                android:alpha="0"
+                android:gravity="center_horizontal"
+                android:padding="8dp"
                 android:background="@android:color/transparent"
-                android:text="Touch Pad&#10;Drag Mode OFF&#10;Single tap -> Click&#10;Double tap -> Double click&#10;Two finger tap -> Right click&#10;Two finger drag -> Scroll&#10;Long press -> Toggle drag mode"/>
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:letterSpacing="0.01"
+                android:lineSpacingMultiplier="1.34" />
+
+            <ImageButton
+                android:id="@+id/touchPadInfo"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="4dp"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/touch_pad_info_content_description"
+                android:padding="12dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_touchpad_info_24" />
 
         </FrameLayout>
 
