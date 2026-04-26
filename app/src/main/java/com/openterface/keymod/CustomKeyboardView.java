@@ -336,6 +336,13 @@ public class CustomKeyboardView extends LinearLayout {
         splitPartner.post(() -> splitPartner.updateKeyboard());
     }
 
+    /** Sync Fn lock so both halves show F-layer labels and resolve mappings (e.g. yuiop → F6–F10). */
+    private void syncFnLockedToPartner() {
+        if (splitPartner == null) return;
+        splitPartner.isFnLocked = isFnLocked;
+        splitPartner.post(() -> splitPartner.updateKeyboard());
+    }
+
     /** Create a shared top scrolling panel view for split mode. */
     public FrameLayout createTopPanel() {
         rebuildTopShortcutPanels();
@@ -351,7 +358,7 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         FrameLayout viewport = new FrameLayout(getContext());
-        int rowHeightPx = dpToPx(24);
+        int rowHeightPx = splitPart != SPLIT_NONE ? dpToPx(22) : dpToPx(24);
         int panelHeight = rowHeightPx * 2;
         viewport.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, panelHeight));
@@ -555,6 +562,47 @@ public class CustomKeyboardView extends LinearLayout {
         return rows;
     }
 
+    /**
+     * Split mode slices each row at the middle; a single wide Space bar would sit entirely on
+     * one half. Replace that key with two half-width Space keys (same HID 0x2C) so left and
+     * right keyboards each get a space bar.
+     */
+    private List<List<Key>> expandSpaceBarForSplitRows(List<List<Key>> rows) {
+        String spaceLabel = getContext().getString(R.string.Space_Button);
+        List<List<Key>> result = new ArrayList<>();
+        for (List<Key> row : rows) {
+            List<Key> newRow = new ArrayList<>();
+            for (Key k : row) {
+                if (k != null && k.code == 0x2C && spaceLabel.equals(k.label)) {
+                    float half = k.widthPercent / 2f;
+                    newRow.add(cloneKeyWithWidth(k, half));
+                    newRow.add(cloneKeyWithWidth(k, half));
+                } else {
+                    newRow.add(k);
+                }
+            }
+            result.add(newRow);
+        }
+        return result;
+    }
+
+    private static Key cloneKeyWithWidth(Key src, float widthPercent) {
+        return new Key(
+                src.label,
+                src.symbolLabel,
+                src.alternates,
+                src.cornerHint,
+                src.code,
+                src.codeStr,
+                widthPercent,
+                src.iconResId,
+                src.horizontalGap,
+                src.isRepeatable,
+                src.requiresShift,
+                src.shortcutModifiers,
+                src.isTopPanelKey);
+    }
+
     private void updateKeyboard() {
         removeAllViews();
 
@@ -562,6 +610,7 @@ public class CustomKeyboardView extends LinearLayout {
 
         // In split keyboard mode, divide each row into left or right half
         if (splitPart != SPLIT_NONE) {
+            currentKeys = expandSpaceBarForSplitRows(currentKeys);
             List<List<Key>> splitKeys = new ArrayList<>();
             for (List<Key> row : currentKeys) {
                 int mid = (row.size() + 1) / 2; // round up for odd rows
@@ -2329,6 +2378,7 @@ public class CustomKeyboardView extends LinearLayout {
         switch (key.code) {
             case KEY_MODE_FN:
                 isFnLocked = !isFnLocked;
+                syncFnLockedToPartner();
                 updateRequired = true;
                 break;
             case 0xE1: // Shift Left

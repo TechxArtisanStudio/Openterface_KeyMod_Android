@@ -4,16 +4,16 @@ overview: Simplify landscape Keyboard & Mouse to a two-state toggle (keyboard-on
 todos:
   - id: fn-split-sync
     content: "CustomKeyboardView: sync isFnLocked (and post updateKeyboard) to splitPartner when Fn toggles; consider folding into syncModifierStates rename/sync scope"
-    status: pending
+    status: completed
   - id: landscape-cycle
     content: "CompositeFragment: landscape cycleDisplayMode KEYBOARD↔SPLIT; normalize BOTH/TOUCHPAD→SPLIT on landscape apply/config"
-    status: pending
+    status: completed
   - id: split-top-panel
     content: Audit split_top_panel + createTopPanel in split landscape; fix layout/clipping/UX issues found
-    status: pending
+    status: completed
   - id: landscape-header
     content: "MainActivity header: landscape variant or compact layout (reduce KeyMod dead space, optional lower header_height)"
-    status: pending
+    status: completed
 isProject: false
 ---
 

@@ -37,6 +37,9 @@
     <dimen name="touchpad_elevation">2dp</dimen>
     <dimen name="touchpad_help_overlay_shift_up">-28dp</dimen>
     <dimen name="touchpad_help_overlay_shift_up_split">-20dp</dimen>
+    <!-- Split layout: max height for scrollable gesture help overlay (portrait split) -->
+    <dimen name="touchpad_help_overlay_max_height_split">280dp</dimen>
+    <dimen name="touchpad_help_overlay_split_text_size">14sp</dimen>
 
     <!-- Toggle handle between touchpad and keyboard (portrait = height, landscape = narrow axis) -->
     <dimen name="toggle_handle_height">28dp</dimen>

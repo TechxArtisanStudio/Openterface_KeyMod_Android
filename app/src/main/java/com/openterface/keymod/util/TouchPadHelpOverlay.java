@@ -1,5 +1,6 @@
 package com.openterface.keymod.util;
 
+import android.text.method.ScrollingMovementMethod;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.PathInterpolator;
@@ -45,6 +46,10 @@ public final class TouchPadHelpOverlay {
         if (overlay == null) return;
         cancelAnimation(overlay);
         overlay.setText(TouchPadTipsFormatter.buildGestureHelpOverlayText(overlay.getContext()));
+        overlay.scrollTo(0, 0);
+        overlay.setMovementMethod(new ScrollingMovementMethod());
+        overlay.setVerticalScrollBarEnabled(true);
+        overlay.setScrollbarFadingEnabled(false);
         overlay.setVisibility(View.VISIBLE);
         overlay.setAlpha(0f);
         overlay.animate()
@@ -58,22 +63,18 @@ public final class TouchPadHelpOverlay {
     public static void clear(TextView overlay) {
         if (overlay != null) {
             cancelAnimation(overlay);
+            overlay.setMovementMethod(null);
         }
     }
 
     /**
-     * Any {@link MotionEvent#ACTION_DOWN} on the pad, footer tips, or the hint text dismisses the hint.
+     * Touch on the pad or footer tips dismisses the hint. We intentionally do not attach a
+     * dismiss listener to {@code help}: when the overlay is scrollable, raw {@code ACTION_DOWN}
+     * would fight vertical scrolling; dismiss via pad tap or the info button toggle.
      */
     public static void wireDismissTouchTargets(
             @Nullable TouchPadView pad, @Nullable TextView tips, @Nullable TextView help) {
         if (help == null) return;
-        help.setOnTouchListener((v, e) -> {
-            if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                dismissIfVisible(help);
-                return true;
-            }
-            return false;
-        });
         if (tips != null) {
             tips.setOnTouchListener((v, e) -> {
                 if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
@@ -103,7 +104,10 @@ public final class TouchPadHelpOverlay {
                 .setDuration(FADE_OUT_MS)
                 .setInterpolator(FADE_OUT_INTERP)
                 .withLayer()
-                .withEndAction(() -> overlay.setVisibility(View.GONE))
+                .withEndAction(() -> {
+                    overlay.setMovementMethod(null);
+                    overlay.setVisibility(View.GONE);
+                })
                 .start();
     }
 }

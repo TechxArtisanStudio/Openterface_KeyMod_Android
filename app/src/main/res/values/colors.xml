@@ -39,6 +39,7 @@
     <color name="holo_red_light">#FFFF4444</color>
     <color name="button_text">#FF212121</color>
     <color name="touchpad_background">#FFE0E0E0</color>
+    <color name="touchpad_help_overlay_panel">#F5FFFFFF</color>
     <color name="sidebar_background">#FFFFFFFF</color>
     <color name="sidebar_item_text">#FF212121</color>
     <color name="ic_launcher_background">#FFF57C00</color>

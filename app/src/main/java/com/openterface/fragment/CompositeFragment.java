@@ -608,17 +608,53 @@ public class CompositeFragment extends Fragment {
     }
 
     private void cycleDisplayMode() {
-        boolean isPortrait = getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT;
-        switch (displayMode) {
-            case BOTH:     displayMode = DisplayMode.KEYBOARD;  break;
-            case KEYBOARD: displayMode = isPortrait ? DisplayMode.BOTH : DisplayMode.TOUCHPAD;  break;
-            case TOUCHPAD: displayMode = isPortrait ? DisplayMode.BOTH : DisplayMode.SPLIT;     break;
-            case SPLIT:    displayMode = DisplayMode.BOTH;      break;
+        normalizeDisplayModeForOrientation();
+        boolean isPortrait =
+                getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT;
+        if (isPortrait) {
+            switch (displayMode) {
+                case BOTH:
+                    displayMode = DisplayMode.KEYBOARD;
+                    break;
+                case KEYBOARD:
+                case TOUCHPAD:
+                case SPLIT:
+                    displayMode = DisplayMode.BOTH;
+                    break;
+            }
+        } else {
+            switch (displayMode) {
+                case KEYBOARD:
+                    displayMode = DisplayMode.SPLIT;
+                    break;
+                case SPLIT:
+                    displayMode = DisplayMode.KEYBOARD;
+                    break;
+                case BOTH:
+                case TOUCHPAD:
+                default:
+                    displayMode = DisplayMode.SPLIT;
+                    break;
+            }
         }
         applyDisplayMode();
     }
 
+    /**
+     * Landscape Keyboard & Mouse: only keyboard-only and split layouts are offered; coerce legacy
+     * BOTH/TOUCHPAD to SPLIT.
+     */
+    private void normalizeDisplayModeForOrientation() {
+        if (getResources().getConfiguration().orientation != Configuration.ORIENTATION_LANDSCAPE) {
+            return;
+        }
+        if (displayMode == DisplayMode.BOTH || displayMode == DisplayMode.TOUCHPAD) {
+            displayMode = DisplayMode.SPLIT;
+        }
+    }
+
     private void applyDisplayMode() {
+        normalizeDisplayModeForOrientation();
         boolean isInSplit = displayMode == DisplayMode.SPLIT;
 
         if (isInSplit) {
@@ -751,8 +787,9 @@ public class CompositeFragment extends Fragment {
             return;
         }
 
+        normalizeDisplayModeForOrientation();
+        applyDisplayMode();
         if (displayMode == DisplayMode.SPLIT) {
-            // Reconfigure split keyboard views for new orientation
             if (keyboardViewLeft != null) {
                 keyboardViewLeft.reloadForCurrentOrientation();
                 keyboardViewLeft.setSplitPart(CustomKeyboardView.SPLIT_LEFT);
@@ -761,9 +798,6 @@ public class CompositeFragment extends Fragment {
                 keyboardViewRight.reloadForCurrentOrientation();
                 keyboardViewRight.setSplitPart(CustomKeyboardView.SPLIT_RIGHT);
             }
-        } else {
-            applyOrientationLayout();
-            applyDisplayMode();
         }
     }
 }
