@@ -44,6 +44,7 @@ public class ComposeFragment extends Fragment {
     private EditText body;
     private TextView asciiWarning;
     private TextView charCount;
+    private Button clearButton;
     private Button sendButton;
     private CustomKeyboardView keyboardView;
 
@@ -62,6 +63,7 @@ public class ComposeFragment extends Fragment {
         body = view.findViewById(R.id.compose_body);
         asciiWarning = view.findViewById(R.id.compose_ascii_warning);
         charCount = view.findViewById(R.id.compose_char_count);
+        clearButton = view.findViewById(R.id.compose_clear_button);
         sendButton = view.findViewById(R.id.compose_send_button);
         keyboardView = view.findViewById(R.id.compose_keyboard_view);
 
@@ -75,6 +77,15 @@ public class ComposeFragment extends Fragment {
             registerKeyboardOsListener(keyboardView);
         }
 
+        if (clearButton != null) {
+            clearButton.setOnClickListener(v -> {
+                if (sending || body == null) {
+                    return;
+                }
+                body.setText("");
+                updateComposeValidationUi();
+            });
+        }
         sendButton.setOnClickListener(v -> onSendOrStopClicked());
 
         body.addTextChangedListener(new TextWatcher() {
@@ -134,6 +145,7 @@ public class ComposeFragment extends Fragment {
         body = null;
         asciiWarning = null;
         charCount = null;
+        clearButton = null;
         sendButton = null;
         keyboardView = null;
         super.onDestroyView();
@@ -239,6 +251,12 @@ public class ComposeFragment extends Fragment {
         if (getActivity() instanceof MainActivity) {
             ConnectionManager cm = ((MainActivity) getActivity()).getConnectionManager();
             connected = cm != null && cm.isConnected();
+        }
+
+        if (clearButton != null) {
+            boolean canClear = !sending && !t.isEmpty();
+            clearButton.setEnabled(canClear);
+            clearButton.setAlpha(canClear ? 1f : 0.45f);
         }
 
         if (sending) {
