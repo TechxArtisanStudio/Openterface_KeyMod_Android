@@ -1848,58 +1848,59 @@ public class CustomKeyboardView extends LinearLayout {
         List<ExtraGridKey> gridKeys = new ArrayList<>();
 
         // Row 1
-        gridKeys.add(new ExtraGridKey(new Key("HOME", "", 0x4A, "4A", 25f, 0, 0f, false), 0, 0));
-        gridKeys.add(new ExtraGridKey(new Key("UP", "", 0x52, "52", 25f, R.drawable.keyboard_arrow_up_24, 0f, false), 0, 1));
-        gridKeys.add(new ExtraGridKey(new Key("END", "", 0x4D, "4D", 25f, 0, 0f, false), 0, 2));
-        gridKeys.add(new ExtraGridKey(new Key("PGUP", "", 0x4B, "4B", 25f, 0, 0f, false), 0, 3));
+        gridKeys.add(new ExtraGridKey(new Key("HOME", "", 0x4A, "4A", 25f, 0, 0f, false), 0, 0, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("UP", "", 0x52, "52", 25f, R.drawable.keyboard_arrow_up_24, 0f, false), 0, 2, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("END", "", 0x4D, "4D", 25f, 0, 0f, false), 0, 4, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("PGUP", "", 0x4B, "4B", 25f, 0, 0f, false), 0, 6, 1, 2));
 
         // Row 2
-        gridKeys.add(new ExtraGridKey(new Key("LEFT", "", 0x50, "50", 25f, R.drawable.keyboard_arrow_left_24, 0f, false), 1, 0));
-        gridKeys.add(new ExtraGridKey(new Key("DOWN", "", 0x51, "51", 25f, R.drawable.keyboard_arrow_down_24, 0f, false), 1, 1));
-        gridKeys.add(new ExtraGridKey(new Key("RIGHT", "", 0x4F, "4F", 25f, R.drawable.keyboard_arrow_right_24, 0f, false), 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("PGDN", "", 0x4E, "4E", 25f, 0, 0f, false), 1, 3));
+        gridKeys.add(new ExtraGridKey(new Key("LEFT", "", 0x50, "50", 25f, R.drawable.keyboard_arrow_left_24, 0f, false), 1, 0, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("DOWN", "", 0x51, "51", 25f, R.drawable.keyboard_arrow_down_24, 0f, false), 1, 2, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("RIGHT", "", 0x4F, "4F", 25f, R.drawable.keyboard_arrow_right_24, 0f, false), 1, 4, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("PGDN", "", 0x4E, "4E", 25f, 0, 0f, false), 1, 6, 1, 2));
 
         // Row 3
-        gridKeys.add(new ExtraGridKey(new Key("COPY", "", 0x06, "06", 25f, R.drawable.content_copy_24, 0f, false, false, primaryModifier, false), 2, 0));
-        gridKeys.add(new ExtraGridKey(new Key("CUT", "", 0x1B, "1B", 25f, R.drawable.content_cut_24, 0f, false, false, primaryModifier, false), 2, 1));
-        gridKeys.add(new ExtraGridKey(new Key("PASTE", "", 0x19, "19", 25f, R.drawable.content_paste_24, 0f, false, false, primaryModifier, false), 2, 2));
-        gridKeys.add(new ExtraGridKey(new Key("UNDO", "", 0x1D, "1D", 25f, R.drawable.undo_24, 0f, false, false, primaryModifier, false), 2, 3));
+        gridKeys.add(new ExtraGridKey(new Key("COPY", "", 0x06, "06", 25f, R.drawable.content_copy_24, 0f, false, false, primaryModifier, false), 2, 0, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("CUT", "", 0x1B, "1B", 25f, R.drawable.content_cut_24, 0f, false, false, primaryModifier, false), 2, 2, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("PASTE", "", 0x19, "19", 25f, R.drawable.content_paste_24, 0f, false, false, primaryModifier, false), 2, 4, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("UNDO", "", 0x1D, "1D", 25f, R.drawable.undo_24, 0f, false, false, primaryModifier, false), 2, 6, 1, 2));
 
         // Row 4
-        gridKeys.add(new ExtraGridKey(new Key("ESC", "", 0x29, "29", 25f, 0, 0f, false), 3, 0));
-        gridKeys.add(new ExtraGridKey(new Key("Tab", "", 0x2B, "2B", 25f, R.drawable.keyboard_tab_24, 0f, false), 3, 1));
-        gridKeys.add(new ExtraGridKey(new Key("SAVE", "", 0x16, "16", 25f, R.drawable.save_24, 0f, false, false, primaryModifier, false), 3, 2));
-        gridKeys.add(new ExtraGridKey(new Key("DEL", "", 0x4C, "4C", 25f, 0, 0f, false), 3, 3));
+        gridKeys.add(new ExtraGridKey(new Key("ESC", "", 0x29, "29", 25f, 0, 0f, false), 3, 0, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("SAVE", "", 0x16, "16", 25f, R.drawable.save_24, 0f, false, false, primaryModifier, false), 3, 2, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("ALL", "", 0x04, "04", 25f, R.drawable.select_all_24, 0f, false, false, primaryModifier, false), 3, 4, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("DEL", "", 0x4C, "4C", 25f, 0, 0f, false), 3, 6, 1, 2));
 
         // Row 5
-        gridKeys.add(new ExtraGridKey(new Key("/", "", 0x54, "54", 25f, 0, 0f, false), 4, 0));
-        gridKeys.add(new ExtraGridKey(new Key("*", "", 0x55, "55", 25f, 0, 0f, false), 4, 1));
-        gridKeys.add(new ExtraGridKey(new Key("+", "", 0x57, "57", 25f, 0, 0f, false), 4, 2));
-        gridKeys.add(new ExtraGridKey(new Key("-", "", 0x56, "56", 25f, 0, 0f, false), 4, 3));
+        gridKeys.add(new ExtraGridKey(new Key("/", "", 0x54, "54", 25f, 0, 0f, false), 4, 0, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("*", "", 0x55, "55", 25f, 0, 0f, false), 4, 2, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("+", "", 0x57, "57", 25f, 0, 0f, false), 4, 4, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("-", "", 0x56, "56", 25f, 0, 0f, false), 4, 6, 1, 2));
 
         // Row 6
-        gridKeys.add(new ExtraGridKey(new Key("7", "", 0x5F, "5F", 25f, 0, 0f, false), 5, 0));
-        gridKeys.add(new ExtraGridKey(new Key("8", "", 0x60, "60", 25f, 0, 0f, false), 5, 1));
-        gridKeys.add(new ExtraGridKey(new Key("9", "", 0x61, "61", 25f, 0, 0f, false), 5, 2));
-        gridKeys.add(new ExtraGridKey(new Key("=", "", 0x67, "67", 25f, 0, 0f, false), 5, 3));
+        gridKeys.add(new ExtraGridKey(new Key("7", "", 0x5F, "5F", 25f, 0, 0f, false), 5, 0, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("8", "", 0x60, "60", 25f, 0, 0f, false), 5, 2, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("9", "", 0x61, "61", 25f, 0, 0f, false), 5, 4, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("=", "", 0x67, "67", 25f, 0, 0f, false), 5, 6, 1, 2));
 
         // Row 7
-        gridKeys.add(new ExtraGridKey(new Key("4", "", 0x5C, "5C", 25f, 0, 0f, false), 6, 0));
-        gridKeys.add(new ExtraGridKey(new Key("5", "", 0x5D, "5D", 25f, 0, 0f, false), 6, 1));
-        gridKeys.add(new ExtraGridKey(new Key("6", "", 0x5E, "5E", 25f, 0, 0f, false), 6, 2));
-        gridKeys.add(new ExtraGridKey(new Key(",", "", 0x36, "36", 25f, 0, 0f, false), 6, 3));
+        gridKeys.add(new ExtraGridKey(new Key("4", "", 0x5C, "5C", 25f, 0, 0f, false), 6, 0, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("5", "", 0x5D, "5D", 25f, 0, 0f, false), 6, 2, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("6", "", 0x5E, "5E", 25f, 0, 0f, false), 6, 4, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("Tab", "", 0x2B, "2B", 25f, R.drawable.keyboard_tab_24, 0f, false), 6, 6, 1, 2));
 
         // Row 8
-        gridKeys.add(new ExtraGridKey(new Key("1", "", 0x59, "59", 25f, 0, 0f, false), 7, 0));
-        gridKeys.add(new ExtraGridKey(new Key("2", "", 0x5A, "5A", 25f, 0, 0f, false), 7, 1));
-        gridKeys.add(new ExtraGridKey(new Key("3", "", 0x5B, "5B", 25f, 0, 0f, false), 7, 2));
-        gridKeys.add(new ExtraGridKey(new Key("ENTER", "", 0x28, "28", 25f, 0, 0f, false), 7, 3, 2, 1));
+        gridKeys.add(new ExtraGridKey(new Key("1", "", 0x59, "59", 25f, 0, 0f, false), 7, 0, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("2", "", 0x5A, "5A", 25f, 0, 0f, false), 7, 2, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("3", "", 0x5B, "5B", 25f, 0, 0f, false), 7, 4, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("ENTER", "", 0x28, "28", 25f, 0, 0f, false), 7, 6, 2, 2));
 
         // Row 9
-        gridKeys.add(new ExtraGridKey(new Key("0", "", 0x62, "62", 25f, 0, 0f, false), 8, 0, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key(".", "", 0x63, "63", 25f, 0, 0f, false), 8, 2));
+        gridKeys.add(new ExtraGridKey(new Key(",", "", 0x36, "36", 25f, 0, 0f, false), 8, 0, 1, 1));
+        gridKeys.add(new ExtraGridKey(new Key(".", "", 0x63, "63", 25f, 0, 0f, false), 8, 1, 1, 1));
+        gridKeys.add(new ExtraGridKey(new Key("0", "", 0x62, "62", 25f, 0, 0f, false), 8, 2, 1, 4));
 
-        addExtraGrid(9, 4, gridKeys);
+        addExtraGrid(9, 8, gridKeys);
     }
 
     private void addExtraGrid(int rows, int columns, List<ExtraGridKey> gridKeys) {
@@ -1910,7 +1911,7 @@ public class CustomKeyboardView extends LinearLayout {
 
         for (ExtraGridKey entry : gridKeys) {
             GridLayout.Spec rowSpec = GridLayout.spec(entry.row, entry.rowSpan, (float) entry.rowSpan);
-            GridLayout.Spec colSpec = GridLayout.spec(entry.col, entry.colSpan, 1f);
+            GridLayout.Spec colSpec = GridLayout.spec(entry.col, entry.colSpan, (float) entry.colSpan);
             GridLayout.LayoutParams params = new GridLayout.LayoutParams(rowSpec, colSpec);
             params.width = 0;
             params.height = 0;
@@ -1949,6 +1950,25 @@ public class CustomKeyboardView extends LinearLayout {
                 textButton.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
                 textButton.setText(entry.key.label);
                 textButton.setTextColor(resolveThemeTextColor());
+                if ("/".equals(entry.key.label)
+                        || "*".equals(entry.key.label)
+                        || "+".equals(entry.key.label)
+                        || "-".equals(entry.key.label)
+                        || "=".equals(entry.key.label)
+                        || "7".equals(entry.key.label)
+                        || "8".equals(entry.key.label)
+                        || "9".equals(entry.key.label)
+                        || "4".equals(entry.key.label)
+                        || "5".equals(entry.key.label)
+                        || "6".equals(entry.key.label)
+                        || "1".equals(entry.key.label)
+                        || "2".equals(entry.key.label)
+                        || "3".equals(entry.key.label)
+                        || ",".equals(entry.key.label)
+                        || ".".equals(entry.key.label)
+                        || "0".equals(entry.key.label)) {
+                    textButton.setTextSize(18);
+                }
                 if ("HOME".equals(entry.key.label)
                         || "END".equals(entry.key.label)
                         || "PGUP".equals(entry.key.label)
