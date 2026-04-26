@@ -3,6 +3,7 @@ package com.openterface.keymod;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.text.method.LinkMovementMethod;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.TextView;
@@ -107,6 +108,11 @@ public class LaunchPanelActivity extends AppCompatActivity {
         macrosCard = findViewById(R.id.macros_card);
         voiceCard = findViewById(R.id.voice_card);
         presentationCard = findViewById(R.id.presentation_card);
+
+        TextView credit = findViewById(R.id.launch_panel_credit);
+        if (credit != null) {
+            credit.setMovementMethod(LinkMovementMethod.getInstance());
+        }
     }
 
     private void updateCardSelections() {
