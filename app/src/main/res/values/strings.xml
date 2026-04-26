@@ -295,7 +295,7 @@
     <string name="target_os_linux">Linux</string>
 
     <!-- Keyboard + mouse mode touchpad overlay (plain fallback for layout preview; runtime uses spans) -->
-    <string name="touch_pad_title">Touchpad</string>
+    <string name="touch_pad_title">TouchPad</string>
     <string name="touch_pad_status_buttons_up">Buttons: up (no drag)</string>
     <string name="touch_pad_status_buttons_drag">Buttons: left held (drag)</string>
     <string name="touch_pad_status_touch_idle">Touch: idle</string>
@@ -306,6 +306,6 @@
     <string name="touch_pad_help_overlay_one_finger_detail">Glide to move the pointer.\nTap to click.\nDouble-tap to double-click.\nLong press to start drag.\nTap to release drag.</string>
     <string name="touch_pad_help_overlay_two_fingers">Two fingers</string>
     <string name="touch_pad_help_overlay_two_fingers_detail">Tap for right-click.\nGlide with two fingers to scroll.</string>
-    <string name="touch_pad_compact_initial">Touchpad\nButtons: up (no drag)\nTouch: idle</string>
+    <string name="touch_pad_compact_initial">TouchPad\nButtons: up (no drag)\nTouch: idle</string>
     <string name="touch_pad_info_content_description">Show touchpad gesture help</string>
 </resources>

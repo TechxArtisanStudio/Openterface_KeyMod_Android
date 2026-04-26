@@ -75,6 +75,27 @@ public class HIDSender {
     }
 
     /**
+     * Send scroll / horizontal pan using the same relative-mouse report as Keyboard and Mouse
+     * ({@code sendScrollData}): vertical delta in the wheel byte, horizontal delta as relative X.
+     */
+    public static void sendScroll(UsbSerialPort usbPort, BluetoothService bluetoothService,
+                                  int deltaX, int deltaY) {
+        if (deltaX == 0 && deltaY == 0) {
+            return;
+        }
+        if (deltaY != 0) {
+            int wheel = Math.max(-127, Math.min(127, deltaY));
+            byte[] data = buildMousePacketFull(0, 0, 0, wheel);
+            sendPacket(usbPort, bluetoothService, data, "Mouse Scroll");
+        }
+        if (deltaX != 0) {
+            int boundedX = Math.max(-127, Math.min(127, deltaX));
+            byte[] data = buildMousePacketFull(boundedX, 0, 0, 0);
+            sendPacket(usbPort, bluetoothService, data, "Mouse HorizScroll");
+        }
+    }
+
+    /**
      * Send mouse click event
      */
     public static void sendMouseClick(UsbSerialPort usbPort, BluetoothService bluetoothService,
@@ -167,16 +188,20 @@ public class HIDSender {
 
     /**
      * Build relative mouse HID packet (CH9329: 5-byte header + 5-byte data + 1-byte checksum = 11 bytes)
-     * Format: 57 AB 00 04 05 | 01(relative) | buttons | deltaX | deltaY | wheel | checksum
+     * Format: 57 AB 00 05 05 | 01(relative) | buttons | deltaX | deltaY | wheel | checksum
      */
     private static byte[] buildMousePacket(int deltaX, int deltaY, int buttons) {
+        return buildMousePacketFull(deltaX, deltaY, buttons, 0);
+    }
+
+    private static byte[] buildMousePacketFull(int deltaX, int deltaY, int buttons, int wheel) {
         byte[] data = new byte[11]; // 5 header + 5 data + 1 checksum
         System.arraycopy(MOUSE_HEADER, 0, data, 0, 5);
         data[5] = 0x01;            // Relative mode
         data[6] = (byte) buttons;  // Button mask: bit0=left, bit1=right, bit2=middle
         data[7] = (byte) deltaX;   // Signed X delta
         data[8] = (byte) deltaY;   // Signed Y delta
-        data[9] = 0;               // Scroll wheel
+        data[9] = (byte) wheel;    // Scroll wheel (vertical)
         data[10] = calculateChecksum(data);
         return data;
     }

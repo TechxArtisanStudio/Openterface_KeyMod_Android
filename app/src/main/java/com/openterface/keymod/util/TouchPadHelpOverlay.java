@@ -23,12 +23,19 @@ public final class TouchPadHelpOverlay {
     private TouchPadHelpOverlay() {}
 
     public static void onInfoPressed(TextView overlay) {
+        onInfoPressed(overlay, true);
+    }
+
+    /**
+     * @param includeMainHelpTitle same as {@link #show(TextView, boolean)} when opening the overlay.
+     */
+    public static void onInfoPressed(TextView overlay, boolean includeMainHelpTitle) {
         if (overlay == null) return;
         if (overlay.getVisibility() == View.VISIBLE && overlay.getAlpha() > 0.05f) {
             cancelAnimation(overlay);
             fadeOutAndHide(overlay);
         } else {
-            show(overlay);
+            show(overlay, includeMainHelpTitle);
         }
     }
 
@@ -53,9 +60,17 @@ public final class TouchPadHelpOverlay {
     }
 
     public static void show(TextView overlay) {
+        show(overlay, true);
+    }
+
+    /**
+     * @param includeMainHelpTitle when false, omits the top “Touchpad gestures” line (compact dialog layout).
+     */
+    public static void show(TextView overlay, boolean includeMainHelpTitle) {
         if (overlay == null) return;
         cancelAnimation(overlay);
-        overlay.setText(TouchPadTipsFormatter.buildGestureHelpOverlayText(overlay.getContext()));
+        overlay.setText(
+                TouchPadTipsFormatter.buildGestureHelpOverlayText(overlay.getContext(), includeMainHelpTitle));
         overlay.setVisibility(View.VISIBLE);
         overlay.setAlpha(0f);
         overlay.animate()

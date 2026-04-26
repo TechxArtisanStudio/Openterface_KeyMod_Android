@@ -1,11 +1,17 @@
 package com.openterface.fragment;
 
+import android.animation.AnimatorListenerAdapter;
+import android.animation.AnimatorSet;
+import android.animation.TimeInterpolator;
+import android.animation.ValueAnimator;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.pm.ActivityInfo;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
@@ -21,17 +27,22 @@ import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.Gravity;
 import android.view.ViewGroup;
+import android.view.ViewParent;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.LinearInterpolator;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.RadioGroup;
+import android.widget.ImageButton;
 import android.widget.RadioButton;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.ColorUtils;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -41,8 +52,12 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.openterface.keymod.ConnectionManager;
 import com.openterface.keymod.MainActivity;
 import com.openterface.keymod.R;
+import com.openterface.keymod.ThemeManager;
 import com.openterface.keymod.TouchPadView;
+import com.openterface.keymod.util.TouchPadHelpOverlay;
 import com.openterface.keymod.util.TouchPadHaptics;
+import com.openterface.keymod.util.TouchPadPointerPhase;
+import com.openterface.keymod.util.TouchPadTipsFormatter;
 
 import java.util.concurrent.TimeUnit;
 
@@ -53,6 +68,15 @@ import java.util.concurrent.TimeUnit;
 public class PresentationFragment extends Fragment {
 
     private static final String TAG = "PresentationFragment";
+
+    /** Match {@link MouseFragment} touchpad bottom wash and tips behavior. */
+    private static final float TOUCHPAD_WASH_HEIGHT_RATIO = 0.32f;
+    private static final float TOUCHPAD_WASH_CLICK_PEAK_INTENSITY = 0.20f;
+    private static final float TOUCHPAD_WASH_DRAG_BASE_INTENSITY = 0.12f;
+    private static final long TOUCHPAD_WASH_CLICK_FADE_IN_MS = 70L;
+    private static final long TOUCHPAD_WASH_CLICK_FADE_OUT_MS = 460L;
+    private static final long TOUCHPAD_WASH_DRAG_OFF_FADE_OUT_MS = 340L;
+    private static final long POINTER_IDLE_AFTER_MS = 400L;
 
     // Preference keys
     private static final String PREF_TIMER_DURATION = "presentation_timer_duration";
@@ -174,6 +198,21 @@ public class PresentationFragment extends Fragment {
     // Touchpad dialog
     private Dialog touchpadDialog;
     private View touchpadView;
+    /** Left button held for drag (long-press), same model as Keyboard and Mouse touchpad. */
+    private boolean touchpadDragActive;
+
+    private final Handler touchpadTipHandler = new Handler(Looper.getMainLooper());
+    private TouchPadPointerPhase touchpadPointerPhase = TouchPadPointerPhase.IDLE;
+    private View touchpadDialogWashOverlay;
+    private int touchpadDialogWashColor = Color.TRANSPARENT;
+    private float touchpadDialogWashIntensity;
+    private AnimatorSet touchpadDialogWashAnimator;
+    private boolean touchpadHelpAutoShownOnce;
+    private final Runnable touchpadPointerIdleRunnable =
+            () -> {
+                touchpadPointerPhase = TouchPadPointerPhase.IDLE;
+                presentationTouchpadUpdateTips();
+            };
 
     @Nullable
     @Override
@@ -577,6 +616,175 @@ public class PresentationFragment extends Fragment {
         return null;
     }
 
+    // ── Presentation touchpad dialog: same tips + wash as MouseFragment ─────────
+
+    private void presentationTouchpadInitWashStyle() {
+        int accent = ThemeManager.getColorPrimary(requireContext());
+        touchpadDialogWashColor = ColorUtils.setAlphaComponent(accent, 0x88);
+    }
+
+    private void presentationTouchpadSetupWash(TouchPadView touchPad) {
+        if (touchPad == null) return;
+        ViewParent parentRef = touchPad.getParent();
+        if (!(parentRef instanceof ViewGroup)) return;
+        ViewGroup parent = (ViewGroup) parentRef;
+        if (!(parent instanceof FrameLayout)) return;
+
+        if (touchpadDialogWashOverlay == null) {
+            touchpadDialogWashOverlay = new View(requireContext());
+            touchpadDialogWashOverlay.setClickable(false);
+            touchpadDialogWashOverlay.setFocusable(false);
+            GradientDrawable washDrawable = new GradientDrawable(
+                    GradientDrawable.Orientation.BOTTOM_TOP,
+                    new int[] {touchpadDialogWashColor, Color.TRANSPARENT});
+            touchpadDialogWashOverlay.setBackground(washDrawable);
+        } else {
+            ViewParent existingParent = touchpadDialogWashOverlay.getParent();
+            if (existingParent instanceof ViewGroup && existingParent != parent) {
+                ((ViewGroup) existingParent).removeView(touchpadDialogWashOverlay);
+            }
+        }
+
+        if (touchpadDialogWashOverlay.getParent() == null) {
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    1,
+                    Gravity.BOTTOM);
+            // Insert directly above the pad so tips/help/info (and their ripples) draw on top.
+            int padIndex = parent.indexOfChild(touchPad);
+            int insertAt = padIndex >= 0 ? padIndex + 1 : 0;
+            parent.addView(touchpadDialogWashOverlay, insertAt, lp);
+        }
+
+        touchPad.post(() -> {
+            if (touchpadDialogWashOverlay == null) return;
+            ViewGroup.LayoutParams params = touchpadDialogWashOverlay.getLayoutParams();
+            int washHeight = Math.max(1, Math.round(touchPad.getHeight() * TOUCHPAD_WASH_HEIGHT_RATIO));
+            if (params != null && params.height != washHeight) {
+                params.height = washHeight;
+                touchpadDialogWashOverlay.setLayoutParams(params);
+            }
+            presentationTouchpadApplyWashIntensity(
+                    touchpadDragActive ? TOUCHPAD_WASH_DRAG_BASE_INTENSITY : 0f);
+        });
+    }
+
+    private void presentationTouchpadApplyWashIntensity(float intensity) {
+        touchpadDialogWashIntensity = Math.max(0f, Math.min(1f, intensity));
+        if (touchpadDialogWashOverlay != null) {
+            touchpadDialogWashOverlay.setAlpha(touchpadDialogWashIntensity);
+        }
+    }
+
+    private void presentationTouchpadAnimateWashTo(
+            float target, long durationMs, TimeInterpolator interpolator) {
+        float clampedTarget = Math.max(0f, Math.min(1f, target));
+        ValueAnimator animator = ValueAnimator.ofFloat(touchpadDialogWashIntensity, clampedTarget);
+        animator.setDuration(durationMs);
+        animator.setInterpolator(interpolator);
+        animator.addUpdateListener(a -> presentationTouchpadApplyWashIntensity((float) a.getAnimatedValue()));
+        AnimatorSet set = new AnimatorSet();
+        set.play(animator);
+        set.addListener(
+                new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(android.animation.Animator animation) {
+                        touchpadDialogWashAnimator = null;
+                    }
+
+                    @Override
+                    public void onAnimationCancel(android.animation.Animator animation) {
+                        touchpadDialogWashAnimator = null;
+                    }
+                });
+        touchpadDialogWashAnimator = set;
+        set.start();
+    }
+
+    private void presentationTouchpadCancelWashAnimation() {
+        if (touchpadDialogWashAnimator != null) {
+            touchpadDialogWashAnimator.cancel();
+            touchpadDialogWashAnimator = null;
+        }
+    }
+
+    private void presentationTouchpadPulseClickVisual() {
+        if (touchpadDialogWashOverlay == null) return;
+        presentationTouchpadCancelWashAnimation();
+        final float rest = touchpadDragActive ? TOUCHPAD_WASH_DRAG_BASE_INTENSITY : 0f;
+        final float peak = Math.max(rest, TOUCHPAD_WASH_CLICK_PEAK_INTENSITY);
+
+        ValueAnimator fadeIn = ValueAnimator.ofFloat(rest, peak);
+        fadeIn.setDuration(TOUCHPAD_WASH_CLICK_FADE_IN_MS);
+        fadeIn.setInterpolator(new LinearInterpolator());
+        fadeIn.addUpdateListener(a -> presentationTouchpadApplyWashIntensity((float) a.getAnimatedValue()));
+
+        ValueAnimator fadeOut = ValueAnimator.ofFloat(peak, rest);
+        fadeOut.setDuration(TOUCHPAD_WASH_CLICK_FADE_OUT_MS);
+        fadeOut.setInterpolator(new DecelerateInterpolator());
+        fadeOut.addUpdateListener(a -> presentationTouchpadApplyWashIntensity((float) a.getAnimatedValue()));
+
+        AnimatorSet set = new AnimatorSet();
+        set.playSequentially(fadeIn, fadeOut);
+        set.addListener(
+                new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(android.animation.Animator animation) {
+                        touchpadDialogWashAnimator = null;
+                        presentationTouchpadApplyWashIntensity(rest);
+                    }
+
+                    @Override
+                    public void onAnimationCancel(android.animation.Animator animation) {
+                        touchpadDialogWashAnimator = null;
+                        presentationTouchpadApplyWashIntensity(
+                                touchpadDragActive ? TOUCHPAD_WASH_DRAG_BASE_INTENSITY : 0f);
+                    }
+                });
+        touchpadDialogWashAnimator = set;
+        set.start();
+    }
+
+    private void presentationTouchpadUpdateTips() {
+        if (touchpadView == null) return;
+        TextView tips = touchpadView.findViewById(R.id.presentation_touchpad_tips);
+        if (tips == null) return;
+        tips.setText(TouchPadTipsFormatter.buildCompact(
+                requireContext(), touchpadDragActive, touchpadPointerPhase, true));
+    }
+
+    private void presentationTouchpadNotePhase(TouchPadPointerPhase phase) {
+        touchpadTipHandler.removeCallbacks(touchpadPointerIdleRunnable);
+        touchpadPointerPhase = phase;
+        presentationTouchpadUpdateTips();
+        if (phase != TouchPadPointerPhase.IDLE) {
+            touchpadTipHandler.postDelayed(touchpadPointerIdleRunnable, POINTER_IDLE_AFTER_MS);
+        }
+    }
+
+    private void presentationTouchpadClearPhaseOnFingerUp() {
+        touchpadTipHandler.removeCallbacks(touchpadPointerIdleRunnable);
+        touchpadPointerPhase = TouchPadPointerPhase.IDLE;
+        presentationTouchpadUpdateTips();
+    }
+
+    private void presentationTouchpadTeardownUi() {
+        touchpadTipHandler.removeCallbacks(touchpadPointerIdleRunnable);
+        presentationTouchpadCancelWashAnimation();
+        if (touchpadView != null) {
+            TextView help = touchpadView.findViewById(R.id.presentation_touchpad_help_overlay);
+            TouchPadHelpOverlay.clear(help);
+        }
+        if (touchpadDialogWashOverlay != null) {
+            ViewParent p = touchpadDialogWashOverlay.getParent();
+            if (p instanceof ViewGroup) {
+                ((ViewGroup) p).removeView(touchpadDialogWashOverlay);
+            }
+            touchpadDialogWashOverlay = null;
+        }
+        touchpadPointerPhase = TouchPadPointerPhase.IDLE;
+    }
+
     // ── Touchpad Dialog ───────────────────────────────────────────────
 
     private void showTouchpadDialog() {
@@ -585,44 +793,115 @@ public class PresentationFragment extends Fragment {
             return;
         }
 
+        touchpadDragActive = false;
+        touchpadPointerPhase = TouchPadPointerPhase.IDLE;
+
         touchpadView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_touchpad, null);
         TouchPadView touchSurface = touchpadView.findViewById(R.id.touch_surface);
+        TextView tips = touchpadView.findViewById(R.id.presentation_touchpad_tips);
+        TextView helpOverlay = touchpadView.findViewById(R.id.presentation_touchpad_help_overlay);
+        ImageButton infoBtn = touchpadView.findViewById(R.id.presentation_touchpad_info);
+
+        presentationTouchpadInitWashStyle();
+        presentationTouchpadSetupWash(touchSurface);
+        presentationTouchpadUpdateTips();
+
+        if (infoBtn != null) {
+            infoBtn.setOnClickListener(v -> TouchPadHelpOverlay.onInfoPressed(helpOverlay, false));
+        }
+        if (!touchpadHelpAutoShownOnce && helpOverlay != null) {
+            touchSurface.post(() -> TouchPadHelpOverlay.show(helpOverlay, false));
+            touchpadHelpAutoShownOnce = true;
+        }
 
         touchSurface.setOnTouchPadListener(new TouchPadView.OnTouchPadListener() {
             @Override
             public void onTouchMove(float x, float y, float lastX, float lastY) {
-                if (getActivity() instanceof MainActivity) {
-                    ConnectionManager cm = ((MainActivity) getActivity()).getConnectionManager();
-                    if (cm == null || !cm.isConnected()) return;
-                    float dx = x - lastX;
-                    float dy = y - lastY;
-                    int clampedDx = (int) Math.max(-127, Math.min(127, dx));
-                    int clampedDy = (int) Math.max(-127, Math.min(127, dy));
-                    if (clampedDx != 0 || clampedDy != 0) {
-                        cm.sendMouseMovement(clampedDx, clampedDy, 0);
-                    }
+                ConnectionManager cm = getConnectionManager();
+                if (cm == null || !cm.isConnected()) return;
+                if (lastX == 0f && lastY == 0f) {
+                    presentationTouchpadNotePhase(TouchPadPointerPhase.SCROLL);
+                    cm.sendScroll((int) x, (int) y);
+                    return;
+                }
+                presentationTouchpadNotePhase(TouchPadPointerPhase.MOVE);
+                float dx = x - lastX;
+                float dy = y - lastY;
+                int clampedDx = (int) Math.max(-127, Math.min(127, dx));
+                int clampedDy = (int) Math.max(-127, Math.min(127, dy));
+                if (clampedDx != 0 || clampedDy != 0) {
+                    int buttons = touchpadDragActive ? 1 : 0;
+                    cm.sendMouseMovement(clampedDx, clampedDy, buttons);
                 }
             }
 
             @Override
             public void onTouchClick() {
+                if (touchpadDragActive) {
+                    touchpadDragActive = false;
+                    releaseTouchpadMouseButtons();
+                    presentationTouchpadCancelWashAnimation();
+                    presentationTouchpadAnimateWashTo(
+                            0f, TOUCHPAD_WASH_DRAG_OFF_FADE_OUT_MS, new DecelerateInterpolator());
+                    presentationTouchpadUpdateTips();
+                    return;
+                }
+                presentationTouchpadPulseClickVisual();
                 TouchPadHaptics.onLeftClick(touchSurface.getContext());
                 sendMouseClick(1);
             }
 
             @Override
             public void onTouchDoubleClick() {
+                if (touchpadDragActive) {
+                    touchpadDragActive = false;
+                    releaseTouchpadMouseButtons();
+                    presentationTouchpadCancelWashAnimation();
+                    presentationTouchpadAnimateWashTo(
+                            0f, TOUCHPAD_WASH_DRAG_OFF_FADE_OUT_MS, new DecelerateInterpolator());
+                    presentationTouchpadUpdateTips();
+                    return;
+                }
+                presentationTouchpadPulseClickVisual();
                 TouchPadHaptics.onDoubleClick(touchSurface.getContext());
                 sendMouseClick(1);
-                timerHandler.postDelayed(() -> sendMouseClick(1), 150);
+                timerHandler.postDelayed(() -> {
+                    presentationTouchpadPulseClickVisual();
+                    sendMouseClick(1);
+                }, 150);
             }
 
             @Override
             public void onTouchRightClick() {
+                presentationTouchpadPulseClickVisual();
                 TouchPadHaptics.onRightClick(touchSurface.getContext());
                 sendMouseClick(2);
             }
+
+            @Override
+            public void onTouchLongPress() {
+                if (touchpadDragActive) {
+                    return;
+                }
+                ConnectionManager cm = getConnectionManager();
+                if (cm == null || !cm.isConnected()) return;
+                presentationTouchpadCancelWashAnimation();
+                TouchPadHaptics.onDragToggle(touchSurface.getContext());
+                touchpadDragActive = true;
+                cm.sendMouseMovement(0, 0, 1);
+                presentationTouchpadApplyWashIntensity(TOUCHPAD_WASH_DRAG_BASE_INTENSITY);
+                presentationTouchpadUpdateTips();
+            }
+
+            @Override
+            public void onTouchRelease() {
+                presentationTouchpadClearPhaseOnFingerUp();
+                if (!touchpadDragActive) {
+                    releaseTouchpadMouseButtons();
+                }
+            }
         });
+        TouchPadHelpOverlay.wireDismissTouchTargets(touchSurface, tips, helpOverlay);
 
         Dialog dialog = new Dialog(requireContext());
         dialog.setContentView(touchpadView);
@@ -633,17 +912,21 @@ public class PresentationFragment extends Fragment {
             dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
         }
 
-        // Tap anywhere in the dialog content except touch surface interactions to dismiss.
         touchpadView.setOnClickListener(v -> dialog.dismiss());
 
         dialog.setOnDismissListener(d -> {
+            if (touchpadDragActive) {
+                touchpadDragActive = false;
+                releaseTouchpadMouseButtons();
+            }
+            presentationTouchpadTeardownUi();
             sendKeyHID(6); // 'C' to hide pointer
             touchpadDialog = null;
+            touchpadView = null;
         });
         touchpadDialog = dialog;
         dialog.show();
 
-        // Send 'C' to show pointer cursor in presentation software
         sendKeyHID(6); // HID code for 'C'
         Log.d(TAG, "Touchpad dialog shown, pointer enabled");
     }
@@ -661,6 +944,14 @@ public class PresentationFragment extends Fragment {
                     }
                 }
             }, 100);
+        }
+    }
+
+    /** Release all mouse buttons (CH9329 neutral report). */
+    private void releaseTouchpadMouseButtons() {
+        ConnectionManager cm = getConnectionManager();
+        if (cm != null && cm.isConnected()) {
+            cm.sendMouseMovement(0, 0, 0);
         }
     }
 
@@ -1215,5 +1506,11 @@ public class PresentationFragment extends Fragment {
         stopTimer();
         if (vibrator != null) vibrator.cancel();
         timerHandler.removeCallbacksAndMessages(null);
+        touchpadTipHandler.removeCallbacksAndMessages(null);
+        if (touchpadDialog != null && touchpadDialog.isShowing()) {
+            touchpadDialog.dismiss();
+        } else {
+            presentationTouchpadTeardownUi();
+        }
     }
 }
