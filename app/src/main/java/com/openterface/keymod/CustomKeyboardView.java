@@ -1061,9 +1061,7 @@ public class CustomKeyboardView extends LinearLayout {
                     longPressConsumed[0] = false;
                     performKeyHapticFeedback(v);
                     if (shouldEnableAlternates(key)) {
-                        final float downRawX = event.getRawX();
-                        final float downRawY = event.getRawY();
-                        final Runnable openAlternates = () -> showAlternatesPopup(v, key, downRawX);
+                        final Runnable openAlternates = () -> showAlternatesPopup(v, key);
                         v.setTag(R.id.tag_custom_keyboard_pending_alternates, openAlternates);
                         longPressHandler.postDelayed(openAlternates, ALT_LONG_PRESS_TIMEOUT_MS);
                     }
@@ -1247,7 +1245,7 @@ public class CustomKeyboardView extends LinearLayout {
         return alternatePopupWindow != null && alternatePopupWindow.isShowing();
     }
 
-    private void showAlternatesPopup(View anchor, Key key, float initialRawX) {
+    private void showAlternatesPopup(View anchor, Key key) {
         List<AlternateOption> options = buildAlternateOptions(key);
         if (options.size() < 2) {
             return;
@@ -1296,7 +1294,6 @@ public class CustomKeyboardView extends LinearLayout {
             int popupX = (int) (loc[0] + (anchor.getWidth() / 2f) - (alternatePopupContainer.getMeasuredWidth() / 2f));
             int popupY = loc[1] - dpToPx(ALT_POPUP_VERTICAL_OFFSET_DP);
             alternatePopupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY, popupX, popupY);
-            updateAlternateSelection(initialRawX, loc[1]);
         });
     }
 
