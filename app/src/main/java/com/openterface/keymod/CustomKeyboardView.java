@@ -2467,10 +2467,10 @@ public class CustomKeyboardView extends LinearLayout {
         gridKeys.add(new ExtraGridKey(new Key("BKSP", "", 0x2A, "2A", 25f, R.drawable.backspace, 0f, false), 1, 6, 1, 2));
 
         // Row 3 (was row 5)
-        gridKeys.add(new ExtraGridKey(new Key("/", "", 0x54, "54", 25f, 0, 0f, false), 2, 0, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("*", "", 0x55, "55", 25f, 0, 0f, false), 2, 2, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("=", "", 0x67, "67", 25f, 0, 0f, false), 2, 4, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("-", "", 0x56, "56", 25f, 0, 0f, false), 2, 6, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("=", "", 0x67, "67", 25f, 0, 0f, false), 2, 0, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("Space", "", 0x2C, "2C", 25f, R.drawable.space_bar_24px, 0f, false), 2, 2, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("/", "", 0x54, "54", 25f, 0, 0f, false), 2, 4, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("*", "", 0x55, "55", 25f, 0, 0f, false), 2, 6, 1, 2));
 
         // Row 4 (was row 6)
         gridKeys.add(new ExtraGridKey(new Key("7", "", 0x5F, "5F", 25f, 0, 0f, false), 3, 0, 1, 2));
@@ -2516,6 +2516,10 @@ public class CustomKeyboardView extends LinearLayout {
             params.setGravity(Gravity.FILL);
             int keyMargin = dpToPx(KEY_OUTER_MARGIN_DP);
             params.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
+            if (shouldRenderExtraNumpadSplitPlusCell(entry)) {
+                gridLayout.addView(createExtraNumpadSplitPlusCell(params));
+                continue;
+            }
             if (entry.key.iconResId != 0) {
                 ImageButton iconButton = new ImageButton(getContext());
                 applyFlatKeyStyle(iconButton);
@@ -2585,6 +2589,96 @@ public class CustomKeyboardView extends LinearLayout {
 
         addView(gridLayout);
         refreshExtraNumpadGridUi();
+    }
+
+    private boolean shouldRenderExtraNumpadSplitPlusCell(ExtraGridKey entry) {
+        return entry != null
+                && entry.key != null
+                && "+".equals(entry.key.label)
+                && entry.key.code == 0x57
+                && entry.row == 3
+                && entry.col == 6
+                && entry.rowSpan == 1
+                && entry.colSpan == 2;
+    }
+
+    private View createExtraNumpadSplitPlusCell(GridLayout.LayoutParams params) {
+        LinearLayout container = new LinearLayout(getContext());
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setLayoutParams(params);
+
+        int innerGap = dpToPx(2);
+        int sidePadding = dpToPx(2);
+
+        Key plusKey = new Key("-", "", 0x56, "56", 25f, 0, 0f, false);
+        Button plusButton = new Button(getContext());
+        applyFlatKeyStyle(plusButton);
+        LinearLayout.LayoutParams plusParams = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, 1f);
+        plusParams.setMargins(0, 0, 0, innerGap);
+        plusButton.setLayoutParams(plusParams);
+        plusButton.setBackgroundResource(R.drawable.function_button_background);
+        plusButton.setGravity(Gravity.CENTER);
+        plusButton.setTextSize(14);
+        plusButton.setPadding(sidePadding, sidePadding, sidePadding, innerGap);
+        plusButton.setText(plusKey.label);
+        plusButton.setTextColor(resolveThemeTextColor());
+        plusButton.setTag(R.id.tag_custom_keyboard_extra_cell_key, plusKey);
+        styleExtraNumpadGridKeyButton(plusButton, plusKey.label);
+        if (shouldRepeatOnLongPress(plusKey)) {
+            attachKeyListeners(plusButton, plusKey);
+        } else {
+            plusButton.setOnClickListener(v -> handleKeyPress(plusKey));
+            plusButton.setOnTouchListener((v, event) -> {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    performKeyHapticFeedback(v);
+                }
+                if (event.getAction() == MotionEvent.ACTION_UP) {
+                    repeatHandler.postDelayed(() -> {
+                        sendReleaseData();
+                        Log.d(TAG, "Sent key release for extra key: " + plusKey.label);
+                    }, 30);
+                }
+                return false;
+            });
+        }
+
+        Key spaceKey = new Key("+", "", 0x57, "57", 25f, 0, 0f, false);
+        Button spaceButton = new Button(getContext());
+        applyFlatKeyStyle(spaceButton);
+        LinearLayout.LayoutParams spaceParams = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, 1f);
+        spaceParams.setMargins(0, innerGap, 0, 0);
+        spaceButton.setLayoutParams(spaceParams);
+        spaceButton.setBackgroundResource(R.drawable.function_button_background);
+        spaceButton.setGravity(Gravity.CENTER);
+        spaceButton.setTextSize(14);
+        spaceButton.setPadding(sidePadding, innerGap, sidePadding, sidePadding);
+        spaceButton.setText(spaceKey.label);
+        spaceButton.setTextColor(resolveThemeTextColor());
+        spaceButton.setTag(R.id.tag_custom_keyboard_extra_cell_key, spaceKey);
+        styleExtraNumpadGridKeyButton(spaceButton, spaceKey.label);
+        if (shouldRepeatOnLongPress(spaceKey)) {
+            attachKeyListeners(spaceButton, spaceKey);
+        } else {
+            spaceButton.setOnClickListener(v -> handleKeyPress(spaceKey));
+            spaceButton.setOnTouchListener((v, event) -> {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    performKeyHapticFeedback(v);
+                }
+                if (event.getAction() == MotionEvent.ACTION_UP) {
+                    repeatHandler.postDelayed(() -> {
+                        sendReleaseData();
+                        Log.d(TAG, "Sent key release for extra key: " + spaceKey.label);
+                    }, 30);
+                }
+                return false;
+            });
+        }
+
+        container.addView(plusButton);
+        container.addView(spaceButton);
+        return container;
     }
 
     /**
@@ -2719,13 +2813,21 @@ public class CustomKeyboardView extends LinearLayout {
             int primaryMod = "macos".equals(getTargetOs()) ? MOD_WIN : MOD_CTRL;
             return new FnMapping("Save", 0x16, primaryMod, R.drawable.save_24);
         }
+        // Operator row (grid row 2): Fn shows £ € ¥ $ left-to-right (=, Space, /, *).
+        if ("Space".equals(key.label) && key.code == 0x2C) {
+            return new FnMapping("€", 0x1F, MOD_ALT | MOD_SHIFT);
+        }
+        // Split column under *: Fn shows % (top) and forward delete (bottom), same icon as BKSP→DEL.
+        if ("-".equals(key.label) && key.code == 0x56) {
+            return new FnMapping("%", 0x22, MOD_SHIFT);
+        }
+        if ("+".equals(key.label) && key.code == 0x57) {
+            return new FnMapping("DEL", 0x4C, 0, R.drawable.backspace);
+        }
         switch (key.code) {
-            // Numpad operators / = → currency & % (US HID + macOS-style Option combos for ¥ € £)
-            case 0x54: return new FnMapping("$", 0x21, MOD_SHIFT);
-            case 0x55: return new FnMapping("¥", 0x1C, MOD_ALT);
-            case 0x56: return new FnMapping("€", 0x1F, MOD_ALT | MOD_SHIFT);
-            // Fn layer: + ↔ = show % vs £ (swapped vs earlier mapping)
-            case 0x57: return new FnMapping("%", 0x22, MOD_SHIFT);
+            // Numpad / * when Fn: ¥ and $ (order matches £ € ¥ $ on operator row).
+            case 0x54: return new FnMapping("¥", 0x1C, MOD_ALT);
+            case 0x55: return new FnMapping("$", 0x21, MOD_SHIFT);
             case 0x67: return new FnMapping("£", 0x20, MOD_ALT);
             case 0x62: return new FnMapping("000", 0x62, 0);
             case 0x60: return new FnMapping("UP", 0x52, 0, R.drawable.keyboard_arrow_up_24);
@@ -2754,14 +2856,19 @@ public class CustomKeyboardView extends LinearLayout {
                     : R.drawable.function_button_background);
         }
         for (int i = 0; i < extraNumpadGrid.getChildCount(); i++) {
-            View child = extraNumpadGrid.getChildAt(i);
-            Object tag = child.getTag(R.id.tag_custom_keyboard_extra_cell_key);
-            if (!(tag instanceof Key)) {
-                continue;
-            }
+            refreshExtraNumpadGridUiForView(extraNumpadGrid.getChildAt(i));
+        }
+    }
+
+    private void refreshExtraNumpadGridUiForView(View child) {
+        if (child == null) {
+            return;
+        }
+        Object tag = child.getTag(R.id.tag_custom_keyboard_extra_cell_key);
+        if (tag instanceof Key) {
             Key baseKey = (Key) tag;
             if (baseKey.code == KEY_EXTRA_NUMPAD_FN) {
-                continue;
+                return;
             }
             FnMapping mapping = resolveExtraNumpadFnMapping(baseKey);
             if (child instanceof ImageButton) {
@@ -2785,6 +2892,7 @@ public class CustomKeyboardView extends LinearLayout {
                                 ? EXTRA_NUMPAD_FN_ARROW_ICON_DP
                                 : EXTRA_NUMPAD_FN_ACTION_ICON_DP;
                         applyExtraNumpadGridIconOverlay(b, mapping.iconResId, mapping.label, iconDp);
+                        b.setScaleX(mapping.keyCode == 0x4C ? -1f : 1f);
                     } else {
                         clearExtraNumpadArrowIconOverlay(b);
                         b.setContentDescription(null);
@@ -2794,6 +2902,7 @@ public class CustomKeyboardView extends LinearLayout {
                         b.setPadding(pad, pad, pad, pad);
                         b.setText(mapping.label);
                         styleExtraNumpadGridKeyButton(b, mapping.label);
+                        b.setScaleX(1f);
                     }
                 } else {
                     clearExtraNumpadArrowIconOverlay(b);
@@ -2802,6 +2911,7 @@ public class CustomKeyboardView extends LinearLayout {
                     b.setCompoundDrawablePadding(0);
                     int pad = dpToPx(2);
                     b.setPadding(pad, pad, pad, pad);
+                    b.setScaleX(1f);
                     if ("TAB".equals(baseKey.label) && baseKey.code == 0x2B) {
                         applyExtraNumpadGridIconOverlay(b, R.drawable.keyboard_tab_24, "Tab",
                                 EXTRA_NUMPAD_FN_ACTION_ICON_DP);
@@ -2810,6 +2920,13 @@ public class CustomKeyboardView extends LinearLayout {
                         styleExtraNumpadGridKeyButton(b, baseKey.label);
                     }
                 }
+            }
+            return;
+        }
+        if (child instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) child;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                refreshExtraNumpadGridUiForView(group.getChildAt(i));
             }
         }
     }
