@@ -118,6 +118,16 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int ALT_LONG_PRESS_TIMEOUT_MS = ViewConfiguration.getLongPressTimeout();
     private static final int ALT_CANCEL_VERTICAL_DP = 72;
     private static final int ALT_POPUP_VERTICAL_OFFSET_DP = 72;
+    private static final int ALT_POPUP_CONTAINER_PADDING_DP_PORTRAIT = 6;
+    private static final int ALT_POPUP_CONTAINER_PADDING_DP_LANDSCAPE = 8;
+    private static final int ALT_POPUP_OPTION_MARGIN_DP_PORTRAIT = 2;
+    private static final int ALT_POPUP_OPTION_MARGIN_DP_LANDSCAPE = 3;
+    private static final int ALT_POPUP_OPTION_TEXT_SP_PORTRAIT = 15;
+    private static final int ALT_POPUP_OPTION_TEXT_SP_LANDSCAPE = 18;
+    private static final int ALT_POPUP_OPTION_PADDING_HORIZONTAL_DP_PORTRAIT = 8;
+    private static final int ALT_POPUP_OPTION_PADDING_HORIZONTAL_DP_LANDSCAPE = 10;
+    private static final int ALT_POPUP_OPTION_PADDING_VERTICAL_DP_PORTRAIT = 5;
+    private static final int ALT_POPUP_OPTION_PADDING_VERTICAL_DP_LANDSCAPE = 7;
     private static final int KEY_OUTER_MARGIN_DP = 2;
     private final Handler longPressHandler = new Handler();
     private PopupWindow alternatePopupWindow;
@@ -1250,6 +1260,22 @@ public class CustomKeyboardView extends LinearLayout {
         if (options.size() < 2) {
             return;
         }
+        boolean landscape = isLandscape(getContext());
+        int containerPaddingDp = landscape
+                ? ALT_POPUP_CONTAINER_PADDING_DP_LANDSCAPE
+                : ALT_POPUP_CONTAINER_PADDING_DP_PORTRAIT;
+        int optionMarginDp = landscape
+                ? ALT_POPUP_OPTION_MARGIN_DP_LANDSCAPE
+                : ALT_POPUP_OPTION_MARGIN_DP_PORTRAIT;
+        int optionTextSp = landscape
+                ? ALT_POPUP_OPTION_TEXT_SP_LANDSCAPE
+                : ALT_POPUP_OPTION_TEXT_SP_PORTRAIT;
+        int optionPadHorizontalDp = landscape
+                ? ALT_POPUP_OPTION_PADDING_HORIZONTAL_DP_LANDSCAPE
+                : ALT_POPUP_OPTION_PADDING_HORIZONTAL_DP_PORTRAIT;
+        int optionPadVerticalDp = landscape
+                ? ALT_POPUP_OPTION_PADDING_VERTICAL_DP_LANDSCAPE
+                : ALT_POPUP_OPTION_PADDING_VERTICAL_DP_PORTRAIT;
 
         dismissAlternatesPopup();
         alternateAnchorView = anchor;
@@ -1259,17 +1285,21 @@ public class CustomKeyboardView extends LinearLayout {
         alternatePopupContainer = new LinearLayout(getContext());
         alternatePopupContainer.setOrientation(LinearLayout.HORIZONTAL);
         alternatePopupContainer.setBackgroundResource(R.drawable.alternate_popup_background);
-        alternatePopupContainer.setPadding(dpToPx(6), dpToPx(6), dpToPx(6), dpToPx(6));
+        int containerPaddingPx = dpToPx(containerPaddingDp);
+        alternatePopupContainer.setPadding(containerPaddingPx, containerPaddingPx, containerPaddingPx, containerPaddingPx);
 
         alternateOptionViews.clear();
         for (AlternateOption option : options) {
             TextView optionView = new TextView(getContext());
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-            p.setMargins(dpToPx(2), 0, dpToPx(2), 0);
+            int optionMarginPx = dpToPx(optionMarginDp);
+            p.setMargins(optionMarginPx, 0, optionMarginPx, 0);
             optionView.setLayoutParams(p);
             optionView.setText(option.display);
-            optionView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-            optionView.setPadding(dpToPx(8), dpToPx(5), dpToPx(8), dpToPx(5));
+            optionView.setTextSize(TypedValue.COMPLEX_UNIT_SP, optionTextSp);
+            int optionPadHorizontalPx = dpToPx(optionPadHorizontalDp);
+            int optionPadVerticalPx = dpToPx(optionPadVerticalDp);
+            optionView.setPadding(optionPadHorizontalPx, optionPadVerticalPx, optionPadHorizontalPx, optionPadVerticalPx);
             optionView.setTextColor(resolveThemeTextColor());
             alternatePopupContainer.addView(optionView);
             alternateOptionViews.add(optionView);
