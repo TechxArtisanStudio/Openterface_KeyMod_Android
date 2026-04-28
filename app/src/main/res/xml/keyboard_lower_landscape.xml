@@ -39,17 +39,17 @@
         <Key android:codes="06" android:keyLabel="c" custom:keySymbolLabel="C" custom:keyAlternates=";" custom:keyCornerHint=";"/>
         <Key android:codes="19" android:keyLabel="v" custom:keySymbolLabel="V" custom:keyAlternates=":" custom:keyCornerHint=":"/>
         <Key android:codes="05" android:keyLabel="b" custom:keySymbolLabel="B" custom:keyAlternates="'" custom:keyCornerHint="'"/>
-        <Key android:codes="11" android:keyLabel="n" custom:keySymbolLabel="N" custom:keyAlternates="&quot;" custom:keyCornerHint="&quot;"/>
-        <Key android:codes="10" android:keyLabel="m" custom:keySymbolLabel="M" custom:keyAlternates="_" custom:keyCornerHint="_"/>
-        <Key android:codes="38" android:keyLabel="/" custom:keySymbolLabel="&#63;" custom:keyAlternates="+,`,~" custom:keyCornerHint="+" android:keyWidth="15%p"/>
+        <Key android:codes="11" android:keyLabel="n" custom:keySymbolLabel="N" custom:keyAlternates="&quot;,'" custom:keyCornerHint="&quot;"/>
+        <Key android:codes="10" android:keyLabel="m" custom:keySymbolLabel="M" custom:keyAlternates="+,_" custom:keyCornerHint="+"/>
+        <Key android:codes="38" android:keyLabel="/" custom:keySymbolLabel="?" custom:keyAlternates="&#92;,&#124;" custom:keyCornerHint="&#92;" android:keyWidth="15%p"/>
     </Row>
 
     <Row>
         <Key android:codes="F005" android:keyLabel="Fn" android:keyWidth="15%p"/>
-        <Key android:codes="36" android:keyLabel="," custom:keySymbolLabel=";" custom:keyAlternates="-,:" custom:keyCornerHint="-" android:keyWidth="10%p"/>
+        <Key android:codes="36" android:keyLabel="," custom:keySymbolLabel=";" custom:keyAlternates="&#96;,-,~" custom:keyCornerHint="&#96;" android:keyWidth="10%p"/>
         <Key android:codes="E3" android:keyLabel="@string/Win" android:keyWidth="10%p"/>
         <Key android:codes="2C" android:keyLabel="@string/Space_Button" android:keyWidth="40%p"/>
-        <Key android:codes="37" android:keyLabel="." custom:keySymbolLabel="'" custom:keyAlternates="=,&quot;" custom:keyCornerHint="=" android:keyWidth="10%p"/>
+        <Key android:codes="37" android:keyLabel="." custom:keySymbolLabel="'" custom:keyAlternates="=" custom:keyCornerHint="=" android:keyWidth="10%p"/>
         <Key android:codes="28" android:keyLabel="@string/Enter_Button" android:keyWidth="15%p"/>
     </Row>
 </Keyboard>

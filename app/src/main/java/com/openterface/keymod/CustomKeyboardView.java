@@ -48,6 +48,7 @@ import org.xmlpull.v1.XmlPullParserException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 
@@ -608,6 +609,99 @@ public class CustomKeyboardView extends LinearLayout {
         context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
     }
 
+    /**
+     * {@link XmlPullParser#getAttributeValue} does not expand {@code &#...;} / named entities in
+     * custom namespace attrs. Decode the subset used in keyboard XML so corner hints, symbols,
+     * and alternates match real characters (e.g. {@code &#92;} → {@code \} for {@code /}).
+     */
+    private static String decodeKeyboardXmlEntities(String input) {
+        if (input == null || input.isEmpty()) {
+            return input == null ? "" : input;
+        }
+        if (input.indexOf('&') < 0) {
+            return input;
+        }
+        StringBuilder sb = new StringBuilder(input.length());
+        int i = 0;
+        while (i < input.length()) {
+            if (input.charAt(i) == '&') {
+                int semi = input.indexOf(';', i);
+                if (semi > i && semi - i <= 14) {
+                    String ent = input.substring(i, semi + 1);
+                    String repl = decodeSingleKeyboardEntity(ent);
+                    if (repl != null) {
+                        sb.append(repl);
+                        i = semi + 1;
+                        continue;
+                    }
+                }
+            }
+            sb.append(input.charAt(i));
+            i++;
+        }
+        return sb.toString();
+    }
+
+    private static String decodeSingleKeyboardEntity(String ent) {
+        if ("&amp;".equals(ent)) {
+            return "&";
+        }
+        if ("&lt;".equals(ent)) {
+            return "<";
+        }
+        if ("&gt;".equals(ent)) {
+            return ">";
+        }
+        if ("&quot;".equals(ent)) {
+            return "\"";
+        }
+        if ("&apos;".equals(ent)) {
+            return "'";
+        }
+        if (ent.startsWith("&#") && ent.endsWith(";") && ent.length() >= 4) {
+            String inner = ent.substring(2, ent.length() - 1);
+            try {
+                int cp;
+                if (inner.startsWith("x") || inner.startsWith("X")) {
+                    cp = Integer.parseInt(inner.substring(1), 16);
+                } else {
+                    cp = Integer.parseInt(inner, 10);
+                }
+                if (cp >= 0 && cp <= 0xFFFF) {
+                    return String.valueOf((char) cp);
+                }
+            } catch (NumberFormatException ignored) {
+                // fall through
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Splits {@code keyAlternates} on commas without regex quirks; ignores empty segments.
+     */
+    private static List<String> splitAlternatesTokens(String alternates) {
+        if (TextUtils.isEmpty(alternates)) {
+            return Collections.emptyList();
+        }
+        List<String> out = new ArrayList<>();
+        int start = 0;
+        for (int i = 0; i < alternates.length(); i++) {
+            if (alternates.charAt(i) == ',') {
+                String t = alternates.substring(start, i).trim();
+                if (!t.isEmpty()) {
+                    out.add(t);
+                }
+                start = i + 1;
+            }
+        }
+        String last = alternates.substring(start).trim();
+        if (!last.isEmpty()) {
+            out.add(last);
+        }
+        return out;
+    }
+
     private List<List<Key>> parseKeyboard(Context context, int resourceId) {
         List<List<Key>> rows = new ArrayList<>();
         List<Key> currentRow = null;
@@ -671,6 +765,10 @@ public class CustomKeyboardView extends LinearLayout {
                         if (cornerHint == null) {
                             cornerHint = "";
                         }
+
+                        symbolLabel = decodeKeyboardXmlEntities(symbolLabel);
+                        alternates = decodeKeyboardXmlEntities(alternates);
+                        cornerHint = decodeKeyboardXmlEntities(cornerHint);
 
                         String codeStr = parser.getAttributeValue(ANDROID_NS, "codes");
                         int code = 0;
@@ -1328,16 +1426,12 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private List<AlternateOption> buildAlternateOptions(Key key) {
-        // Keep alternates ordering predictable: symbol -> alternates -> base label.
-        // Example: h with symbol H and alternate "-" => H - h.
+        // Product rule: long-press list = alternates + base key only.
+        // keySymbolLabel is shown on key face / shift state, but not included in popup options.
         LinkedHashSet<String> labels = new LinkedHashSet<>();
-        if (!TextUtils.isEmpty(key.symbolLabel) && key.symbolLabel.length() == 1) {
-            labels.add(key.symbolLabel);
-        }
         if (!TextUtils.isEmpty(key.alternates)) {
-            String[] extra = key.alternates.split(",");
-            for (String token : extra) {
-                String trimmed = token.trim();
+            for (String raw : splitAlternatesTokens(key.alternates)) {
+                String trimmed = decodeKeyboardXmlEntities(raw).trim();
                 if (trimmed.length() == 1) {
                     labels.add(trimmed);
                 }
@@ -1354,31 +1448,63 @@ public class CustomKeyboardView extends LinearLayout {
                 result.add(mapped);
             }
         }
+        return reorderAlternatesWithCornerHintFirstAndKeepBaseRight(result, key);
+    }
+
+    /**
+     * Puts the key's corner-hint character first in the long-press row so the leftmost tile matches
+     * the small label on the key (when that character is a valid mapped alternate), while keeping
+     * the base key at the far right when present.
+     */
+    private List<AlternateOption> reorderAlternatesWithCornerHintFirstAndKeepBaseRight(List<AlternateOption> result, Key key) {
+        if (key == null || result == null || result.size() < 2) {
+            return result;
+        }
+        String base = key.label;
+        AlternateOption baseOption = null;
+        int baseIdx = -1;
+        if (!TextUtils.isEmpty(base) && base.length() == 1) {
+            for (int i = 0; i < result.size(); i++) {
+                if (base.equals(result.get(i).display)) {
+                    baseIdx = i;
+                    break;
+                }
+            }
+            if (baseIdx >= 0) {
+                baseOption = result.remove(baseIdx);
+            }
+        }
+        String corner = key.cornerHint;
+        if (TextUtils.isEmpty(corner) || corner.length() != 1) {
+            if (baseOption != null) {
+                result.add(baseOption);
+            }
+            return result;
+        }
+        int idx = -1;
+        for (int i = 0; i < result.size(); i++) {
+            if (corner.equals(result.get(i).display)) {
+                idx = i;
+                break;
+            }
+        }
+        if (idx <= 0) {
+            if (baseOption != null) {
+                result.add(baseOption);
+            }
+            return result;
+        }
+        AlternateOption cornerOption = result.remove(idx);
+        result.add(0, cornerOption);
+        if (baseOption != null) {
+            result.add(baseOption);
+        }
         return result;
     }
 
     private int findDefaultAlternateSelection(List<AlternateOption> options, Key key) {
-        if (!TextUtils.isEmpty(key.alternates)) {
-            String[] extra = key.alternates.split(",");
-            for (String token : extra) {
-                String trimmed = token.trim();
-                if (trimmed.length() != 1) {
-                    continue;
-                }
-                for (int i = 0; i < options.size(); i++) {
-                    if (options.get(i).display.equals(trimmed)) {
-                        return i;
-                    }
-                }
-            }
-        }
-        String baseLabel = key.label;
-        for (int i = 0; i < options.size(); i++) {
-            if (options.get(i).display.equals(baseLabel)) {
-                return i;
-            }
-        }
-        return 0;
+        // Product rule: default highlighted option is always the leftmost popup tile.
+        return options.isEmpty() ? -1 : 0;
     }
 
     private void updateAlternateSelection(float rawX, float rawY) {
@@ -1525,6 +1651,8 @@ public class CustomKeyboardView extends LinearLayout {
             case '"': return new AlternateOption(token, 0x34, true);
             case '`': return new AlternateOption(token, 0x35, false);
             case '~': return new AlternateOption(token, 0x35, true);
+            case '\\': return new AlternateOption(token, 0x31, false);
+            case '|': return new AlternateOption(token, 0x31, true);
             default: return null;
         }
     }
