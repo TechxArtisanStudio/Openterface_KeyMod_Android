@@ -888,6 +888,9 @@ public class CustomKeyboardView extends LinearLayout {
                         if (label.equals("Win")) {
                             iconResId = R.drawable.windows;
                             System.out.println("Hardcoded icon for Win: " + iconResId);
+                        } else if (label.equals("Space")) {
+                            iconResId = R.drawable.space_bar_24px;
+                            System.out.println("Hardcoded icon for Space: " + iconResId);
                         } else if (label.equals("BackSpace")) {
                             iconResId = R.drawable.backspace;
                             System.out.println("Hardcoded icon for BackSpace: " + iconResId);
@@ -1087,11 +1090,18 @@ public class CustomKeyboardView extends LinearLayout {
                     }
                 }
 
-                if (key.label.equals("Win") || key.label.equals("Cmd") || key.label.equals("Super") || key.label.equals("BackSpace") ||
-                        key.label.equals("Shift") ||
-                        key.label.equals("Enter") ||
-                        key.label.equals("Up_arrow") || key.label.equals("Down_arrow") ||
-                        key.label.equals("Left_arrow") || key.label.equals("Right_arrow")) {
+                boolean shouldUseIconButton = key.label.equals("Win")
+                        || key.label.equals("Cmd")
+                        || key.label.equals("Space")
+                        || key.label.equals("BackSpace")
+                        || key.label.equals("Shift")
+                        || key.label.equals("Enter")
+                        || key.label.equals("Up_arrow")
+                        || key.label.equals("Down_arrow")
+                        || key.label.equals("Left_arrow")
+                        || key.label.equals("Right_arrow")
+                        || (key.label.equals("Super") && key.iconResId != 0);
+                if (shouldUseIconButton) {
                     ImageButton imageButton = new ImageButton(getContext());
                     applyFlatKeyStyle(imageButton);
                     imageButton.setLayoutParams(params);
