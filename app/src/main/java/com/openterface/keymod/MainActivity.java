@@ -51,6 +51,7 @@ import com.openterface.fragment.ShortcutFragment;
 import com.openterface.fragment.ShortcutHubFragment;
 import com.openterface.fragment.VoiceInputFragment;
 import com.openterface.keymod.BuildConfig;
+import com.openterface.keymod.util.TopModeShortcutPrefs;
 import com.openterface.serial.UsbDeviceManager;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
@@ -93,6 +94,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private LinearLayout navCompose;
     private LinearLayout navPresentation;
     private ImageButton targetOsHeaderButton;
+    private final ImageButton[] headerModeSlotButtons = new ImageButton[3];
 
     /** Global target OS preference key */
     private static final String PREF_TARGET_OS = "target_os";
@@ -285,6 +287,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         
         // Re-apply immersive mode
         setImmersiveMode();
+        refreshHeaderModeSlotButtons();
     }
     
     @Override
@@ -397,6 +400,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             targetOsHeaderButton.setOnClickListener(v -> showTargetOsPickerDialog());
             updateTargetOsHeaderIcon();
         }
+        setupHeaderModeSlotButtons();
 
         // Display app version in sidebar footer
         TextView versionText = findViewById(R.id.version_text);
@@ -419,6 +423,68 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (shortcut != null) shortcutDrawable = shortcut.getCompoundDrawables()[1];
 
         setupButtonListeners();
+    }
+
+    private void setupHeaderModeSlotButtons() {
+        headerModeSlotButtons[0] = findViewById(R.id.header_mode_slot_1);
+        headerModeSlotButtons[1] = findViewById(R.id.header_mode_slot_2);
+        headerModeSlotButtons[2] = findViewById(R.id.header_mode_slot_3);
+        for (int i = 0; i < headerModeSlotButtons.length; i++) {
+            ImageButton button = headerModeSlotButtons[i];
+            if (button == null) {
+                continue;
+            }
+            final int slotIndex = i + 1;
+            button.setOnClickListener(v -> {
+                String mode = TopModeShortcutPrefs.getModeForSlot(MainActivity.this, slotIndex);
+                switchToLaunchMode(mode);
+            });
+            button.setOnLongClickListener(v -> {
+                showHeaderModeSlotPicker(slotIndex);
+                return true;
+            });
+        }
+        refreshHeaderModeSlotButtons();
+    }
+
+    private void showHeaderModeSlotPicker(int slotIndex1Based) {
+        String[] modes = TopModeShortcutPrefs.getSelectableModes();
+        CharSequence[] labels = TopModeShortcutPrefs.getModeLabels(this);
+        String current = TopModeShortcutPrefs.getModeForSlot(this, slotIndex1Based);
+        int checked = 0;
+        for (int i = 0; i < modes.length; i++) {
+            if (modes[i].equals(current)) {
+                checked = i;
+                break;
+            }
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.top_mode_slot_picker_title)
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    TopModeShortcutPrefs.setModeForSlot(getApplicationContext(), slotIndex1Based, modes[which]);
+                    refreshHeaderModeSlotButtons();
+                    dialog.dismiss();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void refreshHeaderModeSlotButtons() {
+        int tint = connectionManager != null
+                ? headerConnectionClusterTint(connectionManager.getCurrentConnectionState())
+                : ContextCompat.getColor(this, R.color.header_connection_idle);
+        for (int i = 0; i < headerModeSlotButtons.length; i++) {
+            ImageButton button = headerModeSlotButtons[i];
+            if (button == null) {
+                continue;
+            }
+            int slotIndex = i + 1;
+            String mode = TopModeShortcutPrefs.getModeForSlot(this, slotIndex);
+            int iconRes = TopModeShortcutPrefs.iconResForMode(mode);
+            button.setImageResource(iconRes);
+            button.setContentDescription(getString(TopModeShortcutPrefs.labelResForMode(mode)));
+            button.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+        }
     }
     
     private void setupConnectionStateListener() {
@@ -551,6 +617,11 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         connectionButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
         if (targetOsHeaderButton != null) {
             targetOsHeaderButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+        }
+        for (ImageButton slotButton : headerModeSlotButtons) {
+            if (slotButton != null) {
+                slotButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+            }
         }
 
         switch (state) {

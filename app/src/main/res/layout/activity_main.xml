@@ -67,6 +67,45 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
+                <LinearLayout
+                    android:id="@+id/header_mode_slots_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/spacing_tiny"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <ImageButton
+                        android:id="@+id/header_mode_slot_1"
+                        android:layout_width="@dimen/header_icon_size"
+                        android:layout_height="@dimen/header_icon_size"
+                        android:src="@drawable/keyboard_mouse"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/top_mode_label_keyboard_mouse"
+                        android:padding="@dimen/button_icon_padding"
+                        android:tint="@color/text_secondary" />
+
+                    <ImageButton
+                        android:id="@+id/header_mode_slot_2"
+                        android:layout_width="@dimen/header_icon_size"
+                        android:layout_height="@dimen/header_icon_size"
+                        android:src="@drawable/ic_edit"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/compose_mode_title"
+                        android:padding="@dimen/button_icon_padding"
+                        android:tint="@color/text_secondary" />
+
+                    <ImageButton
+                        android:id="@+id/header_mode_slot_3"
+                        android:layout_width="@dimen/header_icon_size"
+                        android:layout_height="@dimen/header_icon_size"
+                        android:src="@drawable/ic_presentation"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/presentation_mode"
+                        android:padding="@dimen/button_icon_padding"
+                        android:tint="@color/text_secondary" />
+                </LinearLayout>
+
                 <ImageButton
                     android:id="@+id/target_os_header_button"
                     android:layout_width="@dimen/header_icon_size"

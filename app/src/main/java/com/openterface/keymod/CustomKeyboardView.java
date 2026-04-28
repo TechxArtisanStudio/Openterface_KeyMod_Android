@@ -388,7 +388,7 @@ public class CustomKeyboardView extends LinearLayout {
         int newIconResId;
         if ("macos".equals(targetOs)) {
             newLabel = context.getString(R.string.Cmd);
-            newIconResId = R.drawable.ic_os_macos;
+            newIconResId = R.drawable.keyboard_command_key_24px;
         } else if ("linux".equals(targetOs)) {
             newLabel = context.getString(R.string.Super);
             newIconResId = R.drawable.ic_os_linux;
@@ -2199,9 +2199,9 @@ public class CustomKeyboardView extends LinearLayout {
         keys.add(new Key("CTRL",   "", 0xE0, "E0", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("ALT",    "", 0xE2, "E2", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("TAB",    "", 0x2B, "2B", 1f, R.drawable.keyboard_tab_24, 0f, false, false, -1, true));
-        keys.add(modeSlotKey(1));
-        keys.add(modeSlotKey(2));
-        keys.add(modeSlotKey(3));
+        keys.add(new Key("PH1",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH2",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH3",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
         return keys;
     }
 
