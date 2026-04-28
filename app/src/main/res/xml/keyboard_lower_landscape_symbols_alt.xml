@@ -10,7 +10,7 @@
         <Key android:codes="2E" android:keyLabel="+" android:keyWidth="25%p"/>
         <Key android:codes="2D" android:keyLabel="-" android:keyWidth="25%p"/>
         <Key android:codes="25" android:keyLabel="*" android:keyWidth="25%p"/>
-        <Key android:codes="57" android:keyLabel="/" android:keyWidth="25%p"/>
+        <Key android:codes="57" android:keyLabel="/" android:keyWidth="25%p" custom:keySymbolLabel="?" custom:keyAlternates="&#92;,&#124;" custom:keyCornerHint="&#92;"/>
     </Row>
 
     <Row>

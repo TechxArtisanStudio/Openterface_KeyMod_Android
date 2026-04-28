@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.res.Resources;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
@@ -49,7 +50,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.List;
 
 public class CustomKeyboardView extends LinearLayout {
@@ -117,7 +117,10 @@ public class CustomKeyboardView extends LinearLayout {
     private Runnable repeatRunnable;
     private boolean isRepeating = false;
     private static final int ALT_LONG_PRESS_TIMEOUT_MS = ViewConfiguration.getLongPressTimeout();
-    private static final int ALT_CANCEL_VERTICAL_DP = 72;
+    /** Inside this radius from touch-down, release commits the default alternate (Alt0 or base). */
+    private static final int ALT_GESTURE_R_MIN_DP = 12;
+    /** Beyond this radius from touch-down, release cancels (no character). */
+    private static final int ALT_GESTURE_R_CANCEL_DP = 220;
     private static final int ALT_POPUP_VERTICAL_OFFSET_DP = 72;
     private static final int ALT_POPUP_CONTAINER_PADDING_DP_PORTRAIT = 6;
     private static final int ALT_POPUP_CONTAINER_PADDING_DP_LANDSCAPE = 8;
@@ -132,11 +135,16 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int KEY_OUTER_MARGIN_DP = 2;
     private final Handler longPressHandler = new Handler();
     private PopupWindow alternatePopupWindow;
-    private LinearLayout alternatePopupContainer;
+    private ViewGroup alternatePopupContainer;
     private View alternateAnchorView;
-    private final List<TextView> alternateOptionViews = new ArrayList<>();
-    private List<AlternateOption> currentAlternateOptions = new ArrayList<>();
-    private int currentAlternateSelection = -1;
+    /** TextView per slot index {@link AlternatePopupGeometry#SLOT_ALT0}…{@link AlternatePopupGeometry#SLOT_BASE}. */
+    private final TextView[] alternateSlotViews = new TextView[6];
+    private AlternatePopupModel currentAlternatePopupModel;
+    /** Latest pick from {@link AlternatePopupGeometry#pickSlot}. */
+    private int currentAlternatePick = AlternatePopupGeometry.RESULT_DEFAULT;
+    private int lastAlternatePickForHaptic = Integer.MIN_VALUE;
+    private float alternatesGestureStartRawX;
+    private float alternatesGestureStartRawY;
     private int topPanelPageIndex = 0;
     private ShortcutProfileManager shortcutProfileManager;
     private final List<TopShortcutPanel> topShortcutPanels = new ArrayList<>();
@@ -229,6 +237,55 @@ public class CustomKeyboardView extends LinearLayout {
             this.display = display;
             this.keyCode = keyCode;
             this.requiresShift = requiresShift;
+        }
+    }
+
+    /** Long-press popup: fixed slots Alt0–Alt4 + base (see {@link AlternatePopupGeometry}). */
+    private static class AlternatePopupModel {
+        final AlternateOption[] slotOptions = new AlternateOption[6];
+        /** First occupied slot in order Alt0 → Alt4 → Base (long-press default if finger does not move). */
+        final AlternateOption defaultOption;
+        final int defaultSlotIndex;
+
+        AlternatePopupModel(AlternateOption[] srcSlots) {
+            System.arraycopy(srcSlots, 0, this.slotOptions, 0, 6);
+            int ds = -1;
+            for (int s = AlternatePopupGeometry.SLOT_ALT0; s <= AlternatePopupGeometry.SLOT_ALT4; s++) {
+                if (slotOptions[s] != null) {
+                    ds = s;
+                    break;
+                }
+            }
+            if (ds < 0 && slotOptions[AlternatePopupGeometry.SLOT_BASE] != null) {
+                ds = AlternatePopupGeometry.SLOT_BASE;
+            }
+            this.defaultSlotIndex = ds;
+            this.defaultOption = ds >= 0 ? slotOptions[ds] : null;
+        }
+
+        int countSelectable() {
+            int c = 0;
+            for (AlternateOption o : slotOptions) {
+                if (o != null) {
+                    c++;
+                }
+            }
+            return c;
+        }
+
+        boolean[] slotOccupiedFlags() {
+            boolean[] b = new boolean[6];
+            for (int i = 0; i < 6; i++) {
+                b[i] = slotOptions[i] != null;
+            }
+            return b;
+        }
+
+        int defaultHighlightSlot() {
+            if (defaultSlotIndex >= 0) {
+                return defaultSlotIndex;
+            }
+            return AlternatePopupGeometry.SLOT_BASE;
         }
     }
 
@@ -1115,7 +1172,31 @@ public class CustomKeyboardView extends LinearLayout {
                         textButton.setCompoundDrawablesWithIntrinsicBounds(0, key.iconResId, 0, 0);
                         textButton.setCompoundDrawablePadding(dpToPx(4));
                     }
-                    if (!TextUtils.isEmpty(key.cornerHint)
+                    String capHints = buildAlternateHintsLineForKeycap(key);
+                    if (!TextUtils.isEmpty(capHints)
+                            && TextUtils.isEmpty(fnDisplayLabel)
+                            && fnDisplayIconResId == 0) {
+                        FrameLayout keyContainer = new FrameLayout(getContext());
+                        keyContainer.setLayoutParams(params);
+                        keyContainer.addView(textButton);
+                        TextView hintRow = new TextView(getContext());
+                        FrameLayout.LayoutParams hintParams = new FrameLayout.LayoutParams(
+                                LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT,
+                                Gravity.CENTER_HORIZONTAL | Gravity.TOP);
+                        hintParams.setMargins(0, dpToPx(2), 0, 0);
+                        hintRow.setLayoutParams(hintParams);
+                        hintRow.setText(capHints);
+                        hintRow.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9);
+                        hintRow.setTypeface(Typeface.MONOSPACE);
+                        hintRow.setTextColor(resolveThemeTextColor());
+                        hintRow.setAlpha(0.5f);
+                        hintRow.setIncludeFontPadding(false);
+                        hintRow.setClickable(false);
+                        hintRow.setFocusable(false);
+                        keyContainer.addView(hintRow);
+                        hintRow.bringToFront();
+                        button = keyContainer;
+                    } else if (!TextUtils.isEmpty(key.cornerHint)
                             && TextUtils.isEmpty(fnDisplayLabel)
                             && fnDisplayIconResId == 0) {
                         FrameLayout keyContainer = new FrameLayout(getContext());
@@ -1145,6 +1226,9 @@ public class CustomKeyboardView extends LinearLayout {
                         textButton.setLayoutParams(params);
                         button = textButton;
                     }
+                    // Touch must stay on the Button: a clickable child (e.g. inner Button) consumes
+                    // events before the parent FrameLayout, so wrapping FrameLayout must NOT be the
+                    // listener target or long-press alternates never run.
                     listenerTarget = textButton;
                 }
 
@@ -1169,6 +1253,8 @@ public class CustomKeyboardView extends LinearLayout {
                     longPressConsumed[0] = false;
                     performKeyHapticFeedback(v);
                     if (shouldEnableAlternates(key)) {
+                        alternatesGestureStartRawX = event.getRawX();
+                        alternatesGestureStartRawY = event.getRawY();
                         final Runnable openAlternates = () -> showAlternatesPopup(v, key);
                         v.setTag(R.id.tag_custom_keyboard_pending_alternates, openAlternates);
                         longPressHandler.postDelayed(openAlternates, ALT_LONG_PRESS_TIMEOUT_MS);
@@ -1178,6 +1264,11 @@ public class CustomKeyboardView extends LinearLayout {
                 case MotionEvent.ACTION_MOVE: {
                     if (isAlternatePopupVisible()) {
                         updateAlternateSelection(event.getRawX(), event.getRawY());
+                        return true;
+                    }
+                    if (v.getTag(R.id.tag_custom_keyboard_pending_alternates) instanceof Runnable) {
+                        // Keep the touch on this key until long-press fires; otherwise a parent may
+                        // cancel the stream before the alternates popup opens.
                         return true;
                     }
                     return false;
@@ -1353,9 +1444,150 @@ public class CustomKeyboardView extends LinearLayout {
         return alternatePopupWindow != null && alternatePopupWindow.isShowing();
     }
 
+    /**
+     * Fills {@code slots[0..5]} for Alt0–Alt4 and base. Legacy {@code keyAlternates} tokens fill
+     * Alt1–Alt4 in order; Alt0 is the capital of a–z when the base label is a single lowercase letter.
+     */
+    private void fillAlternateSlotOptions(Key key, AlternateOption[] slots) {
+        Arrays.fill(slots, null);
+        if (key == null) {
+            return;
+        }
+        if (!TextUtils.isEmpty(key.alternates)) {
+            List<String> tokens = splitAlternatesTokens(key.alternates);
+            for (int t = 0; t < tokens.size() && t < 4; t++) {
+                String trimmed = tokens.get(t).trim();
+                if (trimmed.length() == 1) {
+                    AlternateOption mapped = mapAsciiAlternate(trimmed);
+                    if (mapped != null) {
+                        slots[AlternatePopupGeometry.SLOT_ALT1 + t] = mapped;
+                    }
+                }
+            }
+        }
+        if (!TextUtils.isEmpty(key.label) && key.label.length() == 1) {
+            slots[AlternatePopupGeometry.SLOT_BASE] = mapAsciiAlternate(key.label);
+            char c = key.label.charAt(0);
+            if (c >= 'a' && c <= 'z') {
+                AlternateOption cap = mapAsciiAlternate(String.valueOf(Character.toUpperCase(c)));
+                if (cap != null) {
+                    slots[AlternatePopupGeometry.SLOT_ALT0] = cap;
+                }
+            }
+        }
+        normalizeSlashKeyAlternates(key, slots);
+    }
+
+    /**
+     * Ensures {@code /} always offers backslash and pipe.
+     * Some builds can drop/mis-parse the first XML token (`&#92;`) and end up with Alt1=`|`.
+     */
+    private void normalizeSlashKeyAlternates(Key key, AlternateOption[] slots) {
+        if (key == null || TextUtils.isEmpty(key.label) || key.label.length() != 1 || key.label.charAt(0) != '/') {
+            return;
+        }
+        AlternateOption bs = mapAsciiAlternate("\\");
+        AlternateOption pipe = mapAsciiAlternate("|");
+        if (bs != null) {
+            AlternateOption alt1 = slots[AlternatePopupGeometry.SLOT_ALT1];
+            if (alt1 == null || "|".equals(alt1.display)) {
+                slots[AlternatePopupGeometry.SLOT_ALT1] = bs;
+            }
+        }
+        if (slots[AlternatePopupGeometry.SLOT_ALT2] == null && pipe != null) {
+            slots[AlternatePopupGeometry.SLOT_ALT2] = pipe;
+        }
+    }
+
+    private AlternatePopupModel buildAlternatePopupModel(Key key) {
+        AlternateOption[] slots = new AlternateOption[6];
+        fillAlternateSlotOptions(key, slots);
+        return new AlternatePopupModel(slots);
+    }
+
+    private String buildAlternateHintsLineForKeycap(Key key) {
+        AlternateOption[] slots = new AlternateOption[6];
+        fillAlternateSlotOptions(key, slots);
+        StringBuilder sb = new StringBuilder();
+        for (int s = AlternatePopupGeometry.SLOT_ALT1; s <= AlternatePopupGeometry.SLOT_ALT4; s++) {
+            if (slots[s] != null) {
+                if (sb.length() > 0) {
+                    sb.append(' ');
+                }
+                sb.append(slots[s].display);
+            }
+        }
+        return sb.toString();
+    }
+
+    private void performAlternatesPopupHaptic(View anchor, int feedbackType) {
+        if (anchor == null || getContext() == null) {
+            return;
+        }
+        boolean enabled = PreferenceManager.getDefaultSharedPreferences(getContext())
+                .getBoolean("haptic_feedback", true);
+        if (!enabled) {
+            return;
+        }
+        anchor.performHapticFeedback(feedbackType, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+    }
+
+    private void onAlternatePickChanged(View anchor, int newPick) {
+        int old = lastAlternatePickForHaptic;
+        if (newPick == old) {
+            return;
+        }
+        lastAlternatePickForHaptic = newPick;
+        if (newPick == AlternatePopupGeometry.RESULT_CANCEL && old != AlternatePopupGeometry.RESULT_CANCEL) {
+            performAlternatesPopupHaptic(anchor, HapticFeedbackConstants.REJECT);
+        } else if (newPick != AlternatePopupGeometry.RESULT_CANCEL && old == AlternatePopupGeometry.RESULT_CANCEL) {
+            performAlternatesPopupHaptic(anchor, HapticFeedbackConstants.VIRTUAL_KEY);
+        } else if (newPick >= 0 && newPick <= AlternatePopupGeometry.SLOT_BASE && old >= 0 && old <= AlternatePopupGeometry.SLOT_BASE && newPick != old) {
+            performAlternatesPopupHaptic(anchor, HapticFeedbackConstants.KEYBOARD_TAP);
+        } else if (newPick >= 0 && newPick <= AlternatePopupGeometry.SLOT_BASE && old == AlternatePopupGeometry.RESULT_DEFAULT) {
+            performAlternatesPopupHaptic(anchor, HapticFeedbackConstants.VIRTUAL_KEY);
+        } else if (newPick == AlternatePopupGeometry.RESULT_DEFAULT && old >= 0 && old <= AlternatePopupGeometry.SLOT_BASE) {
+            performAlternatesPopupHaptic(anchor, HapticFeedbackConstants.VIRTUAL_KEY);
+        }
+    }
+
+    private void applyAlternatePickHighlight() {
+        if (currentAlternatePopupModel == null) {
+            return;
+        }
+        int highlightSlot;
+        if (currentAlternatePick == AlternatePopupGeometry.RESULT_CANCEL) {
+            highlightSlot = -1;
+            alternatePopupContainer.setAlpha(0.42f);
+        } else {
+            alternatePopupContainer.setAlpha(1f);
+            if (currentAlternatePick == AlternatePopupGeometry.RESULT_DEFAULT) {
+                highlightSlot = currentAlternatePopupModel.defaultHighlightSlot();
+            } else {
+                highlightSlot = currentAlternatePick;
+            }
+        }
+        for (int s = 0; s < 6; s++) {
+            TextView tv = alternateSlotViews[s];
+            if (tv == null) {
+                continue;
+            }
+            AlternateOption opt = currentAlternatePopupModel.slotOptions[s];
+            if (opt == null) {
+                tv.setBackgroundResource(android.R.color.transparent);
+                continue;
+            }
+            if (highlightSlot >= 0 && s == highlightSlot) {
+                tv.setBackgroundResource(R.drawable.alternate_popup_option_selected_background);
+            } else {
+                tv.setBackgroundResource(android.R.color.transparent);
+            }
+        }
+    }
+
     private void showAlternatesPopup(View anchor, Key key) {
-        List<AlternateOption> options = buildAlternateOptions(key);
-        if (options.size() < 2) {
+        AlternatePopupModel model = buildAlternatePopupModel(key);
+        if (model.countSelectable() < 2) {
             return;
         }
         boolean landscape = isLandscape(getContext());
@@ -1377,184 +1609,106 @@ public class CustomKeyboardView extends LinearLayout {
 
         dismissAlternatesPopup();
         alternateAnchorView = anchor;
-        currentAlternateOptions = options;
-        currentAlternateSelection = findDefaultAlternateSelection(options, key);
+        currentAlternatePopupModel = model;
+        currentAlternatePick = AlternatePopupGeometry.RESULT_DEFAULT;
+        lastAlternatePickForHaptic = AlternatePopupGeometry.RESULT_DEFAULT;
+        Arrays.fill(alternateSlotViews, null);
 
-        alternatePopupContainer = new LinearLayout(getContext());
-        alternatePopupContainer.setOrientation(LinearLayout.HORIZONTAL);
-        alternatePopupContainer.setBackgroundResource(R.drawable.alternate_popup_background);
+        GridLayout grid = new GridLayout(getContext());
+        grid.setColumnCount(3);
+        grid.setRowCount(2);
+        grid.setBackgroundResource(R.drawable.alternate_popup_background);
         int containerPaddingPx = dpToPx(containerPaddingDp);
-        alternatePopupContainer.setPadding(containerPaddingPx, containerPaddingPx, containerPaddingPx, containerPaddingPx);
+        grid.setPadding(containerPaddingPx, containerPaddingPx, containerPaddingPx, containerPaddingPx);
 
-        alternateOptionViews.clear();
-        for (AlternateOption option : options) {
-            TextView optionView = new TextView(getContext());
-            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-            int optionMarginPx = dpToPx(optionMarginDp);
-            p.setMargins(optionMarginPx, 0, optionMarginPx, 0);
-            optionView.setLayoutParams(p);
-            optionView.setText(option.display);
-            optionView.setTextSize(TypedValue.COMPLEX_UNIT_SP, optionTextSp);
-            int optionPadHorizontalPx = dpToPx(optionPadHorizontalDp);
-            int optionPadVerticalPx = dpToPx(optionPadVerticalDp);
-            optionView.setPadding(optionPadHorizontalPx, optionPadVerticalPx, optionPadHorizontalPx, optionPadVerticalPx);
-            optionView.setTextColor(resolveThemeTextColor());
-            alternatePopupContainer.addView(optionView);
-            alternateOptionViews.add(optionView);
+        int[][] slotPlacement = {
+                {AlternatePopupGeometry.SLOT_ALT1, AlternatePopupGeometry.SLOT_ALT0, AlternatePopupGeometry.SLOT_ALT2},
+                {AlternatePopupGeometry.SLOT_ALT3, AlternatePopupGeometry.SLOT_BASE, AlternatePopupGeometry.SLOT_ALT4}
+        };
+        int marginPx = dpToPx(optionMarginDp);
+        for (int row = 0; row < 2; row++) {
+            for (int col = 0; col < 3; col++) {
+                int slot = slotPlacement[row][col];
+                TextView cell = new TextView(getContext());
+                GridLayout.LayoutParams glp = new GridLayout.LayoutParams(
+                        GridLayout.spec(row),
+                        GridLayout.spec(col));
+                glp.width = LayoutParams.WRAP_CONTENT;
+                glp.height = LayoutParams.WRAP_CONTENT;
+                glp.setMargins(marginPx, marginPx, marginPx, marginPx);
+                cell.setLayoutParams(glp);
+                AlternateOption opt = model.slotOptions[slot];
+                cell.setText(opt != null ? opt.display : "");
+                cell.setTextSize(TypedValue.COMPLEX_UNIT_SP, optionTextSp);
+                cell.setTypeface(Typeface.MONOSPACE);
+                int ph = dpToPx(optionPadHorizontalDp);
+                int pv = dpToPx(optionPadVerticalDp);
+                cell.setPadding(ph, pv, ph, pv);
+                cell.setGravity(Gravity.CENTER);
+                cell.setTextColor(resolveThemeTextColor());
+                if (opt == null) {
+                    cell.setAlpha(0.35f);
+                }
+                grid.addView(cell);
+                alternateSlotViews[slot] = cell;
+            }
         }
+        alternatePopupContainer = grid;
+        applyAlternatePickHighlight();
+        performAlternatesPopupHaptic(anchor, HapticFeedbackConstants.LONG_PRESS);
 
-        highlightAlternateSelection(currentAlternateSelection);
-
-        alternatePopupWindow = new PopupWindow(alternatePopupContainer,
+        alternatePopupWindow = new PopupWindow(grid,
                 LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, false);
         alternatePopupWindow.setOutsideTouchable(false);
         alternatePopupWindow.setClippingEnabled(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             alternatePopupWindow.setElevation(dpToPx(12));
         }
-        alternatePopupContainer.measure(
+        grid.measure(
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         );
         anchor.post(() -> {
             int[] loc = new int[2];
             anchor.getLocationOnScreen(loc);
-            int popupX = (int) (loc[0] + (anchor.getWidth() / 2f) - (alternatePopupContainer.getMeasuredWidth() / 2f));
+            int popupX = (int) (loc[0] + (anchor.getWidth() / 2f) - (grid.getMeasuredWidth() / 2f));
             int popupY = loc[1] - dpToPx(ALT_POPUP_VERTICAL_OFFSET_DP);
             alternatePopupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY, popupX, popupY);
         });
     }
 
-    private List<AlternateOption> buildAlternateOptions(Key key) {
-        // Product rule: long-press list = alternates + base key only.
-        // keySymbolLabel is shown on key face / shift state, but not included in popup options.
-        LinkedHashSet<String> labels = new LinkedHashSet<>();
-        if (!TextUtils.isEmpty(key.alternates)) {
-            for (String raw : splitAlternatesTokens(key.alternates)) {
-                String trimmed = decodeKeyboardXmlEntities(raw).trim();
-                if (trimmed.length() == 1) {
-                    labels.add(trimmed);
-                }
-            }
-        }
-        if (!TextUtils.isEmpty(key.label) && key.label.length() == 1) {
-            labels.add(key.label);
-        }
-
-        List<AlternateOption> result = new ArrayList<>();
-        for (String label : labels) {
-            AlternateOption mapped = mapAsciiAlternate(label);
-            if (mapped != null) {
-                result.add(mapped);
-            }
-        }
-        return reorderAlternatesWithCornerHintFirstAndKeepBaseRight(result, key);
-    }
-
-    /**
-     * Puts the key's corner-hint character first in the long-press row so the leftmost tile matches
-     * the small label on the key (when that character is a valid mapped alternate), while keeping
-     * the base key at the far right when present.
-     */
-    private List<AlternateOption> reorderAlternatesWithCornerHintFirstAndKeepBaseRight(List<AlternateOption> result, Key key) {
-        if (key == null || result == null || result.size() < 2) {
-            return result;
-        }
-        String base = key.label;
-        AlternateOption baseOption = null;
-        int baseIdx = -1;
-        if (!TextUtils.isEmpty(base) && base.length() == 1) {
-            for (int i = 0; i < result.size(); i++) {
-                if (base.equals(result.get(i).display)) {
-                    baseIdx = i;
-                    break;
-                }
-            }
-            if (baseIdx >= 0) {
-                baseOption = result.remove(baseIdx);
-            }
-        }
-        String corner = key.cornerHint;
-        if (TextUtils.isEmpty(corner) || corner.length() != 1) {
-            if (baseOption != null) {
-                result.add(baseOption);
-            }
-            return result;
-        }
-        int idx = -1;
-        for (int i = 0; i < result.size(); i++) {
-            if (corner.equals(result.get(i).display)) {
-                idx = i;
-                break;
-            }
-        }
-        if (idx <= 0) {
-            if (baseOption != null) {
-                result.add(baseOption);
-            }
-            return result;
-        }
-        AlternateOption cornerOption = result.remove(idx);
-        result.add(0, cornerOption);
-        if (baseOption != null) {
-            result.add(baseOption);
-        }
-        return result;
-    }
-
-    private int findDefaultAlternateSelection(List<AlternateOption> options, Key key) {
-        // Product rule: default highlighted option is always the leftmost popup tile.
-        return options.isEmpty() ? -1 : 0;
-    }
-
     private void updateAlternateSelection(float rawX, float rawY) {
-        if (alternatePopupContainer == null || currentAlternateOptions.isEmpty()) {
+        if (alternatePopupContainer == null || currentAlternatePopupModel == null || alternateAnchorView == null) {
             return;
         }
-        int[] loc = new int[2];
-        alternatePopupContainer.getLocationOnScreen(loc);
-        float localX = rawX - loc[0];
-        float localY = rawY - loc[1];
-        if (localY < -dpToPx(ALT_CANCEL_VERTICAL_DP) || localY > alternatePopupContainer.getHeight() + dpToPx(ALT_CANCEL_VERTICAL_DP)) {
-            currentAlternateSelection = -1;
-            highlightAlternateSelection(-1);
-            return;
-        }
-        int nextIndex = -1;
-        for (int i = 0; i < alternateOptionViews.size(); i++) {
-            View option = alternateOptionViews.get(i);
-            if (localX >= option.getLeft() && localX <= option.getRight()) {
-                nextIndex = i;
-                break;
-            }
-        }
-        if (nextIndex == -1 && !alternateOptionViews.isEmpty()) {
-            if (localX < alternateOptionViews.get(0).getLeft()) {
-                nextIndex = 0;
-            } else if (localX > alternateOptionViews.get(alternateOptionViews.size() - 1).getRight()) {
-                nextIndex = alternateOptionViews.size() - 1;
-            }
-        }
-        currentAlternateSelection = nextIndex;
-        highlightAlternateSelection(nextIndex);
-    }
-
-    private void highlightAlternateSelection(int selectedIndex) {
-        for (int i = 0; i < alternateOptionViews.size(); i++) {
-            TextView view = alternateOptionViews.get(i);
-            if (i == selectedIndex) {
-                view.setBackgroundResource(R.drawable.alternate_popup_option_selected_background);
-            } else {
-                view.setBackgroundResource(android.R.color.transparent);
-            }
+        float dx = rawX - alternatesGestureStartRawX;
+        float dy = rawY - alternatesGestureStartRawY;
+        boolean[] occ = currentAlternatePopupModel.slotOccupiedFlags();
+        int pick = AlternatePopupGeometry.pickSlot(dx, dy,
+                dpToPx(ALT_GESTURE_R_MIN_DP), dpToPx(ALT_GESTURE_R_CANCEL_DP), occ);
+        if (pick != currentAlternatePick) {
+            onAlternatePickChanged(alternateAnchorView, pick);
+            currentAlternatePick = pick;
+            applyAlternatePickHighlight();
         }
     }
 
     private void commitCurrentAlternateSelection() {
-        if (currentAlternateSelection < 0 || currentAlternateSelection >= currentAlternateOptions.size()) {
+        if (currentAlternatePopupModel == null) {
             return;
         }
-        sendAlternateOption(currentAlternateOptions.get(currentAlternateSelection));
+        if (currentAlternatePick == AlternatePopupGeometry.RESULT_CANCEL) {
+            return;
+        }
+        AlternateOption opt;
+        if (currentAlternatePick == AlternatePopupGeometry.RESULT_DEFAULT) {
+            opt = currentAlternatePopupModel.defaultOption;
+        } else {
+            opt = currentAlternatePopupModel.slotOptions[currentAlternatePick];
+        }
+        if (opt != null) {
+            sendAlternateOption(opt);
+        }
     }
 
     private void sendAlternateOption(AlternateOption option) {
@@ -1579,9 +1733,10 @@ public class CustomKeyboardView extends LinearLayout {
             alternateAnchorView = null;
         }
         alternatePopupContainer = null;
-        alternateOptionViews.clear();
-        currentAlternateOptions = new ArrayList<>();
-        currentAlternateSelection = -1;
+        Arrays.fill(alternateSlotViews, null);
+        currentAlternatePopupModel = null;
+        currentAlternatePick = AlternatePopupGeometry.RESULT_DEFAULT;
+        lastAlternatePickForHaptic = Integer.MIN_VALUE;
     }
 
     private void performKeyHapticFeedback(View view) {
