@@ -9,10 +9,14 @@
     <!-- Welcome & Guide (mode picker + tutorial); opened from launcher or side menu -->
     <string name="nav_welcome_guide">Welcome &amp; Guide</string>
     <string name="nav_welcome_guide_content_description">Welcome screen, mode picker, and tutorial</string>
-    <string name="launch_panel_subtitle">Choose your preferred mode, or open the tutorial below.</string>
-    <string name="launch_panel_land_subtitle">Choose a mode, or open the tutorial below.</string>
-    <string name="launch_panel_credit">Learn more at https://openterface.com — an open-source project from TechxArtisan.</string>
+    <string name="launch_panel_subtitle">Turn Your Phone into a Smart Keyboard</string>
+    <string name="launch_panel_land_subtitle">Turn Your Phone into a Smart Keyboard</string>
+    <string name="launch_panel_credit">Learn more at openterface.com
+by TechxArtisan</string>
     <string name="show_tutorial_link">Show tutorial</string>
+    <string name="launch_panel_remember_choice">Remember and auto-enter this mode</string>
+    <string name="launch_panel_start">Start</string>
+    <string name="launch_panel_skip">Skip for now</string>
     <string name="PrtSc">PrtSc</string>
     <string name="ScrLk">ScrLk</string>
     <string name="Pause">Pause</string>

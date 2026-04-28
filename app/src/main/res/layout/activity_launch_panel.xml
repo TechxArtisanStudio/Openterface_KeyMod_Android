@@ -6,13 +6,17 @@
     android:orientation="vertical"
     android:background="@color/background_light">
 
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="22dp" />
+
     <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="24dp"
-        android:paddingTop="40dp"
+        android:paddingTop="20dp"
         android:gravity="center">
 
         <TextView
@@ -29,8 +33,11 @@
             android:layout_height="wrap_content"
             android:text="@string/launch_panel_subtitle"
             android:textSize="16sp"
+            android:fontFamily="sans-serif-medium"
             android:textColor="@color/text_secondary"
-            android:layout_marginTop="8dp" />
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:textAlignment="center" />
 
     </LinearLayout>
 
@@ -49,9 +56,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:columnCount="2"
-            android:rowCount="4"
-            android:padding="16dp"
-            android:paddingBottom="24dp"
+            android:padding="14dp"
+            android:paddingBottom="16dp"
             android:alignmentMode="alignMargins">
 
         <!-- Keyboard & Mouse Card -->
@@ -353,6 +359,7 @@
             android:id="@+id/voice_card"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_columnSpan="2"
             android:layout_columnWeight="1"
             android:layout_margin="8dp"
             app:cardCornerRadius="12dp"
@@ -417,20 +424,37 @@
         android:paddingStart="8dp"
         android:paddingEnd="8dp" />
 
+    <TextView
+        android:id="@+id/launch_panel_credit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="6dp"
+        android:paddingHorizontal="20dp"
+        android:gravity="center"
+        android:text="@string/launch_panel_credit"
+        android:textSize="12sp"
+        android:textColor="@color/text_secondary"
+        android:textColorLink="?attr/colorPrimary"
+        android:autoLink="web"
+        android:lineSpacingMultiplier="1.15" />
+
     <!-- Footer -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp"
-        android:paddingBottom="30dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="32dp"
         android:background="@color/background_light">
 
         <CheckBox
             android:id="@+id/remember_choice_checkbox"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Remember this choice and auto-enter this mode"
+            android:text="@string/launch_panel_remember_choice"
             android:textSize="14sp"
             android:textColor="@color/text_primary" />
 
@@ -439,7 +463,7 @@
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginTop="12dp"
-            android:text="Start"
+            android:text="@string/launch_panel_start"
             android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="@android:color/white"
@@ -451,26 +475,12 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginTop="8dp"
-            android:text="Skip for now"
+            android:text="@string/launch_panel_skip"
             android:textSize="14sp"
             android:textStyle="bold"
             android:textColor="?attr/colorPrimary"
             android:background="@drawable/button_skip_bg"
             android:stateListAnimator="@null" />
-
-        <TextView
-            android:id="@+id/launch_panel_credit"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:paddingHorizontal="8dp"
-            android:gravity="center"
-            android:text="@string/launch_panel_credit"
-            android:textSize="12sp"
-            android:textColor="@color/text_secondary"
-            android:textColorLink="?attr/colorPrimary"
-            android:autoLink="web"
-            android:lineSpacingMultiplier="1.15" />
 
     </LinearLayout>
 
