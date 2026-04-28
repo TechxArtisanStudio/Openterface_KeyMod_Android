@@ -232,11 +232,17 @@ public class CustomKeyboardView extends LinearLayout {
         final String display;
         final int keyCode;
         final boolean requiresShift;
+        final int modifierMask;
 
         AlternateOption(String display, int keyCode, boolean requiresShift) {
+            this(display, keyCode, requiresShift, 0);
+        }
+
+        AlternateOption(String display, int keyCode, boolean requiresShift, int modifierMask) {
             this.display = display;
             this.keyCode = keyCode;
             this.requiresShift = requiresShift;
+            this.modifierMask = modifierMask;
         }
     }
 
@@ -1172,7 +1178,8 @@ public class CustomKeyboardView extends LinearLayout {
                         textButton.setCompoundDrawablesWithIntrinsicBounds(0, key.iconResId, 0, 0);
                         textButton.setCompoundDrawablePadding(dpToPx(4));
                     }
-                    String capHints = buildAlternateHintsLineForKeycap(key);
+                    boolean compactHintRow = !isLandscape(getContext());
+                    String capHints = buildAlternateHintsLineForKeycap(key, compactHintRow);
                     if (!TextUtils.isEmpty(capHints)
                             && TextUtils.isEmpty(fnDisplayLabel)
                             && fnDisplayIconResId == 0) {
@@ -1186,8 +1193,13 @@ public class CustomKeyboardView extends LinearLayout {
                         hintParams.setMargins(0, dpToPx(2), 0, 0);
                         hintRow.setLayoutParams(hintParams);
                         hintRow.setText(capHints);
-                        hintRow.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9);
+                        hintRow.setTextSize(TypedValue.COMPLEX_UNIT_SP, compactHintRow ? 8f : 9f);
                         hintRow.setTypeface(Typeface.MONOSPACE);
+                        hintRow.setSingleLine(true);
+                        hintRow.setMaxLines(1);
+                        hintRow.setHorizontallyScrolling(true);
+                        // Keep Alt1-Alt4 on one row in portrait by tightening glyph spacing.
+                        hintRow.setLetterSpacing(compactHintRow ? -0.08f : 0f);
                         hintRow.setTextColor(resolveThemeTextColor());
                         hintRow.setAlpha(0.5f);
                         hintRow.setIncludeFontPadding(false);
@@ -1505,14 +1517,15 @@ public class CustomKeyboardView extends LinearLayout {
         return new AlternatePopupModel(slots);
     }
 
-    private String buildAlternateHintsLineForKeycap(Key key) {
+    private String buildAlternateHintsLineForKeycap(Key key, boolean compactHintRow) {
         AlternateOption[] slots = new AlternateOption[6];
         fillAlternateSlotOptions(key, slots);
         StringBuilder sb = new StringBuilder();
+        String sep = compactHintRow ? "" : " ";
         for (int s = AlternatePopupGeometry.SLOT_ALT1; s <= AlternatePopupGeometry.SLOT_ALT4; s++) {
             if (slots[s] != null) {
                 if (sb.length() > 0) {
-                    sb.append(' ');
+                    sb.append(sep);
                 }
                 sb.append(slots[s].display);
             }
@@ -1717,6 +1730,18 @@ public class CustomKeyboardView extends LinearLayout {
         combinedValue += isShiftLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift")) : 0;
         combinedValue += isAltLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Alt")) : 0;
         combinedValue += isWinLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Win")) : 0;
+        if ((option.modifierMask & MOD_CTRL) != 0) {
+            combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Ctrl"));
+        }
+        if ((option.modifierMask & MOD_SHIFT) != 0) {
+            combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift"));
+        }
+        if ((option.modifierMask & MOD_ALT) != 0) {
+            combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Alt"));
+        }
+        if ((option.modifierMask & MOD_WIN) != 0) {
+            combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Win"));
+        }
         if (option.requiresShift) {
             combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift"));
         }
@@ -1808,6 +1833,11 @@ public class CustomKeyboardView extends LinearLayout {
             case '~': return new AlternateOption(token, 0x35, true);
             case '\\': return new AlternateOption(token, 0x31, false);
             case '|': return new AlternateOption(token, 0x31, true);
+            // Currency alternates follow existing extra-numpad Fn mappings.
+            // These are host-layout dependent but provide practical shortcuts.
+            case '€': return new AlternateOption(token, 0x1F, false, MOD_ALT | MOD_SHIFT);
+            case '¥': return new AlternateOption(token, 0x1C, false, MOD_ALT);
+            case '£': return new AlternateOption(token, 0x20, false, MOD_ALT);
             default: return null;
         }
     }

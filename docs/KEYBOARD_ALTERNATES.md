@@ -66,7 +66,7 @@ Base HID = `android:codes` (hex). The table’s `keyAlternates` column is unchan
 | p | 13 | P | 0 | 0 |
 | a | 04 | A | @ | @ |
 | s | 16 | S | # | # |
-| d | 07 | D | $ | $ |
+| d | 07 | D | $ , € , ¥ , £ | $ |
 | f | 09 | F | % | % |
 | g | 0A | G | ^ | ^ |
 | h | 0B | H | & | & |
@@ -130,6 +130,14 @@ Implemented in `CustomKeyboardView.mapAsciiAlternate`.
 | . > | 0x37 | no / yes |
 | / ? | 0x38 | no / yes |
 | \\ \| | 0x31 | no / yes |
+
+Currency alternates also supported:
+
+| Char | Code | Modifiers |
+|------|------|-----------|
+| € | 0x1F | Alt + Shift |
+| ¥ | 0x1C | Alt |
+| £ | 0x20 | Alt |
 
 Any character **not** listed above will not produce a valid long-press option until you add a `case` in `mapAsciiAlternate` (and use a single-character token in XML).
 
