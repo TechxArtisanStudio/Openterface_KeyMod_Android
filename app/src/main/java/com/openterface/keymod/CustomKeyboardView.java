@@ -2808,7 +2808,7 @@ public class CustomKeyboardView extends LinearLayout {
 
         // Row 3 (was row 5)
         gridKeys.add(new ExtraGridKey(new Key("=", "", 0x67, "67", 25f, 0, 0f, false), 2, 0, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("Space", "", 0x2C, "2C", 25f, R.drawable.space_bar_24px, 0f, false), 2, 2, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("Space", "", 0x2C, "2C", 25f, 0, 0f, false), 2, 2, 1, 2));
         gridKeys.add(new ExtraGridKey(new Key("/", "", 0x54, "54", 25f, 0, 0f, false), 2, 4, 1, 2));
         gridKeys.add(new ExtraGridKey(new Key("*", "", 0x55, "55", 25f, 0, 0f, false), 2, 6, 1, 2));
 
@@ -3263,6 +3263,9 @@ public class CustomKeyboardView extends LinearLayout {
                     if ("TAB".equals(baseKey.label) && baseKey.code == 0x2B) {
                         applyExtraNumpadGridIconOverlay(b, R.drawable.keyboard_tab_24, "Tab",
                                 EXTRA_NUMPAD_FN_ACTION_ICON_DP);
+                    } else if ("Space".equals(baseKey.label) && baseKey.code == 0x2C) {
+                        applyExtraNumpadGridIconOverlay(b, R.drawable.space_bar_24px, "Space",
+                                EXTRA_NUMPAD_FN_ACTION_ICON_DP);
                     } else {
                         b.setText(baseKey.label);
                         b.setTextColor(resolveExtraNumpadLabelColor(baseKey.label));
@@ -3343,6 +3346,9 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private int resolveExtraNumpadLabelColor(String label) {
+        // NUM has two visual states on local Fn layer:
+        // State A -> normal text color (black light / white dark)
+        // State B -> current theme accent color.
         if ("NUM".equals(label) && extraNumpadNumStateB) {
             return ThemeManager.getColorPrimary(getContext());
         }

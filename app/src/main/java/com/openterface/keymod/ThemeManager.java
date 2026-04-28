@@ -81,24 +81,46 @@ public final class ThemeManager {
                     && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
                 return typedValue.data;
             }
+            if (typedValue.resourceId != 0) {
+                try {
+                    return ContextCompat.getColor(context, typedValue.resourceId);
+                } catch (Exception ignored) {
+                    // Fall through to fallback if resource cannot be resolved as a color.
+                }
+            }
         }
         return fallbackArgb;
     }
 
     /** Material / app theme primary accent (Orange, Blue, … per user setting). */
     public static int getColorPrimary(Context context) {
-        // Prefer app/material colorPrimary attr from the current theme; framework attr can diverge.
-        int materialPrimary = resolveThemeColor(
-                context,
-                com.google.android.material.R.attr.colorPrimary,
-                Integer.MIN_VALUE);
-        if (materialPrimary != Integer.MIN_VALUE) {
-            return materialPrimary;
+        // Drive accent from persisted family selection so color stays stable even if this context
+        // is not fully theme-wrapped (seen in custom keyboard subviews).
+        return getConfiguredAccentColor(context);
+    }
+
+    public static int getConfiguredAccentColor(Context context) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        String family = prefs.getString(PREF_THEME_COLOR_FAMILY, FAMILY_ORANGE);
+        int colorResId;
+        if (FAMILY_BLUE.equals(family)) {
+            colorResId = R.color.theme_accent_blue;
+        } else if (FAMILY_GREEN.equals(family)) {
+            colorResId = R.color.theme_accent_green;
+        } else if (FAMILY_PINK.equals(family)) {
+            colorResId = R.color.theme_accent_pink;
+        } else if (FAMILY_PURPLE.equals(family)) {
+            colorResId = R.color.theme_accent_purple;
+        } else if (FAMILY_RED.equals(family)) {
+            colorResId = R.color.theme_accent_red;
+        } else if (FAMILY_TEAL.equals(family)) {
+            colorResId = R.color.theme_accent_teal;
+        } else if (FAMILY_INDIGO.equals(family)) {
+            colorResId = R.color.theme_accent_indigo;
+        } else {
+            colorResId = R.color.theme_accent_orange;
         }
-        return resolveThemeColor(
-                context,
-                android.R.attr.colorPrimary,
-                ContextCompat.getColor(context, R.color.primary));
+        return ContextCompat.getColor(context, colorResId);
     }
 
     private static int resolveTheme(String family) {
