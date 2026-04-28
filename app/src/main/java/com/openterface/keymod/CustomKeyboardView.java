@@ -32,7 +32,6 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
@@ -496,7 +495,7 @@ public class CustomKeyboardView extends LinearLayout {
         return key.shortcutModifiers >= 0 || key.code == 0x2B;
     }
 
-    private void setTopShortcutShowActionLabels(boolean enabled, boolean fromUserAction) {
+    private void setTopShortcutShowActionLabels(boolean enabled) {
         if (topShortcutShowActionLabels == enabled) {
             return;
         }
@@ -507,17 +506,11 @@ public class CustomKeyboardView extends LinearLayout {
                     .edit()
                     .putBoolean(KEY_TOP_SHORTCUT_SHOW_ACTION_LABELS, enabled)
                     .apply();
-            if (fromUserAction) {
-                int msgRes = enabled
-                        ? R.string.top_shortcut_label_mode_actions
-                        : R.string.top_shortcut_label_mode_icons;
-                Toast.makeText(context, context.getString(msgRes), Toast.LENGTH_SHORT).show();
-            }
         }
         rebuildTopShortcutPanels();
         syncTopPanelViewportContent();
         if (splitPartner != null) {
-            splitPartner.setTopShortcutShowActionLabels(enabled, false);
+            splitPartner.setTopShortcutShowActionLabels(enabled);
         }
     }
 
@@ -2440,10 +2433,7 @@ public class CustomKeyboardView extends LinearLayout {
                     } else if (isTopShortcutToggleKey(k)) {
                         Context ctx = getContext();
                         if (ctx != null) {
-                            int msgRes = topShortcutShowActionLabels
-                                    ? R.string.top_shortcut_label_mode_actions
-                                    : R.string.top_shortcut_label_mode_icons;
-                            ib.setContentDescription(ctx.getString(msgRes));
+                            ib.setContentDescription(ctx.getString(R.string.top_shortcut_toggle_display_mode));
                         }
                     }
                     ib.setTag(k);
@@ -2467,7 +2457,7 @@ public class CustomKeyboardView extends LinearLayout {
                         : k.label;
                     b.setText(topButtonText);
                     if (renderAsActionLabel) {
-                        b.setTextSize(9);
+                        b.setTextSize(11);
                         b.setTypeface(Typeface.DEFAULT_BOLD);
                     }
                     b.setTextColor(resolveThemeTextColor());
@@ -3496,7 +3486,7 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         if (isTopShortcutToggleKey(key)) {
-            setTopShortcutShowActionLabels(!topShortcutShowActionLabels, true);
+            setTopShortcutShowActionLabels(!topShortcutShowActionLabels);
             return;
         }
 
