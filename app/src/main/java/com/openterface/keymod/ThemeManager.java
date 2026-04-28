@@ -87,6 +87,14 @@ public final class ThemeManager {
 
     /** Material / app theme primary accent (Orange, Blue, … per user setting). */
     public static int getColorPrimary(Context context) {
+        // Prefer app/material colorPrimary attr from the current theme; framework attr can diverge.
+        int materialPrimary = resolveThemeColor(
+                context,
+                com.google.android.material.R.attr.colorPrimary,
+                Integer.MIN_VALUE);
+        if (materialPrimary != Integer.MIN_VALUE) {
+            return materialPrimary;
+        }
         return resolveThemeColor(
                 context,
                 android.R.attr.colorPrimary,

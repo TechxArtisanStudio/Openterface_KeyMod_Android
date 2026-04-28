@@ -92,6 +92,8 @@ public class CustomKeyboardView extends LinearLayout {
     private boolean isSymbolMode = false;
     private boolean isFnLocked = false;
     private boolean extraNumpadFnLocked = false;
+    /** Extra numpad NumLock visual state: false = State A(default text), true = State B(theme accent). */
+    private boolean extraNumpadNumStateB = false;
     private GridLayout extraNumpadGrid;
     private ImageButton extraNumpadFnButton;
     private boolean showExtraPortraitKeys = false;
@@ -2802,7 +2804,7 @@ public class CustomKeyboardView extends LinearLayout {
         gridKeys.add(new ExtraGridKey(new Key("ESC", "", 0x29, "29", 25f, 0, 0f, false), 1, 0, 1, 2));
         gridKeys.add(new ExtraGridKey(new Key("#", "", 0x20, "20", 25f, 0, 0f, false, false, MOD_SHIFT, false), 1, 2, 1, 2));
         gridKeys.add(new ExtraGridKey(new Key("UNDO", "", 0x1D, "1D", 25f, R.drawable.undo_24, 0f, false, false, primaryModifier, false), 1, 4, 1, 2));
-        gridKeys.add(new ExtraGridKey(new Key("BKSP", "", 0x2A, "2A", 25f, R.drawable.backspace, 0f, false), 1, 6, 1, 2));
+        gridKeys.add(new ExtraGridKey(new Key("BKSP", "", 0x2A, "2A", 25f, R.drawable.backspace_24, 0f, false), 1, 6, 1, 2));
 
         // Row 3 (was row 5)
         gridKeys.add(new ExtraGridKey(new Key("=", "", 0x67, "67", 25f, 0, 0f, false), 2, 0, 1, 2));
@@ -2863,7 +2865,7 @@ public class CustomKeyboardView extends LinearLayout {
                 applyFlatKeyStyle(iconButton);
                 iconButton.setBackgroundResource(R.drawable.function_button_background);
                 iconButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
-                int iconPadDp = entry.key.code == 0x2A ? 4 : 6;
+                int iconPadDp = (entry.key.code == 0x2A && "BKSP".equals(entry.key.label)) ? 1 : 6;
                 iconButton.setPadding(dpToPx(iconPadDp), dpToPx(iconPadDp), dpToPx(iconPadDp), dpToPx(iconPadDp));
                 iconButton.setImageResource(entry.key.iconResId);
                 iconButton.setColorFilter(resolveThemeTextColor());
@@ -3139,7 +3141,7 @@ public class CustomKeyboardView extends LinearLayout {
             return new FnMapping("|", 0x64, MOD_SHIFT, 0);
         }
         if ("BKSP".equals(key.label) && key.code == 0x2A) {
-            return new FnMapping("DEL", 0x4C, 0, R.drawable.backspace);
+            return null;
         }
         if ("UNDO".equals(key.label) && key.code == 0x1D) {
             if ("macos".equals(getTargetOs())) {
@@ -3155,12 +3157,12 @@ public class CustomKeyboardView extends LinearLayout {
         if ("Space".equals(key.label) && key.code == 0x2C) {
             return new FnMapping("€", 0x1F, MOD_ALT | MOD_SHIFT);
         }
-        // Split column under *: Fn shows % (top) and forward delete (bottom), same icon as BKSP→DEL.
+        // Split column under *: Fn shows % (top) and forward delete (bottom).
         if ("-".equals(key.label) && key.code == 0x56) {
             return new FnMapping("%", 0x22, MOD_SHIFT);
         }
         if ("+".equals(key.label) && key.code == 0x57) {
-            return new FnMapping("DEL", 0x4C, 0, R.drawable.backspace);
+            return new FnMapping("DEL", 0x4C, 0, R.drawable.backspace_24);
         }
         switch (key.code) {
             // Numpad / * when Fn: ¥ and $ (order matches £ € ¥ $ on operator row).
@@ -3226,10 +3228,17 @@ public class CustomKeyboardView extends LinearLayout {
                 Button b = (Button) child;
                 if (mapping != null) {
                     if (mapping.iconResId != 0) {
-                        int iconDp = isExtraNumpadArrowDirectionLabel(mapping.label)
+                        boolean isDelBackspaceIcon = "DEL".equals(mapping.label) && mapping.iconResId == R.drawable.backspace_24;
+                        int iconDp = isDelBackspaceIcon
+                                ? 20
+                                : isExtraNumpadArrowDirectionLabel(mapping.label)
                                 ? EXTRA_NUMPAD_FN_ARROW_ICON_DP
                                 : EXTRA_NUMPAD_FN_ACTION_ICON_DP;
                         applyExtraNumpadGridIconOverlay(b, mapping.iconResId, mapping.label, iconDp);
+                        if (isDelBackspaceIcon) {
+                            int iconPad = dpToPx(6);
+                            b.setPadding(iconPad, iconPad, iconPad, iconPad);
+                        }
                         b.setScaleX(mapping.keyCode == 0x4C ? -1f : 1f);
                     } else {
                         clearExtraNumpadArrowIconOverlay(b);
@@ -3239,6 +3248,7 @@ public class CustomKeyboardView extends LinearLayout {
                         int pad = dpToPx(2);
                         b.setPadding(pad, pad, pad, pad);
                         b.setText(mapping.label);
+                        b.setTextColor(resolveExtraNumpadLabelColor(mapping.label));
                         styleExtraNumpadGridKeyButton(b, mapping.label);
                         b.setScaleX(1f);
                     }
@@ -3255,6 +3265,7 @@ public class CustomKeyboardView extends LinearLayout {
                                 EXTRA_NUMPAD_FN_ACTION_ICON_DP);
                     } else {
                         b.setText(baseKey.label);
+                        b.setTextColor(resolveExtraNumpadLabelColor(baseKey.label));
                         styleExtraNumpadGridKeyButton(b, baseKey.label);
                     }
                 }
@@ -3331,6 +3342,13 @@ public class CustomKeyboardView extends LinearLayout {
         return hex != null ? Integer.parseInt(hex.replace("0x", ""), 16) : 0;
     }
 
+    private int resolveExtraNumpadLabelColor(String label) {
+        if ("NUM".equals(label) && extraNumpadNumStateB) {
+            return ThemeManager.getColorPrimary(getContext());
+        }
+        return resolveThemeTextColor();
+    }
+
     private void handleKeyPress(Key key) {
         Log.d(TAG, "Key pressed: label=" + key.label + ", code=" + key.code);
 
@@ -3356,6 +3374,16 @@ public class CustomKeyboardView extends LinearLayout {
                 splitPartner.refreshExtraNumpadGridUi();
             }
             return;
+        }
+
+        // Local extra numpad State A/B toggle for NUM key (displayed as Fn+ESC).
+        if (extraNumpadFnLocked && "ESC".equals(key.label) && key.code == 0x29) {
+            extraNumpadNumStateB = !extraNumpadNumStateB;
+            refreshExtraNumpadGridUi();
+            if (splitPartner != null) {
+                splitPartner.extraNumpadNumStateB = extraNumpadNumStateB;
+                splitPartner.refreshExtraNumpadGridUi();
+            }
         }
 
         if (key.shortcutModifiers >= 0) {
