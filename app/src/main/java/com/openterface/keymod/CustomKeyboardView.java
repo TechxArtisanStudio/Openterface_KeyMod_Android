@@ -127,11 +127,13 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int ALT_POPUP_OPTION_MARGIN_DP_PORTRAIT = 2;
     private static final int ALT_POPUP_OPTION_MARGIN_DP_LANDSCAPE = 3;
     private static final int ALT_POPUP_OPTION_TEXT_SP_PORTRAIT = 15;
-    private static final int ALT_POPUP_OPTION_TEXT_SP_LANDSCAPE = 18;
+    private static final int ALT_POPUP_OPTION_TEXT_SP_LANDSCAPE = 20;
     private static final int ALT_POPUP_OPTION_PADDING_HORIZONTAL_DP_PORTRAIT = 8;
     private static final int ALT_POPUP_OPTION_PADDING_HORIZONTAL_DP_LANDSCAPE = 10;
     private static final int ALT_POPUP_OPTION_PADDING_VERTICAL_DP_PORTRAIT = 5;
     private static final int ALT_POPUP_OPTION_PADDING_VERTICAL_DP_LANDSCAPE = 7;
+    private static final float BASE_KEYCAP_TEXT_SP_PORTRAIT = 17f;
+    private static final float BASE_KEYCAP_TEXT_SP_LANDSCAPE = 19f;
     private static final int KEY_OUTER_MARGIN_DP = 2;
     private final Handler longPressHandler = new Handler();
     private PopupWindow alternatePopupWindow;
@@ -1109,7 +1111,9 @@ public class CustomKeyboardView extends LinearLayout {
                     textButton.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
                     textButton.setBackgroundResource(R.drawable.key_background);
                     textButton.setGravity(Gravity.CENTER);
-                    textButton.setTextSize(14);
+                    textButton.setTextSize(isLandscape(getContext())
+                            ? BASE_KEYCAP_TEXT_SP_LANDSCAPE
+                            : BASE_KEYCAP_TEXT_SP_PORTRAIT);
                     textButton.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
 
                     if (isFunctionalKey) {
@@ -1193,7 +1197,7 @@ public class CustomKeyboardView extends LinearLayout {
                         hintParams.setMargins(0, dpToPx(2), 0, 0);
                         hintRow.setLayoutParams(hintParams);
                         hintRow.setText(capHints);
-                        hintRow.setTextSize(TypedValue.COMPLEX_UNIT_SP, compactHintRow ? 8f : 9f);
+                        hintRow.setTextSize(TypedValue.COMPLEX_UNIT_SP, compactHintRow ? 9f : 11f);
                         hintRow.setTypeface(Typeface.MONOSPACE);
                         hintRow.setSingleLine(true);
                         hintRow.setMaxLines(1);
