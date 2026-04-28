@@ -39,33 +39,47 @@
                 android:padding="@dimen/button_icon_padding"
                 android:tint="@color/text_primary"/>
 
-            <!-- App Title (between menu and header end cluster) -->
-            <TextView
-                android:id="@+id/app_title"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_toEndOf="@id/menu_button"
-                android:layout_toStartOf="@id/header_end_cluster"
-                android:layout_centerVertical="true"
-                android:text="@string/app_name"
-                android:textSize="@dimen/header_title_size"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:paddingStart="@dimen/spacing_small"
-                android:paddingEnd="@dimen/spacing_small"
-                android:fontFamily="sans-serif-medium"
-                android:maxLines="1"
-                android:ellipsize="end"/>
-
-            <!-- Target OS + connection (right side) -->
-            <LinearLayout
-                android:id="@+id/header_end_cluster"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
+
+                <!-- App Title (between menu and scrollable header end cluster) -->
+                <TextView
+                    android:id="@+id/app_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="@dimen/spacing_small"
+                    android:layout_marginEnd="@dimen/spacing_small"
+                    android:text="@string/app_name"
+                    android:textSize="@dimen/header_title_size"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:ellipsize="end"/>
+
+                <HorizontalScrollView
+                    android:id="@+id/header_end_scroll"
+                    android:layout_width="176dp"
+                    android:layout_height="wrap_content"
+                    android:scrollbars="none"
+                    android:fillViewport="false"
+                    android:overScrollMode="ifContentScrolls">
+
+                    <!-- Target OS + connection (right side) -->
+                    <LinearLayout
+                        android:id="@+id/header_end_cluster"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="end"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
                 <LinearLayout
                     android:id="@+id/header_mode_slots_container"
@@ -117,18 +131,18 @@
                     android:padding="@dimen/button_icon_padding"
                     android:tint="@color/text_secondary"/>
 
-                <LinearLayout
-                    android:id="@+id/connection_container"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:minWidth="@dimen/header_icon_size"
-                    android:minHeight="@dimen/header_icon_size"
-                    android:padding="4dp">
+                        <LinearLayout
+                            android:id="@+id/connection_container"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:minWidth="@dimen/header_icon_size"
+                            android:minHeight="@dimen/header_icon_size"
+                            android:padding="4dp">
 
                     <ImageView
                         android:id="@+id/connection_button"
@@ -148,8 +162,10 @@
                         android:visibility="gone"
                         android:contentDescription="Signal strength"/>
 
-                </LinearLayout>
+                        </LinearLayout>
 
+                    </LinearLayout>
+                </HorizontalScrollView>
             </LinearLayout>
 
         </RelativeLayout>
