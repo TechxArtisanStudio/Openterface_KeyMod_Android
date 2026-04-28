@@ -8,7 +8,7 @@
 
     <Space
         android:layout_width="match_parent"
-        android:layout_height="22dp" />
+        android:layout_height="28dp" />
 
     <!-- Header -->
     <LinearLayout
@@ -73,7 +73,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:columnCount="2"
-            android:padding="14dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="6dp"
             android:paddingBottom="16dp"
             android:alignmentMode="alignMargins">
 
@@ -464,7 +466,7 @@
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
         android:paddingTop="10dp"
-        android:paddingBottom="32dp"
+        android:paddingBottom="52dp"
         android:background="@color/background_light">
 
         <CheckBox
