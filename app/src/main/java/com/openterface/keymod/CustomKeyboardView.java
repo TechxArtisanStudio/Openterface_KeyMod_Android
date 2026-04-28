@@ -32,6 +32,7 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
@@ -80,6 +81,8 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int KEY_TOP_MODE_SLOT_2 = 0xF008;
     private static final int KEY_TOP_MODE_SLOT_3 = 0xF009;
     private static final int KEY_NOOP_PLACEHOLDER = -1;
+    private static final String APP_PREFS_NAME = "AppPrefs";
+    private static final String KEY_TOP_SHORTCUT_SHOW_ACTION_LABELS = "top_shortcut_show_action_labels";
     private static final int MOD_CTRL = 1;
     private static final int MOD_SHIFT = 2;
     private static final int MOD_ALT = 4;
@@ -99,6 +102,8 @@ public class CustomKeyboardView extends LinearLayout {
     private boolean showExtraPortraitKeys = false;
     /** When true, only the top shortcut strip(s) are shown (Compose mode). */
     private boolean shortcutsStripOnly = false;
+    /** Top strip visual mode toggle (PH3): false icon-first, true action-label-first. */
+    private boolean topShortcutShowActionLabels = false;
 
     /** Split keyboard mode: which half to render (for landscape split mode with touchpad in middle) */
     public static final int SPLIT_NONE = 0;
@@ -349,6 +354,9 @@ public class CustomKeyboardView extends LinearLayout {
     private void init(Context context) {
         setOrientation(VERTICAL);
         shortcutProfileManager = new ShortcutProfileManager(context.getApplicationContext());
+        topShortcutShowActionLabels = context
+                .getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_TOP_SHORTCUT_SHOW_ACTION_LABELS, false);
         
         // Load keyboard layout based on orientation (matching iOS behavior)
         reloadForCurrentOrientation();
@@ -472,6 +480,107 @@ public class CustomKeyboardView extends LinearLayout {
 
     private static boolean isTopModeSlotKey(Key key) {
         return key != null && topModeSlotIndexFromKeyCode(key.code) > 0;
+    }
+
+    private static boolean isTopShortcutToggleKey(Key key) {
+        return key != null
+                && key.isTopPanelKey
+                && "PH3".equals(key.label)
+                && key.code == KEY_NOOP_PLACEHOLDER;
+    }
+
+    private static boolean isTopShortcutActionLabelEligible(Key key) {
+        if (key == null || !key.isTopPanelKey || key.code == KEY_NOOP_PLACEHOLDER) {
+            return false;
+        }
+        return key.shortcutModifiers >= 0 || key.code == 0x2B;
+    }
+
+    private void setTopShortcutShowActionLabels(boolean enabled, boolean fromUserAction) {
+        if (topShortcutShowActionLabels == enabled) {
+            return;
+        }
+        topShortcutShowActionLabels = enabled;
+        Context context = getContext();
+        if (context != null) {
+            context.getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_TOP_SHORTCUT_SHOW_ACTION_LABELS, enabled)
+                    .apply();
+            if (fromUserAction) {
+                int msgRes = enabled
+                        ? R.string.top_shortcut_label_mode_actions
+                        : R.string.top_shortcut_label_mode_icons;
+                Toast.makeText(context, context.getString(msgRes), Toast.LENGTH_SHORT).show();
+            }
+        }
+        rebuildTopShortcutPanels();
+        syncTopPanelViewportContent();
+        if (splitPartner != null) {
+            splitPartner.setTopShortcutShowActionLabels(enabled, false);
+        }
+    }
+
+    private String formatTopShortcutActionLabel(Key key) {
+        if (key == null) {
+            return "";
+        }
+        String keyPart = topShortcutKeyCodeLabel(key.code, key.label);
+        if (keyPart.isEmpty()) {
+            return key.label != null ? key.label : "";
+        }
+        if (key.shortcutModifiers <= 0) {
+            return keyPart;
+        }
+        String targetOs = getTargetOs();
+        if ("macos".equals(targetOs)) {
+            String modifierGlyphs = shortcutModifierGlyphs(key.shortcutModifiers);
+            if (!modifierGlyphs.isEmpty()) {
+                return modifierGlyphs + keyPart;
+            }
+        }
+        String modifierText = shortcutModifierText(key.shortcutModifiers, targetOs);
+        if (modifierText.isEmpty()) {
+            return keyPart;
+        }
+        return modifierText + "+" + keyPart;
+    }
+
+    private String shortcutModifierGlyphs(int modifiers) {
+        StringBuilder out = new StringBuilder();
+        if ((modifiers & MOD_CTRL) != 0) out.append("⌃");
+        if ((modifiers & MOD_ALT) != 0) out.append("⌥");
+        if ((modifiers & MOD_SHIFT) != 0) out.append("⇧");
+        if ((modifiers & MOD_WIN) != 0) out.append("⌘");
+        return out.toString();
+    }
+
+    private String shortcutModifierText(int modifiers, String targetOs) {
+        List<String> parts = new ArrayList<>(4);
+        if ((modifiers & MOD_CTRL) != 0) parts.add("Ctrl");
+        if ((modifiers & MOD_ALT) != 0) parts.add("Alt");
+        if ((modifiers & MOD_SHIFT) != 0) parts.add("Shift");
+        if ((modifiers & MOD_WIN) != 0) {
+            parts.add("macos".equals(targetOs) ? "Cmd" : "Win");
+        }
+        return TextUtils.join("+", parts);
+    }
+
+    private String topShortcutKeyCodeLabel(int keyCode, String fallbackLabel) {
+        switch (keyCode) {
+            case 0x04: return "A";
+            case 0x06: return "C";
+            case 0x16: return "S";
+            case 0x19: return "V";
+            case 0x1B: return "X";
+            case 0x1D: return "Z";
+            case 0x2B: return "Tab";
+            default:
+                if (fallbackLabel == null) {
+                    return "";
+                }
+                return fallbackLabel;
+        }
     }
 
     private Key modeSlotKey(int slotIndex1Based) {
@@ -2213,7 +2322,9 @@ public class CustomKeyboardView extends LinearLayout {
         keys.add(new Key("TAB",    "", 0x2B, "2B", 1f, R.drawable.keyboard_tab_24, 0f, false, false, -1, true));
         keys.add(new Key("PH1",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("PH2",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH3",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH3",   "", KEY_NOOP_PLACEHOLDER, "", 1f,
+                topShortcutShowActionLabels ? R.drawable.toggle_on_24px : R.drawable.toggle_off_24px,
+                0f, false, false, -1, true));
         return keys;
     }
 
@@ -2305,7 +2416,9 @@ public class CustomKeyboardView extends LinearLayout {
                     || (k.code == 0xE1 && isShiftLeftLocked)
                     || (k.code == 0xE2 && isAltLeftLocked)
                     || (k.code == 0xE3 && isWinLeftLocked);
-                if (k.iconResId != 0) {
+                boolean renderAsActionLabel = topShortcutShowActionLabels
+                        && isTopShortcutActionLabelEligible(k);
+                if (k.iconResId != 0 && !renderAsActionLabel) {
                     ImageButton ib = new ImageButton(getContext());
                     applyFlatKeyStyle(ib);
                     ib.setLayoutParams(p);
@@ -2324,6 +2437,14 @@ public class CustomKeyboardView extends LinearLayout {
                             String mode = TopModeShortcutPrefs.getModeForSlot(ctx, slot);
                             ib.setContentDescription(ctx.getString(TopModeShortcutPrefs.labelResForMode(mode)));
                         }
+                    } else if (isTopShortcutToggleKey(k)) {
+                        Context ctx = getContext();
+                        if (ctx != null) {
+                            int msgRes = topShortcutShowActionLabels
+                                    ? R.string.top_shortcut_label_mode_actions
+                                    : R.string.top_shortcut_label_mode_icons;
+                            ib.setContentDescription(ctx.getString(msgRes));
+                        }
                     }
                     ib.setTag(k);
                     ib.setOnTouchListener(createTopPanelTouchListener(k));
@@ -2339,10 +2460,16 @@ public class CustomKeyboardView extends LinearLayout {
                     b.setGravity(Gravity.CENTER);
                     b.setTextSize(10);
                     b.setPadding(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
-                    String topButtonText = k.symbolLabel != null && !k.symbolLabel.isEmpty()
+                    String topButtonText = renderAsActionLabel
+                        ? formatTopShortcutActionLabel(k)
+                        : k.symbolLabel != null && !k.symbolLabel.isEmpty()
                         ? k.symbolLabel + "\n" + k.label
                         : k.label;
                     b.setText(topButtonText);
+                    if (renderAsActionLabel) {
+                        b.setTextSize(9);
+                        b.setTypeface(Typeface.DEFAULT_BOLD);
+                    }
                     b.setTextColor(resolveThemeTextColor());
                     b.setAllCaps(false);
                     if ("ESC".equals(k.label)
@@ -3365,6 +3492,11 @@ public class CustomKeyboardView extends LinearLayout {
                 String mode = TopModeShortcutPrefs.getModeForSlot(ctx, topSlot);
                 onTopModeShortcutListener.onRequestSwitchToMode(mode);
             }
+            return;
+        }
+
+        if (isTopShortcutToggleKey(key)) {
+            setTopShortcutShowActionLabels(!topShortcutShowActionLabels, true);
             return;
         }
 

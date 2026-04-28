@@ -260,6 +260,8 @@ by TechxArtisan</string>
     <string name="top_mode_label_gamepad">Gamepad</string>
     <string name="top_mode_label_shortcuts">Shortcuts</string>
     <string name="top_mode_label_macros">Macros</string>
+    <string name="top_shortcut_label_mode_actions">Top shortcuts: showing key actions</string>
+    <string name="top_shortcut_label_mode_icons">Top shortcuts: showing icons</string>
 
     <!-- Presentation Mode Strings -->
     <string name="presentation_mode">Presentation</string>
