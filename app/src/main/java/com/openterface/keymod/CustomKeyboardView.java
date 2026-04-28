@@ -903,6 +903,12 @@ public class CustomKeyboardView extends LinearLayout {
                         } else if (label.equals("Right_arrow")) {
                             iconResId = R.drawable.caret_right_fill;
                             System.out.println("Hardcoded icon for arrow_up: " + iconResId);
+                        } else if (label.equals("Shift")) {
+                            iconResId = R.drawable.shift_24px;
+                            System.out.println("Hardcoded icon for Shift: " + iconResId);
+                        } else if (label.equals("Enter")) {
+                            iconResId = R.drawable.keyboard_return_24px;
+                            System.out.println("Hardcoded icon for Enter: " + iconResId);
                         }
 
 //                        Log.d(TAG,"Parsed Key: label=" + label + ", symbolLabel=" + symbolLabel + ", code=0x" + Integer.toHexString(code).toUpperCase() + ", codeStr=" + codeStr + ", width=" + widthPercent + ", icon=" + iconResId + ", gap=" + horizontalGap + ", repeatable=" + isRepeatable);
@@ -1082,12 +1088,14 @@ public class CustomKeyboardView extends LinearLayout {
                 }
 
                 if (key.label.equals("Win") || key.label.equals("Cmd") || key.label.equals("Super") || key.label.equals("BackSpace") ||
+                        key.label.equals("Shift") ||
+                        key.label.equals("Enter") ||
                         key.label.equals("Up_arrow") || key.label.equals("Down_arrow") ||
                         key.label.equals("Left_arrow") || key.label.equals("Right_arrow")) {
                     ImageButton imageButton = new ImageButton(getContext());
                     applyFlatKeyStyle(imageButton);
                     imageButton.setLayoutParams(params);
-                    if (key.code == 0xE3 && isWinLeftLocked) {
+                    if ((key.code == 0xE3 && isWinLeftLocked) || (key.code == 0xE1 && isShiftLeftLocked)) {
                         imageButton.setBackgroundResource(R.drawable.press_button_background);
                     } else {
                         imageButton.setBackgroundResource(R.drawable.key_background);
@@ -1096,13 +1104,16 @@ public class CustomKeyboardView extends LinearLayout {
                         imageButton.setImageResource(key.iconResId);
                         imageButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
                         if (isBackspaceKey(key)) {
-                            imageButton.setScaleX(isShiftLeftLocked ? -1f : 1f);
+                            imageButton.setScaleX(isFnLocked ? -1f : 1f);
                         }
-                        if ("Win".equals(key.label) || "Cmd".equals(key.label) || "Super".equals(key.label) || "BackSpace".equals(key.label)) {
+                        if ("Win".equals(key.label) || "Cmd".equals(key.label) || "Super".equals(key.label)
+                                || "BackSpace".equals(key.label) || "Shift".equals(key.label)
+                                || "Enter".equals(key.label)) {
                             imageButton.setColorFilter(resolveThemeTextColor());
                         }
                     }
-                    imageButton.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
+                    int iconPaddingDp = (isBackspaceKey(key) && isLandscape(getContext())) ? 2 : 4;
+                    imageButton.setPadding(dpToPx(iconPaddingDp), dpToPx(iconPaddingDp), dpToPx(iconPaddingDp), dpToPx(iconPaddingDp));
                     button = imageButton;
                     listenerTarget = imageButton;
                 } else {
@@ -1922,7 +1933,7 @@ public class CustomKeyboardView extends LinearLayout {
                 new Key("/",    "", 0x38,   "38",   20.0f, 0, 0f, false),
                 new Key("0",    "", 0x27,   "27",   20.0f, 0, 0f, false),
                 new Key("!?#",  "", 0xF004, "F004", 20.0f, 0, 0f, false),
-                new Key("Enter","", 0x28,   "28",   10.0f, 0, 0f, false)
+                new Key("Enter","", 0x28,   "28",   10.0f, R.drawable.keyboard_return_24px, 0f, false)
             }
         };
 
@@ -1942,7 +1953,7 @@ public class CustomKeyboardView extends LinearLayout {
                     ib.setBackgroundResource(R.drawable.key_background);
                     ib.setImageResource(k.iconResId);
                     ib.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
-                    ib.setScaleX(isShiftLeftLocked ? -1f : 1f);
+                    ib.setScaleX(isFnLocked ? -1f : 1f);
                     ib.setColorFilter(resolveThemeTextColor());
                     ib.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
                     attachKeyListeners(ib, k);
@@ -3396,10 +3407,9 @@ public class CustomKeyboardView extends LinearLayout {
         int effectiveKeyCode = fnMapping != null ? fnMapping.keyCode : key.code;
         boolean effectiveShiftLocked = isShiftLeftLocked;
         int fnModifierMask = fnMapping != null ? fnMapping.modifierMask : 0;
-        if (isBackspaceKey(key) && isShiftLeftLocked) {
-            // Shift+Backspace switches to forward delete behavior.
+        if (isBackspaceKey(key) && isFnLocked) {
+            // Fn+Backspace switches to forward delete behavior.
             effectiveKeyCode = 0x4C;
-            effectiveShiftLocked = false;
         }
 
         int combinedValue = 0;
