@@ -82,7 +82,13 @@ public class CustomKeyboardView extends LinearLayout {
     private static final String KEY_IME_SUB_COMPOSE_EXPANDED = "ime_sub_compose_expanded";
     /** Portrait IME sub-compose: max field length (same order of magnitude as Compose). */
     public static final int IME_CAPTURE_MAX_TEXT_LEN = 10_000;
-    private static final int IME_CAPTURE_TOOLBAR_HEIGHT_DP = 52;
+    /**
+     * Vertical weight for the IME compose toolbar row on the outer {@link CustomKeyboardView} column.
+     * Must be {@code IME_SINGLE_TOP_STRIP_WEIGHT / TOP_PANEL_ROWS} so this row's pixel height matches
+     * one shortcut row inside the viewport (three inner rows each use {@link #TOP_PANEL_ROW_WEIGHT}).
+     */
+    private static final float IME_COMPOSE_TOOLBAR_ROW_WEIGHT =
+            IME_SINGLE_TOP_STRIP_WEIGHT / (float) TOP_PANEL_ROWS;
     private static final float IME_SUB_COMPOSE_EDITOR_WEIGHT_EXPANDED = 12f;
     /** Extra numpad Fn-arrow overlay (dp); larger than top strip 24dp icons for the taller grid cells. */
     private static final int EXTRA_NUMPAD_FN_ARROW_ICON_DP = 36;
@@ -4309,13 +4315,13 @@ public class CustomKeyboardView extends LinearLayout {
 
             imeCaptureToolbar = new LinearLayout(getContext());
             imeCaptureToolbar.setOrientation(HORIZONTAL);
-            int tbH = dpToPx(IME_CAPTURE_TOOLBAR_HEIGHT_DP);
-            imeCaptureToolbar.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, tbH));
+            imeCaptureToolbar.setLayoutParams(
+                    new LayoutParams(LayoutParams.MATCH_PARENT, 0, IME_COMPOSE_TOOLBAR_ROW_WEIGHT));
             imeCaptureToolbar.setGravity(Gravity.CENTER_VERTICAL);
-            int hPad = dpToPx(12);
+            imeCaptureToolbar.setPadding(0, 0, 0, 0);
             int keyMargin = dpToPx(KEY_OUTER_MARGIN_DP);
-            imeCaptureToolbar.setPadding(hPad, keyMargin, hPad, keyMargin);
 
+            // Seven logical columns matching top strip: Undo, Clear, Touchpad, Send = 1+1+1+4.
             imeCaptureUndoButton = new ImageButton(getContext());
             styleImeToolbarLikeTopShortcutIconButton(
                     imeCaptureUndoButton, R.drawable.ic_compose_undo_24, R.string.compose_undo);
@@ -4348,7 +4354,7 @@ public class CustomKeyboardView extends LinearLayout {
             styleImeToolbarLikeTopShortcutIconButton(
                     imeCaptureSendButton, R.drawable.ic_compose_send_24, R.string.compose_send);
             imeCaptureSendButton.setOnClickListener(v -> onImeCaptureSendClicked());
-            LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 3f);
+            LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 4f);
             sendLp.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
             imeCaptureSendButton.setLayoutParams(sendLp);
 
