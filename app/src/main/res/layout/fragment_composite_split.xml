@@ -7,17 +7,18 @@
     android:orientation="vertical"
     android:background="@color/background_light">
 
-    <!-- Shared top scrolling panel -->
+    <!-- Shared top scrolling panel: slightly reduced to free more height for touchpad area -->
     <FrameLayout
         android:id="@+id/split_top_panel"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:layout_height="0dp"
+        android:layout_weight="10"/>
 
     <!-- Main content: stacked keyboards and touchpad for portrait -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_weight="22"
         android:orientation="vertical">
 
         <!-- Left Keyboard -->
@@ -25,7 +26,9 @@
             android:id="@+id/keyboard_view_left"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_weight="0.9"
+            android:paddingTop="@dimen/keyboard_outer_padding_top"
+            android:paddingBottom="@dimen/keyboard_outer_padding_bottom"
             android:keyBackground="@drawable/key_background"
             android:theme="@style/ButtonTheme"/>
 
@@ -34,7 +37,7 @@
             android:id="@+id/touchpad_section"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="0.8"
+            android:layout_weight="1.15"
             android:orientation="horizontal">
 
             <FrameLayout
@@ -50,22 +53,58 @@
 
                 <TextView
                     android:id="@+id/touchPadTips"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|center_horizontal"
+                    android:gravity="center_horizontal"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="10dp"
+                    android:background="@android:color/transparent"
+                    android:text="@string/touch_pad_compact_initial"/>
+
+                <TextView
+                    android:id="@+id/touchPadHelpOverlay"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:gravity="center"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="11sp"
-                    android:padding="12dp"
+                    android:translationY="@dimen/touchpad_help_overlay_shift_up"
+                    android:layout_marginStart="20dp"
+                    android:layout_marginEnd="20dp"
+                    android:maxWidth="@dimen/touchpad_help_overlay_max_width_split"
+                    android:visibility="gone"
+                    android:alpha="0"
+                    android:gravity="center_horizontal"
+                    android:padding="8dp"
                     android:background="@android:color/transparent"
-                    android:text="Touch Pad&#10;Drag Mode OFF&#10;Single tap -> Click&#10;Double tap -> Double click&#10;Two finger tap -> Right click&#10;Two finger drag -> Scroll&#10;Long press -> Toggle drag mode"/>
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:letterSpacing="0.01"
+                    android:lineSpacingMultiplier="1.22"
+                    android:scrollbars="none" />
+
+                <ImageButton
+                    android:id="@+id/touchPadInfo"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/touch_pad_info_content_description"
+                    android:padding="12dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_touchpad_info_24" />
 
             </FrameLayout>
 
             <!-- Toggle Handle (right side) -->
             <LinearLayout
                 android:id="@+id/toggle_handle"
-                android:layout_width="44dp"
+                android:layout_width="@dimen/toggle_handle_height"
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:background="@color/background_light"
@@ -87,7 +126,9 @@
             android:id="@+id/keyboard_view_right"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_weight="0.9"
+            android:paddingTop="@dimen/keyboard_outer_padding_top"
+            android:paddingBottom="@dimen/keyboard_outer_padding_bottom"
             android:keyBackground="@drawable/key_background"
             android:theme="@style/ButtonTheme"/>
 

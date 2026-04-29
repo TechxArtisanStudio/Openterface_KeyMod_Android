@@ -512,6 +512,20 @@ public class ConnectionManager {
     }
 
     /**
+     * Send touchpad scroll (wheel + horizontal pan), matching Keyboard and Mouse two-finger scroll.
+     *
+     * @param deltaX horizontal scroll delta (clamped to -127..127)
+     * @param deltaY vertical wheel delta (clamped to -127..127)
+     */
+    public void sendScroll(int deltaX, int deltaY) {
+        if (!isConnected()) {
+            Log.w(TAG, "Cannot send scroll: not connected");
+            return;
+        }
+        HIDSender.sendScroll(usbPort, bluetoothService, deltaX, deltaY);
+    }
+
+    /**
      * Send HID mouse click
      * @param button Button (1=left, 2=right, 4=middle)
      * @param press True for press, false for release

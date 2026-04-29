@@ -3,8 +3,10 @@ package com.openterface.keymod;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.TypedValue;
 
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
 /**
@@ -66,6 +68,59 @@ public final class ThemeManager {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         String family = prefs.getString(PREF_THEME_COLOR_FAMILY, FAMILY_ORANGE);
         return resolveTheme(family);
+    }
+
+    /**
+     * Resolves a theme color attribute (e.g. {@link android.R.attr#colorPrimary}) from the
+     * context's current theme — matches General Settings color family + light/dark.
+     */
+    public static int resolveThemeColor(Context context, int attrId, int fallbackArgb) {
+        TypedValue typedValue = new TypedValue();
+        if (context.getTheme().resolveAttribute(attrId, typedValue, true)) {
+            if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT
+                    && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
+                return typedValue.data;
+            }
+            if (typedValue.resourceId != 0) {
+                try {
+                    return ContextCompat.getColor(context, typedValue.resourceId);
+                } catch (Exception ignored) {
+                    // Fall through to fallback if resource cannot be resolved as a color.
+                }
+            }
+        }
+        return fallbackArgb;
+    }
+
+    /** Material / app theme primary accent (Orange, Blue, … per user setting). */
+    public static int getColorPrimary(Context context) {
+        // Drive accent from persisted family selection so color stays stable even if this context
+        // is not fully theme-wrapped (seen in custom keyboard subviews).
+        return getConfiguredAccentColor(context);
+    }
+
+    public static int getConfiguredAccentColor(Context context) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        String family = prefs.getString(PREF_THEME_COLOR_FAMILY, FAMILY_ORANGE);
+        int colorResId;
+        if (FAMILY_BLUE.equals(family)) {
+            colorResId = R.color.theme_accent_blue;
+        } else if (FAMILY_GREEN.equals(family)) {
+            colorResId = R.color.theme_accent_green;
+        } else if (FAMILY_PINK.equals(family)) {
+            colorResId = R.color.theme_accent_pink;
+        } else if (FAMILY_PURPLE.equals(family)) {
+            colorResId = R.color.theme_accent_purple;
+        } else if (FAMILY_RED.equals(family)) {
+            colorResId = R.color.theme_accent_red;
+        } else if (FAMILY_TEAL.equals(family)) {
+            colorResId = R.color.theme_accent_teal;
+        } else if (FAMILY_INDIGO.equals(family)) {
+            colorResId = R.color.theme_accent_indigo;
+        } else {
+            colorResId = R.color.theme_accent_orange;
+        }
+        return ContextCompat.getColor(context, colorResId);
     }
 
     private static int resolveTheme(String family) {

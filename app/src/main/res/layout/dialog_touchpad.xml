@@ -7,36 +7,69 @@
     android:background="@drawable/bg_presentation_touchpad_dialog"
     android:clipToOutline="true">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:layout_marginBottom="12dp">
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Touchpad"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="@color/presentation_text_primary"
-            android:gravity="center" />
-    </LinearLayout>
-
-    <com.openterface.keymod.TouchPadView
-        android:id="@+id/touch_surface"
+    <!-- Same stacking as Keyboard and Mouse: pad, bottom wash (added in code), tips, help, info -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="280dp"
-        android:background="@drawable/touchpad_bg"
-        android:layout_marginBottom="12dp" />
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Swipe to move · Tap to click · 2-finger right-click"
-        android:textColor="@color/presentation_text_muted"
-        android:textSize="12sp"
-        android:gravity="center" />
+        <com.openterface.keymod.TouchPadView
+            android:id="@+id/touch_surface"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/touchpad_bg" />
 
+        <TextView
+            android:id="@+id/presentation_touchpad_tips"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:gravity="center_horizontal"
+            android:textColor="@color/presentation_text_secondary"
+            android:textSize="10sp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="16dp"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="true"
+            android:text="@string/touch_pad_compact_initial" />
+
+        <TextView
+            android:id="@+id/presentation_touchpad_help_overlay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:translationY="@dimen/touchpad_help_overlay_shift_up"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:maxWidth="260dp"
+            android:visibility="gone"
+            android:alpha="0"
+            android:gravity="center_horizontal"
+            android:padding="6dp"
+            android:background="@android:color/transparent"
+            android:textColor="@color/presentation_text_primary"
+            android:textSize="10sp"
+            android:letterSpacing="0.01"
+            android:lineSpacingMultiplier="1.22" />
+
+        <ImageButton
+            android:id="@+id/presentation_touchpad_info"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="4dp"
+            android:layout_marginEnd="4dp"
+            android:elevation="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/touch_pad_info_content_description"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_touchpad_info_24" />
+    </FrameLayout>
 </LinearLayout>

@@ -9,9 +9,15 @@
     <!-- Welcome & Guide (mode picker + tutorial); opened from launcher or side menu -->
     <string name="nav_welcome_guide">Welcome &amp; Guide</string>
     <string name="nav_welcome_guide_content_description">Welcome screen, mode picker, and tutorial</string>
-    <string name="launch_panel_subtitle">Choose your preferred mode, or open the tutorial below.</string>
-    <string name="launch_panel_land_subtitle">Choose a mode, or open the tutorial below.</string>
+    <string name="launch_panel_welcome_prefix">Welcome to</string>
+    <string name="launch_panel_subtitle">Turn Your Phone into a Smart Keyboard</string>
+    <string name="launch_panel_land_subtitle">Turn Your Phone into a Smart Keyboard</string>
+    <string name="launch_panel_credit">Learn more at openterface.com
+by TechxArtisan</string>
     <string name="show_tutorial_link">Show tutorial</string>
+    <string name="launch_panel_remember_choice">Remember and auto-enter this mode</string>
+    <string name="launch_panel_start">Start</string>
+    <string name="launch_panel_skip">Skip for now</string>
     <string name="PrtSc">PrtSc</string>
     <string name="ScrLk">ScrLk</string>
     <string name="Pause">Pause</string>
@@ -233,6 +239,36 @@
     <string name="composite_mode">Keyboard + Mouse</string>
     <string name="mode_info">Select your preferred input mode</string>
 
+    <!-- Compose submode (used by CustomKeyboardView IME sub-compose flow) -->
+    <string name="compose_ascii_warning">Non-ASCII characters are not supported for HID send. Remove them to enable Send.</string>
+    <string name="compose_clear">Clear</string>
+    <string name="compose_undo">Undo</string>
+    <string name="compose_touchpad">Touchpad</string>
+    <string name="compose_send">Send</string>
+    <string name="compose_stop">Stop</string>
+    <string name="compose_no_connection">Not connected — connect USB or Bluetooth first.</string>
+    <string name="compose_empty">No text to send.</string>
+    <string name="compose_sent">Sent %1$d characters.</string>
+    <string name="compose_cancelled">Send stopped.</string>
+
+    <!-- Top strip PH1–PH3: long-press mode picker -->
+    <string name="top_mode_slot_picker_title">Choose mode for this shortcut</string>
+    <string name="top_mode_label_keyboard_mouse">Keyboard &amp; Mouse</string>
+    <string name="top_mode_label_gamepad">Gamepad</string>
+    <string name="top_mode_label_shortcuts">Shortcuts</string>
+    <string name="top_mode_label_macros">Macros</string>
+    <string name="top_shortcut_toggle_display_mode">Toggle top shortcut display mode</string>
+    <string name="ime_capture_hint">Type and edit long text here — tap Send to send it to the connected device</string>
+    <string name="top_shortcut_ime_toggle_keymod">KeyMod keyboard (tap for system IME)</string>
+    <string name="top_shortcut_ime_toggle_system">System IME (tap for KeyMod keyboard)</string>
+    <string name="ime_not_connected">Connect USB or Bluetooth to send keystrokes.</string>
+    <string name="ime_sub_compose_expand">Expand text area</string>
+    <string name="ime_sub_compose_collapse">Show touchpad and shortcuts</string>
+    <string name="ime_capture_send_flush_note">Send types the buffered text on the host. In Compose mode, keystrokes are not sent until you tap Send.</string>
+    <string name="ime_sub_compose_mode_toggle_direct">Switch to direct HID: each key sends as you type</string>
+    <string name="ime_sub_compose_mode_toggle_compose">Switch to compose: type a buffer, then tap Send</string>
+    <string name="ime_sub_compose_direct_hid_hint">Keys send out directly as you type</string>
+
     <!-- Presentation Mode Strings -->
     <string name="presentation_mode">Presentation</string>
     <string name="slide_progress_label">PRESENTATION</string>
@@ -278,4 +314,19 @@
     <string name="target_os_macos">macOS</string>
     <string name="target_os_windows">Windows</string>
     <string name="target_os_linux">Linux</string>
+
+    <!-- Keyboard + mouse mode touchpad overlay (plain fallback for layout preview; runtime uses spans) -->
+    <string name="touch_pad_title">TouchPad</string>
+    <string name="touch_pad_status_buttons_up">Buttons: up (no drag)</string>
+    <string name="touch_pad_status_buttons_drag">Buttons: left held (drag)</string>
+    <string name="touch_pad_status_touch_idle">Touch: idle</string>
+    <string name="touch_pad_status_touch_move">Touch: moving pointer</string>
+    <string name="touch_pad_status_touch_scroll">Touch: scrolling</string>
+    <string name="touch_pad_help_overlay_title">Touchpad gestures</string>
+    <string name="touch_pad_help_overlay_one_finger">One finger</string>
+    <string name="touch_pad_help_overlay_one_finger_detail">Glide to move the pointer.\nTap to click.\nDouble-tap to double-click.\nLong press to start drag.\nTap to release drag.</string>
+    <string name="touch_pad_help_overlay_two_fingers">Two fingers</string>
+    <string name="touch_pad_help_overlay_two_fingers_detail">Tap for right-click.\nGlide with two fingers to scroll.</string>
+    <string name="touch_pad_compact_initial">TouchPad\nButtons: up (no drag)\nTouch: idle</string>
+    <string name="touch_pad_info_content_description">Show touchpad gesture help</string>
 </resources>

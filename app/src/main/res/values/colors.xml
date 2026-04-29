@@ -8,13 +8,13 @@
     <color name="card_selected_bg">#FFF57C00</color>
     <color name="text_primary">#FF212121</color>
     <color name="text_secondary">#FF757575</color>
+    <color name="launch_panel_brand_tint">#FF2C2C2C</color>
     <color name="header_background">#FFFFFFFF</color>
     <color name="footer_background">#FFFFFFFF</color>
 
     <!-- Mode Card Colors -->
     <color name="color_keyboard_mouse">#FF2196F3</color>
     <color name="color_gamepad">#FF9C27B0</color>
-    <color name="color_numpad">#FF4CAF50</color>
     <color name="color_shortcuts">#FFFF9800</color>
     <color name="color_macros">#FFF44336</color>
     <color name="color_voice">#FF00BCD4</color>
@@ -40,6 +40,7 @@
     <color name="holo_red_light">#FFFF4444</color>
     <color name="button_text">#FF212121</color>
     <color name="touchpad_background">#FFE0E0E0</color>
+    <color name="touchpad_help_overlay_panel">#F5FFFFFF</color>
     <color name="sidebar_background">#FFFFFFFF</color>
     <color name="sidebar_item_text">#FF212121</color>
     <color name="ic_launcher_background">#FFF57C00</color>

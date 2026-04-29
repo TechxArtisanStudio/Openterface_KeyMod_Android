@@ -117,7 +117,7 @@ https://github.com/TechxArtisanStudio/Openterface_KeyMod_Android/actions
        │  │Macros   │ │Shortcuts│       │
        │  └─────────┘ └─────────┘       │
        │  ┌─────────┐ ┌─────────┐       │
-       │  │Voice    │ │Numpad   │       │
+       │  │Voice    │ │Present. │       │
        │  └─────────┘ └─────────┘       │
        └─────────────────────────────────┘
 
@@ -132,7 +132,7 @@ https://github.com/TechxArtisanStudio/Openterface_KeyMod_Android/actions
        │  KeyMod      │ │ KB  │ │ GP  │ │ MC  │        │
        │  Choose mode │ └─────┘ └─────┘ └─────┘        │
        │              │ ┌─────┐ ┌─────┐ ┌─────┐        │
-       │              │ │ SC  │ │ VC  │ │ NP  │        │
+       │              │ │ SC  │ │ VC  │ │ PR  │        │
        │              │ └─────┘ └─────┘ └─────┘        │
        └─────────────────────────────────────────────────┘
 

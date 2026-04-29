@@ -12,6 +12,7 @@ import android.graphics.drawable.Drawable;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -44,12 +45,12 @@ import com.openterface.fragment.GamepadFragment;
 import com.openterface.fragment.KeyboardFragment;
 import com.openterface.fragment.MacrosFragment;
 import com.openterface.fragment.MouseFragment;
-import com.openterface.fragment.NumpadFragment;
 import com.openterface.fragment.PresentationFragment;
 import com.openterface.fragment.ShortcutFragment;
 import com.openterface.fragment.ShortcutHubFragment;
 import com.openterface.fragment.VoiceInputFragment;
 import com.openterface.keymod.BuildConfig;
+import com.openterface.keymod.util.TopModeShortcutPrefs;
 import com.openterface.serial.UsbDeviceManager;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
@@ -86,12 +87,12 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     // Sidebar nav item views
     private LinearLayout navKeyboardMouse;
     private LinearLayout navGamepad;
-    private LinearLayout navNumpad;
     private LinearLayout navShortcuts;
     private LinearLayout navMacros;
     private LinearLayout navVoice;
     private LinearLayout navPresentation;
     private ImageButton targetOsHeaderButton;
+    private final ImageButton[] headerModeSlotButtons = new ImageButton[3];
 
     /** Global target OS preference key */
     private static final String PREF_TARGET_OS = "target_os";
@@ -284,6 +285,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         
         // Re-apply immersive mode
         setImmersiveMode();
+        refreshHeaderModeSlotButtons();
     }
     
     @Override
@@ -319,8 +321,16 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         filter.addAction(ACTION_USB_PERMISSION);
-        registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        registerReceiver(usbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION), Context.RECEIVER_NOT_EXPORTED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            registerReceiver(
+                    usbPermissionReceiver,
+                    new IntentFilter(ACTION_USB_PERMISSION),
+                    Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(usbReceiver, filter);
+            registerReceiver(usbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION));
+        }
         receiversRegistered = true;
     }
 
@@ -377,7 +387,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         drawerLayout = findViewById(R.id.drawer_layout);
         navKeyboardMouse = findViewById(R.id.nav_keyboard_mouse);
         navGamepad = findViewById(R.id.nav_gamepad);
-        navNumpad = findViewById(R.id.nav_numpad);
         navShortcuts = findViewById(R.id.nav_shortcuts);
         navMacros = findViewById(R.id.nav_macros);
         navVoice = findViewById(R.id.nav_voice);
@@ -388,6 +397,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             targetOsHeaderButton.setOnClickListener(v -> showTargetOsPickerDialog());
             updateTargetOsHeaderIcon();
         }
+        setupHeaderModeSlotButtons();
 
         // Display app version in sidebar footer
         TextView versionText = findViewById(R.id.version_text);
@@ -410,6 +420,68 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (shortcut != null) shortcutDrawable = shortcut.getCompoundDrawables()[1];
 
         setupButtonListeners();
+    }
+
+    private void setupHeaderModeSlotButtons() {
+        headerModeSlotButtons[0] = findViewById(R.id.header_mode_slot_1);
+        headerModeSlotButtons[1] = findViewById(R.id.header_mode_slot_2);
+        headerModeSlotButtons[2] = findViewById(R.id.header_mode_slot_3);
+        for (int i = 0; i < headerModeSlotButtons.length; i++) {
+            ImageButton button = headerModeSlotButtons[i];
+            if (button == null) {
+                continue;
+            }
+            final int slotIndex = i + 1;
+            button.setOnClickListener(v -> {
+                String mode = TopModeShortcutPrefs.getModeForSlot(MainActivity.this, slotIndex);
+                switchToLaunchMode(mode);
+            });
+            button.setOnLongClickListener(v -> {
+                showHeaderModeSlotPicker(slotIndex);
+                return true;
+            });
+        }
+        refreshHeaderModeSlotButtons();
+    }
+
+    private void showHeaderModeSlotPicker(int slotIndex1Based) {
+        String[] modes = TopModeShortcutPrefs.getSelectableModes();
+        CharSequence[] labels = TopModeShortcutPrefs.getModeLabels(this);
+        String current = TopModeShortcutPrefs.getModeForSlot(this, slotIndex1Based);
+        int checked = 0;
+        for (int i = 0; i < modes.length; i++) {
+            if (modes[i].equals(current)) {
+                checked = i;
+                break;
+            }
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.top_mode_slot_picker_title)
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    TopModeShortcutPrefs.setModeForSlot(getApplicationContext(), slotIndex1Based, modes[which]);
+                    refreshHeaderModeSlotButtons();
+                    dialog.dismiss();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void refreshHeaderModeSlotButtons() {
+        int tint = connectionManager != null
+                ? headerConnectionClusterTint(connectionManager.getCurrentConnectionState())
+                : ContextCompat.getColor(this, R.color.header_connection_idle);
+        for (int i = 0; i < headerModeSlotButtons.length; i++) {
+            ImageButton button = headerModeSlotButtons[i];
+            if (button == null) {
+                continue;
+            }
+            int slotIndex = i + 1;
+            String mode = TopModeShortcutPrefs.getModeForSlot(this, slotIndex);
+            int iconRes = TopModeShortcutPrefs.iconResForMode(mode);
+            button.setImageResource(iconRes);
+            button.setContentDescription(getString(TopModeShortcutPrefs.labelResForMode(mode)));
+            button.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+        }
     }
     
     private void setupConnectionStateListener() {
@@ -543,6 +615,11 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (targetOsHeaderButton != null) {
             targetOsHeaderButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
         }
+        for (ImageButton slotButton : headerModeSlotButtons) {
+            if (slotButton != null) {
+                slotButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+            }
+        }
 
         switch (state) {
             case CONNECTED:
@@ -635,14 +712,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 currentNavMode = LaunchPanelActivity.MODE_GAMEPAD;
                 updateNavSelection();
                 showGamepadFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
-            });
-        }
-        if (navNumpad != null) {
-            navNumpad.setOnClickListener(v -> {
-                currentNavMode = LaunchPanelActivity.MODE_NUMPAD;
-                updateNavSelection();
-                showNumpadFragment();
                 drawerLayout.closeDrawer(android.view.Gravity.START);
             });
         }
@@ -790,7 +859,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private void updateNavSelection() {
         if (navKeyboardMouse != null) navKeyboardMouse.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_KEYBOARD_MOUSE));
         if (navGamepad != null) navGamepad.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_GAMEPAD));
-        if (navNumpad != null) navNumpad.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_NUMPAD));
         if (navShortcuts != null) navShortcuts.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_SHORTCUTS));
         if (navMacros != null) navMacros.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_MACROS));
         if (navVoice != null) navVoice.setSelected(currentNavMode.equals(LaunchPanelActivity.MODE_VOICE));
@@ -902,13 +970,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         transaction.commit();
     }
 
-    private void showNumpadFragment() {
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        FragmentTransaction transaction = fragmentManager.beginTransaction();
-        transaction.replace(R.id.fragment_container, NumpadFragment.newInstance(port));
-        transaction.commit();
-    }
-
     private void showVoiceInputFragment() {
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction transaction = fragmentManager.beginTransaction();
@@ -921,6 +982,11 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         FragmentTransaction transaction = fragmentManager.beginTransaction();
         transaction.replace(R.id.fragment_container, new PresentationFragment());
         transaction.commit();
+    }
+
+    /** Switch primary content mode (same behavior as side nav). Used by top-strip PH shortcuts. */
+    public void switchToLaunchMode(String mode) {
+        handleLaunchMode(mode);
     }
 
     /**
@@ -937,7 +1003,9 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 showGamepadFragment();
                 break;
             case LaunchPanelActivity.MODE_NUMPAD:
-                showNumpadFragment();
+                currentNavMode = LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
+                updateNavSelection();
+                showCompositeFragment();
                 break;
             case LaunchPanelActivity.MODE_SHORTCUTS:
                 showShortcutHubFragment();
@@ -947,6 +1015,11 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 break;
             case LaunchPanelActivity.MODE_VOICE:
                 showVoiceInputFragment();
+                break;
+            case LaunchPanelActivity.MODE_COMPOSE:
+                currentNavMode = LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
+                updateNavSelection();
+                showCompositeFragment();
                 break;
             case LaunchPanelActivity.MODE_PRESENTATION:
                 showPresentationFragment();
@@ -975,8 +1048,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             }
         } else if (currentFragment instanceof MouseFragment) {
             ((MouseFragment) currentFragment).setPort(newPort);
-        } else if (currentFragment instanceof NumpadFragment) {
-            ((NumpadFragment) currentFragment).port = newPort;
         }
     }
 
@@ -1124,7 +1195,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             },
             new TutorialOverlay.Step() {
                 public int[] targetViewIds() { return new int[]{R.id.nav_keyboard_mouse}; }
-                public String description() { return "Open the menu to choose your preferred input mode: Keyboard & Mouse, Numpad, Shortcuts, Macros, or Voice."; }
+                public String description() { return "Open the menu to choose your preferred input mode: Keyboard & Mouse, Presentation, Shortcuts, Macros, Voice, or Gamepad."; }
                 public String buttonText() { return "Next"; }
                 public void onShow(android.content.Context context) {
                     androidx.drawerlayout.widget.DrawerLayout drawer = ((android.app.Activity) context).findViewById(R.id.drawer_layout);
@@ -1163,7 +1234,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             },
             new TutorialOverlay.Step() {
                 public int[] targetViewIds() { return new int[]{R.id.touchPad}; }
-                public String description() { return "Use the touchpad to control the cursor. Long press to toggle drag mode."; }
+                public String description() { return "Use the touchpad to control the cursor. Long press to start drag; tap to release."; }
                 public String buttonText() { return "Done"; }
             }
         });

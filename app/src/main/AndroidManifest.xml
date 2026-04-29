@@ -45,11 +45,11 @@
         tools:targetApi="34">
         
         <!-- Launch Panel Activity (Entry Point) -->
+        <!-- No configChanges for orientation: reinflate layout-port vs layout-land on rotation. -->
         <activity
             android:name="com.openterface.keymod.LaunchPanelActivity"
             android:exported="true"
             android:screenOrientation="fullSensor"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:theme="@style/Theme.KeyMod">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -63,7 +63,8 @@
             android:exported="false"
             android:screenOrientation="fullSensor"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
-            android:theme="@style/Theme.KeyMod" />
+            android:theme="@style/Theme.KeyMod"
+            android:windowSoftInputMode="adjustResize" />
         
         <!-- Settings Activity -->
         <activity

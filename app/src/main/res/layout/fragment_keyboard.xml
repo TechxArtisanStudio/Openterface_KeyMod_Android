@@ -11,6 +11,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_gravity="center_horizontal"
+        android:paddingTop="@dimen/keyboard_outer_padding_top"
+        android:paddingBottom="@dimen/keyboard_outer_padding_bottom"
         android:keyBackground="@drawable/key_background"
         android:theme="@style/ButtonTheme"/>
 

@@ -3,11 +3,14 @@ package com.openterface.keymod;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.text.method.LinkMovementMethod;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
@@ -24,13 +27,18 @@ public class LaunchPanelActivity extends AppCompatActivity {
     private static final String LAST_MODE_KEY = "lastMode";
     public static final String SHOW_PANEL = "show_panel";
 
+    private static final String STATE_SELECTED_MODE = "state_selected_mode";
+    private static final String STATE_REMEMBER_CHECKED = "state_remember_checked";
+
     // Mode constants
     public static final String MODE_KEYBOARD_MOUSE = "keyboard_mouse";
     public static final String MODE_GAMEPAD = "gamepad";
+    // Kept for backward compatibility with older intents/preferences.
     public static final String MODE_NUMPAD = "numpad";
     public static final String MODE_SHORTCUTS = "shortcuts";
     public static final String MODE_MACROS = "macros";
     public static final String MODE_VOICE = "voice";
+    public static final String MODE_COMPOSE = "compose";
     public static final String MODE_PRESENTATION = "presentation";
 
     private CheckBox rememberChoiceCheckBox;
@@ -43,14 +51,13 @@ public class LaunchPanelActivity extends AppCompatActivity {
     // Mode cards
     private CardView keyboardMouseCard;
     private CardView gamepadCard;
-    private CardView numpadCard;
     private CardView shortcutsCard;
     private CardView macrosCard;
     private CardView voiceCard;
     private CardView presentationCard;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         ThemeManager.applyTheme(this);
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
@@ -62,7 +69,7 @@ public class LaunchPanelActivity extends AppCompatActivity {
         boolean showPanel = getIntent().getBooleanExtra(SHOW_PANEL, false);
         if (rememberChoice && !showPanel) {
             String lastMode = prefs.getString(LAST_MODE_KEY, MODE_KEYBOARD_MOUSE);
-            launchModeInternal(lastMode);
+            launchModeInternal(normalizeMode(lastMode));
             return;
         }
 
@@ -71,8 +78,22 @@ public class LaunchPanelActivity extends AppCompatActivity {
         getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.background_light));
 
         initializeViews();
+        if (savedInstanceState != null) {
+            selectedMode = savedInstanceState.getString(STATE_SELECTED_MODE, MODE_KEYBOARD_MOUSE);
+            rememberChoiceCheckBox.setChecked(
+                savedInstanceState.getBoolean(STATE_REMEMBER_CHECKED, false));
+        }
         setupClickListeners();
         updateCardSelections();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(STATE_SELECTED_MODE, selectedMode);
+        if (rememberChoiceCheckBox != null) {
+            outState.putBoolean(STATE_REMEMBER_CHECKED, rememberChoiceCheckBox.isChecked());
+        }
     }
 
     private void initializeViews() {
@@ -84,17 +105,20 @@ public class LaunchPanelActivity extends AppCompatActivity {
         // Mode cards
         keyboardMouseCard = findViewById(R.id.keyboard_mouse_card);
         gamepadCard = findViewById(R.id.gamepad_card);
-        numpadCard = findViewById(R.id.numpad_card);
         shortcutsCard = findViewById(R.id.shortcuts_card);
         macrosCard = findViewById(R.id.macros_card);
         voiceCard = findViewById(R.id.voice_card);
         presentationCard = findViewById(R.id.presentation_card);
+
+        TextView credit = findViewById(R.id.launch_panel_credit);
+        if (credit != null) {
+            credit.setMovementMethod(LinkMovementMethod.getInstance());
+        }
     }
 
     private void updateCardSelections() {
         keyboardMouseCard.setSelected(selectedMode.equals(MODE_KEYBOARD_MOUSE));
         gamepadCard.setSelected(selectedMode.equals(MODE_GAMEPAD));
-        numpadCard.setSelected(selectedMode.equals(MODE_NUMPAD));
         shortcutsCard.setSelected(selectedMode.equals(MODE_SHORTCUTS));
         macrosCard.setSelected(selectedMode.equals(MODE_MACROS));
         voiceCard.setSelected(selectedMode.equals(MODE_VOICE));
@@ -109,11 +133,6 @@ public class LaunchPanelActivity extends AppCompatActivity {
 
         gamepadCard.setOnClickListener(v -> {
             selectedMode = MODE_GAMEPAD;
-            updateCardSelections();
-        });
-
-        numpadCard.setOnClickListener(v -> {
-            selectedMode = MODE_NUMPAD;
             updateCardSelections();
         });
 
@@ -157,14 +176,15 @@ public class LaunchPanelActivity extends AppCompatActivity {
     }
 
     private void launchMode(String mode) {
+        String normalizedMode = normalizeMode(mode);
         // Save preference if checkbox is checked
         if (rememberChoiceCheckBox.isChecked()) {
             prefs.edit()
                 .putBoolean(REMEMBER_CHOICE_KEY, true)
-                .putString(LAST_MODE_KEY, mode)
+                .putString(LAST_MODE_KEY, normalizedMode)
                 .apply();
             
-            Toast.makeText(this, "Will remember: " + getModeDisplayName(mode), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Will remember: " + getModeDisplayName(normalizedMode), Toast.LENGTH_SHORT).show();
         } else {
             // Clear remembered choice
             prefs.edit()
@@ -172,12 +192,12 @@ public class LaunchPanelActivity extends AppCompatActivity {
                 .apply();
         }
 
-        launchModeInternal(mode);
+        launchModeInternal(normalizedMode);
     }
 
     private void launchModeInternal(String mode) {
         Intent intent = new Intent(this, MainActivity.class);
-        intent.putExtra("launch_mode", mode);
+        intent.putExtra("launch_mode", normalizeMode(mode));
         
         startActivity(intent);
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
@@ -203,6 +223,13 @@ public class LaunchPanelActivity extends AppCompatActivity {
             default:
                 return "Keyboard & Mouse";
         }
+    }
+
+    private String normalizeMode(String mode) {
+        if (MODE_NUMPAD.equals(mode) || MODE_COMPOSE.equals(mode)) {
+            return MODE_KEYBOARD_MOUSE;
+        }
+        return mode;
     }
 
     @Override

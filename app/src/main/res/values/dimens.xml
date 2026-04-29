@@ -31,10 +31,23 @@
     <!-- Fragment -->
     <dimen name="fragment_padding">8dp</dimen>
     <dimen name="fragment_margin">8dp</dimen>
+    <!-- Vertical breathing room around full keyboard blocks -->
+    <dimen name="keyboard_outer_padding_top">6dp</dimen>
+    <dimen name="keyboard_outer_padding_bottom">8dp</dimen>
+    <!-- Compose: top shortcut strip only (~same share of keyboard as Keyboard+Mouse portrait: 2.4 / (2.4 + 4 letter rows) of keyboard band) -->
+    <dimen name="compose_shortcut_strip_height">120dp</dimen>
     
     <!-- Touchpad -->
     <dimen name="touchpad_corner_radius">12dp</dimen>
     <dimen name="touchpad_elevation">2dp</dimen>
+    <dimen name="touchpad_help_overlay_shift_up">-28dp</dimen>
+    <dimen name="touchpad_help_overlay_shift_up_split">-20dp</dimen>
+    <!-- Split touchpad: max hint width (portrait; matches composite portrait 340dp feel) -->
+    <dimen name="touchpad_help_overlay_max_width_split">340dp</dimen>
+
+    <!-- Toggle handle between touchpad and keyboard (portrait = height, landscape = narrow axis) -->
+    <dimen name="toggle_handle_height">28dp</dimen>
+    <dimen name="toggle_handle_width_landscape">24dp</dimen>
     
     <!-- Card -->
     <dimen name="card_corner_radius">12dp</dimen>

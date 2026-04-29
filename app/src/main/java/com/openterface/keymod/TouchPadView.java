@@ -18,7 +18,7 @@ import androidx.preference.PreferenceManager;
  *  1-finger pan      → mouse move
  *  single tap        → left click  (delayed 150 ms to distinguish from double-tap)
  *  double tap        → double click
- *  long press        → drag-mode toggle
+ *  long press        → drag start (fragments); while drag is on, tap/double-tap release only
  *  2-finger tap      → right click
  *  2-finger pan      → scroll (natural direction, reduced sensitivity)
  */
@@ -38,7 +38,7 @@ public class TouchPadView extends View {
         void onTouchRightClick();
         /** Called when finger(s) are lifted/cancelled so host can release mouse state if needed */
         default void onTouchRelease() {}
-        /** Called when a long-press is detected — host can toggle drag mode */
+        /** Called when a long-press is detected — fragments use this to enter drag (tap exits). */
         default void onTouchLongPress() {}
     }
 

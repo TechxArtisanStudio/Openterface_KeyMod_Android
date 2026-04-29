@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compact header in landscape to free vertical space for Keyboard & Mouse / split -->
+    <dimen name="header_height">44dp</dimen>
+    <dimen name="header_padding">4dp</dimen>
+    <dimen name="header_title_size">16sp</dimen>
+    <dimen name="keyboard_outer_padding_top">4dp</dimen>
+    <dimen name="keyboard_outer_padding_bottom">6dp</dimen>
+
+    <!-- Split + narrow center column: cap hint width so wrap matches portrait-style bubble -->
+    <dimen name="touchpad_help_overlay_max_width_split">256dp</dimen>
+
+    <dimen name="compose_shortcut_strip_height">108dp</dimen>
+</resources>

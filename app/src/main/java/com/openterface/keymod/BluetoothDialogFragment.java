@@ -19,7 +19,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -57,7 +56,6 @@ public class BluetoothDialogFragment extends DialogFragment {
     private BluetoothAdapter bluetoothAdapter;
     private Switch bluetoothSwitch;
     private ListView devicesListView;
-    private ImageButton closeButton;
     private Button scanButton;
     private CustomDeviceAdapter devicesAdapter;
     private ArrayList<DeviceItem> devicesList;
@@ -233,6 +231,12 @@ public class BluetoothDialogFragment extends DialogFragment {
         this.connectionListener = listener;
     }
 
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setCancelable(true);
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -259,6 +263,9 @@ public class BluetoothDialogFragment extends DialogFragment {
     @Override
     public void onStart() {
         super.onStart();
+        if (getDialog() != null) {
+            getDialog().setCanceledOnTouchOutside(true);
+        }
         if (getDialog() != null && getDialog().getWindow() != null) {
             DisplayMetrics displayMetrics = new DisplayMetrics();
             requireActivity().getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
@@ -277,7 +284,6 @@ public class BluetoothDialogFragment extends DialogFragment {
     private void initializeUIComponents(View view) {
         bluetoothSwitch = view.findViewById(R.id.bluetooth_switch);
         devicesListView = view.findViewById(R.id.devices_list);
-        closeButton = view.findViewById(R.id.close_button);
         scanButton = view.findViewById(R.id.scan_button);
 
         devicesList = new ArrayList<>();
@@ -399,8 +405,6 @@ public class BluetoothDialogFragment extends DialogFragment {
             }
             return false;
         });
-
-        closeButton.setOnClickListener(v -> dismiss());
 
         scanButton.setOnClickListener(v -> {
             if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {

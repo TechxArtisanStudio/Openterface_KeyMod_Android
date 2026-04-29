@@ -1,11 +1,9 @@
 package com.openterface.fragment;
 
 import android.app.AlertDialog;
-import android.app.Dialog;
 import android.content.pm.ActivityInfo;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.drawable.ColorDrawable;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
@@ -41,7 +39,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.openterface.keymod.ConnectionManager;
 import com.openterface.keymod.MainActivity;
 import com.openterface.keymod.R;
-import com.openterface.keymod.TouchPadView;
+import com.openterface.keymod.util.PopOutTouchPadDialog;
 
 import java.util.concurrent.TimeUnit;
 
@@ -170,9 +168,7 @@ public class PresentationFragment extends Fragment {
 
     private SharedPreferences prefs;
 
-    // Touchpad dialog
-    private Dialog touchpadDialog;
-    private View touchpadView;
+    private PopOutTouchPadDialog popOutTouchPad;
 
     @Nullable
     @Override
@@ -202,6 +198,14 @@ public class PresentationFragment extends Fragment {
         }
 
         return view;
+    }
+
+    @Override
+    public void onDestroyView() {
+        if (popOutTouchPad != null) {
+            popOutTouchPad.dismissIfShowing();
+        }
+        super.onDestroyView();
     }
 
     private void initViews(View view) {
@@ -576,88 +580,11 @@ public class PresentationFragment extends Fragment {
         return null;
     }
 
-    // ── Touchpad Dialog ───────────────────────────────────────────────
-
     private void showTouchpadDialog() {
-        if (touchpadDialog != null && touchpadDialog.isShowing()) {
-            touchpadDialog.dismiss();
-            return;
+        if (popOutTouchPad == null) {
+            popOutTouchPad = new PopOutTouchPadDialog(this, true);
         }
-
-        touchpadView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_touchpad, null);
-        TouchPadView touchSurface = touchpadView.findViewById(R.id.touch_surface);
-
-        touchSurface.setOnTouchPadListener(new TouchPadView.OnTouchPadListener() {
-            @Override
-            public void onTouchMove(float x, float y, float lastX, float lastY) {
-                if (getActivity() instanceof MainActivity) {
-                    ConnectionManager cm = ((MainActivity) getActivity()).getConnectionManager();
-                    if (cm == null || !cm.isConnected()) return;
-                    float dx = x - lastX;
-                    float dy = y - lastY;
-                    int clampedDx = (int) Math.max(-127, Math.min(127, dx));
-                    int clampedDy = (int) Math.max(-127, Math.min(127, dy));
-                    if (clampedDx != 0 || clampedDy != 0) {
-                        cm.sendMouseMovement(clampedDx, clampedDy, 0);
-                    }
-                }
-            }
-
-            @Override
-            public void onTouchClick() {
-                sendMouseClick(1);
-            }
-
-            @Override
-            public void onTouchDoubleClick() {
-                sendMouseClick(1);
-                timerHandler.postDelayed(() -> sendMouseClick(1), 150);
-            }
-
-            @Override
-            public void onTouchRightClick() {
-                sendMouseClick(2);
-            }
-        });
-
-        Dialog dialog = new Dialog(requireContext());
-        dialog.setContentView(touchpadView);
-        dialog.setCanceledOnTouchOutside(true);
-        dialog.setCancelable(true);
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
-        }
-
-        // Tap anywhere in the dialog content except touch surface interactions to dismiss.
-        touchpadView.setOnClickListener(v -> dialog.dismiss());
-
-        dialog.setOnDismissListener(d -> {
-            sendKeyHID(6); // 'C' to hide pointer
-            touchpadDialog = null;
-        });
-        touchpadDialog = dialog;
-        dialog.show();
-
-        // Send 'C' to show pointer cursor in presentation software
-        sendKeyHID(6); // HID code for 'C'
-        Log.d(TAG, "Touchpad dialog shown, pointer enabled");
-    }
-
-    private void sendMouseClick(int buttons) {
-        if (getActivity() instanceof MainActivity) {
-            ConnectionManager cm = ((MainActivity) getActivity()).getConnectionManager();
-            if (cm == null || !cm.isConnected()) return;
-            cm.sendMouseMovement(0, 0, buttons);
-            timerHandler.postDelayed(() -> {
-                if (getActivity() instanceof MainActivity) {
-                    ConnectionManager c = ((MainActivity) getActivity()).getConnectionManager();
-                    if (c != null && c.isConnected()) {
-                        c.sendMouseMovement(0, 0, 0);
-                    }
-                }
-            }, 100);
-        }
+        popOutTouchPad.show();
     }
 
     // ── Black Screen ─────────────────────────────────────────────────
@@ -882,8 +809,6 @@ public class PresentationFragment extends Fragment {
     }
 
     // ── Application Switcher (Command+Tab) already implemented above ──
-
-    // ── Touchpad Dialog already implemented above ─────────────────────
 
     // ── Timer ────────────────────────────────────────────────────────
 
@@ -1211,5 +1136,8 @@ public class PresentationFragment extends Fragment {
         stopTimer();
         if (vibrator != null) vibrator.cancel();
         timerHandler.removeCallbacksAndMessages(null);
+        if (popOutTouchPad != null) {
+            popOutTouchPad.dismissIfShowing();
+        }
     }
 }

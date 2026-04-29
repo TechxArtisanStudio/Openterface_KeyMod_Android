@@ -45,6 +45,7 @@ import com.openterface.keymod.R;
 import com.openterface.keymod.BluetoothService;
 import com.openterface.keymod.ConnectionManager;
 import com.openterface.keymod.MainActivity;
+import com.openterface.keymod.util.HidTextKeystrokeSender;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -60,8 +61,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Voice Input Fragment - Speech-to-text with Whisper API
@@ -834,164 +833,16 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
 
         executor.execute(() -> {
             try {
-                List<String> tokens = tokenizeInput(text);
-                int activeMods = 0; // HID modifier bitmask
-
-                for (String token : tokens) {
-                    // Closing tags — clear accumulated modifier state
-                    if (token.startsWith("</") && token.endsWith(">")) {
-                        activeMods = 0;
-                        continue;
-                    }
-
-                    // Opening modifier tags — accumulate silently, no key sent yet
-                    switch (token) {
-                        case "<CTRL>":  activeMods |= 0x01; continue;
-                        case "<SHIFT>": activeMods |= 0x02; continue;
-                        case "<ALT>":   activeMods |= 0x04; continue;
-                        case "<CMD>":
-                        case "<WIN>":   activeMods |= 0x08; continue;
-                    }
-
-                    // Delay tokens
-                    if (token.equals("<DELAY1S>"))  { Thread.sleep(1000);  continue; }
-                    if (token.equals("<DELAY2S>"))  { Thread.sleep(2000);  continue; }
-                    if (token.equals("<DELAY5S>"))  { Thread.sleep(5000);  continue; }
-                    if (token.equals("<DELAY10S>")) { Thread.sleep(10000); continue; }
-
-                    // Special key tokens (<ENTER>, <ESC>, <F1>-<F12>, arrows, etc.)
-                    int specialHid = specialTokenToHidCode(token);
-                    if (specialHid > 0) {
-                        connectionManager.sendKeyEvent(activeMods, specialHid);
-                        Thread.sleep(30);
-                        connectionManager.sendKeyRelease();
-                        Thread.sleep(10);
-                        continue;
-                    }
-
-                    // Regular character(s)
-                    for (int ci = 0; ci < token.length(); ) {
-                        int cp = token.codePointAt(ci);
-                        ci += Character.charCount(cp);
-
-                        if (cp > 0x7E) {
-                            // Non-ASCII: route to OS-specific Unicode input method
-                            switch (targetOs) {
-                                case "windows": sendUnicodeCharWindows(cp, connectionManager); break;
-                                case "linux":   sendUnicodeCharLinux(cp, connectionManager);   break;
-                                default:        sendUnicodeCharMacOS(cp, connectionManager);    break;
-                            }
-                        } else {
-                            char c = (char) cp;
-                            int hidCode = mapCharToHidCode(c);
-                            if (hidCode < 0) {
-                                Log.w(TAG, "No HID code for char: '" + c + "' (U+" + Integer.toHexString(cp) + ")");
-                                continue;
-                            }
-                            // Use active modifiers if set; otherwise auto-shift for uppercase/symbols
-                            int mods = (activeMods != 0) ? activeMods : (needsShift(c) ? 0x02 : 0x00);
-                            connectionManager.sendKeyEvent(mods, hidCode);
-                            Thread.sleep(30);
-                            connectionManager.sendKeyRelease();
-                            Thread.sleep(10);
-                        }
-                    }
-                }
+                HidTextKeystrokeSender.send(text, connectionManager, targetOs, true, null);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-            // Clear the text field on the main thread after all keystrokes are sent
             mainHandler.post(() -> {
                 if (transcribedText != null) {
                     transcribedText.setText("");
                 }
             });
         });
-    }
-
-    /**
-     * Tokenize input text into a list of special tokens (e.g. "&lt;CTRL&gt;", "&lt;ENTER&gt;")
-     * and single-character strings, mirroring the iOS KeyboardManager.tokenizeInput logic.
-     */
-    private List<String> tokenizeInput(String text) {
-        // Matches <TAG>, </TAG>, or any single Unicode character
-        Pattern p = Pattern.compile("</?[A-Z0-9]+>|[\\s\\S]");
-        Matcher m = p.matcher(text);
-        List<String> tokens = new ArrayList<>();
-        while (m.find()) {
-            tokens.add(m.group());
-        }
-        return tokens;
-    }
-
-    /**
-     * Map a special token like "&lt;ENTER&gt;" or "&lt;F1&gt;" to its HID key code.
-     * Returns -1 if the token is not a recognised special key.
-     */
-    private int specialTokenToHidCode(String token) {
-        if (!token.startsWith("<") || !token.endsWith(">") || token.startsWith("</")) return -1;
-        String content = token.substring(1, token.length() - 1).toUpperCase(Locale.ROOT);
-        switch (content) {
-            case "ENTER":                   return 0x28;
-            case "ESC":                     return 0x29;
-            case "BACK": case "BACKSPACE":   return 0x2A;
-            case "TAB":                     return 0x2B;
-            case "SPACE":                   return 0x2C;
-            case "RIGHT":                   return 0x4F;
-            case "LEFT":                    return 0x50;
-            case "DOWN":                    return 0x51;
-            case "UP":                      return 0x52;
-            case "HOME":                    return 0x4A;
-            case "END":                     return 0x4D;
-            case "PAGEUP":  case "PGUP":    return 0x4B;
-            case "PAGEDOWN": case "PGDN":   return 0x4E;
-            case "INSERT":                  return 0x49;
-            case "DELETE":  case "DEL":     return 0x4C;
-            case "F1":  return 0x3A;  case "F2":  return 0x3B;  case "F3":  return 0x3C;
-            case "F4":  return 0x3D;  case "F5":  return 0x3E;  case "F6":  return 0x3F;
-            case "F7":  return 0x40;  case "F8":  return 0x41;  case "F9":  return 0x42;
-            case "F10": return 0x43;  case "F11": return 0x44;  case "F12": return 0x45;
-            default:    return -1;
-        }
-    }
-
-    private int mapCharToHidCode(char c) {
-        if (c >= 'a' && c <= 'z') return 4 + (c - 'a');
-        if (c >= 'A' && c <= 'Z') return 4 + (c - 'A');
-        if (c >= '1' && c <= '9') return 30 + (c - '1');
-        if (c == '0') return 39;
-        switch (c) {
-            case ' ':  return 44;
-            case '\n': return 40;
-            case '\t': return 43;
-            case '-': case '_': return 45;
-            case '=': case '+': return 46;
-            case '[': case '{': return 47;
-            case ']': case '}': return 48;
-            case '\\': case '|': return 49;
-            case ';': case ':': return 51;
-            case '\'': case '"': return 52;
-            case ',': case '<': return 54;
-            case '.': case '>': return 55;
-            case '/': case '?': return 56;
-            case '`': case '~': return 53;
-            case '!': return 30;
-            case '@': return 31;
-            case '#': return 32;
-            case '$': return 33;
-            case '%': return 34;
-            case '^': return 35;
-            case '&': return 36;
-            case '*': return 37;
-            case '(': return 38;
-            case ')': return 39;
-            default:   return -1;
-        }
-    }
-
-    private boolean needsShift(char c) {
-        if (Character.isUpperCase(c)) return true;
-        return "~!@#$%^&*()_+{}|:\"<>?".indexOf(c) >= 0;
     }
 
     private void setTargetOs(String os) {
@@ -1020,153 +871,6 @@ public class VoiceInputFragment extends Fragment implements TextToSpeech.OnInitL
             android.content.res.ColorStateList.valueOf("windows".equals(targetOs) ? activeColor : inactiveColor));
         osLinuxButton.setImageTintList(
             android.content.res.ColorStateList.valueOf("linux".equals(targetOs) ? activeColor : inactiveColor));
-    }
-
-    /**
-     * macOS Unicode Hex Input: hold Option, type 4 hex digits, release Option.
-     * Requires "Unicode Hex Input" enabled in macOS Input Sources.
-     */
-    private void sendUnicodeCharMacOS(int codePoint, ConnectionManager cm)
-            throws InterruptedException {
-        String hex = String.format("%04x", codePoint);
-        Log.d(TAG, "Unicode hex input: U+" + hex.toUpperCase() + " for codePoint=" + codePoint);
-
-        final int kAlt = 0x04; // Left Alt / Option modifier bit
-
-        // 1. Alt (Option) down — no key, just modifier
-        cm.sendRawHIDReport(kAlt, 0x00);
-        Thread.sleep(50);
-
-        // 2. Type each hex digit while Alt is held
-        for (char c : hex.toCharArray()) {
-            int code = hexCharToHidCode(c);
-            if (code < 0) continue;
-            cm.sendRawHIDReport(kAlt, code);  // digit pressed with Alt held
-            Thread.sleep(50);
-            cm.sendRawHIDReport(kAlt, 0x00);  // digit released, Alt still held
-            Thread.sleep(50);
-        }
-
-        // 3. Release Alt → macOS commits the character
-        cm.sendRawHIDReport(0x00, 0x00);
-        Thread.sleep(100); // commit delay
-    }
-
-    /**
-     * Windows Unicode input: Alt down, NumpadPlus, then hex digits (uppercase numpad),
-     * then Alt up. Requires registry key EnableHexNumpad=1 and reboot on target Windows.
-     * Numpad codes: 0=0x62, 1=0x59, 2=0x5A, 3=0x5B, 4=0x5C, 5=0x5D,
-     *               6=0x5E, 7=0x5F, 8=0x60, 9=0x61
-     * A=0x04...F=0x09 sent with Shift (uppercase on physical keyboard)
-     */
-    private void sendUnicodeCharWindows(int codePoint, ConnectionManager cm)
-            throws InterruptedException {
-        String hex = String.format("%04X", codePoint); // uppercase for Windows
-        Log.d(TAG, "Windows Unicode input: U+" + hex);
-
-        final int kAlt = 0x04;
-        final int kNumpadPlus = 0x57;
-
-        cm.sendRawHIDReport(kAlt, 0x00);           // Alt down
-        Thread.sleep(50);
-        cm.sendRawHIDReport(kAlt, kNumpadPlus);    // Alt + NumpadPlus
-        Thread.sleep(50);
-        cm.sendRawHIDReport(kAlt, 0x00);           // NumpadPlus release (Alt still held)
-        Thread.sleep(50);
-
-        for (char c : hex.toCharArray()) {
-            int code = windowsHexKeyCode(c);
-            if (code < 0) continue;
-            cm.sendRawHIDReport(kAlt, code);
-            Thread.sleep(50);
-            cm.sendRawHIDReport(kAlt, 0x00);
-            Thread.sleep(50);
-        }
-
-        cm.sendRawHIDReport(0x00, 0x00);           // Alt up → Windows commits
-        Thread.sleep(100);
-    }
-
-    /** Windows uses numpad keys for hex digits 0-9, and regular A-F keys for letters. */
-    private int windowsHexKeyCode(char c) {
-        switch (c) {
-            // Numpad 0-9
-            case '0': return 0x62;
-            case '1': return 0x59;
-            case '2': return 0x5A;
-            case '3': return 0x5B;
-            case '4': return 0x5C;
-            case '5': return 0x5D;
-            case '6': return 0x5E;
-            case '7': return 0x5F;
-            case '8': return 0x60;
-            case '9': return 0x61;
-            // A-F (uppercase HID codes, same as lowercase letters)
-            case 'A': return 0x04;
-            case 'B': return 0x05;
-            case 'C': return 0x06;
-            case 'D': return 0x07;
-            case 'E': return 0x08;
-            case 'F': return 0x09;
-            default:  return -1;
-        }
-    }
-
-    /**
-     * Linux (GTK/IBus) Unicode input: Ctrl+Shift+U, type hex digits, press Enter.
-     * Works in most GTK apps and IBus-managed input fields.
-     */
-    private void sendUnicodeCharLinux(int codePoint, ConnectionManager cm)
-            throws InterruptedException {
-        String hex = String.format("%04x", codePoint);
-        Log.d(TAG, "Linux Unicode input: U+" + hex);
-
-        final int kCtrlShift = 0x01 | 0x02; // Ctrl + Shift
-
-        // Ctrl+Shift+U
-        cm.sendRawHIDReport(kCtrlShift, 0x18); // U = 0x18
-        Thread.sleep(80);
-        cm.sendRawHIDReport(0x00, 0x00);
-        Thread.sleep(80);
-
-        // Hex digits
-        for (char c : hex.toCharArray()) {
-            int code = hexCharToHidCode(c);
-            if (code < 0) continue;
-            cm.sendRawHIDReport(0x00, code);
-            Thread.sleep(50);
-            cm.sendRawHIDReport(0x00, 0x00);
-            Thread.sleep(50);
-        }
-
-        // Enter to commit
-        cm.sendRawHIDReport(0x00, 0x28);
-        Thread.sleep(80);
-        cm.sendRawHIDReport(0x00, 0x00);
-        Thread.sleep(50);
-    }
-
-    /** Maps lowercase hex chars (0-9, a-f) to their HID key codes on the regular keyboard row. */
-    private int hexCharToHidCode(char c) {
-        switch (c) {
-            case '0': return 0x27;
-            case '1': return 0x1E;
-            case '2': return 0x1F;
-            case '3': return 0x20;
-            case '4': return 0x21;
-            case '5': return 0x22;
-            case '6': return 0x23;
-            case '7': return 0x24;
-            case '8': return 0x25;
-            case '9': return 0x26;
-            case 'a': return 0x04;
-            case 'b': return 0x05;
-            case 'c': return 0x06;
-            case 'd': return 0x07;
-            case 'e': return 0x08;
-            case 'f': return 0x09;
-            default:  return -1;
-        }
     }
 
     // ─── History ────────────────────────────────────────────────────────────
