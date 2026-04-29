@@ -98,6 +98,7 @@
     <!-- Bluetooth dialogs -->
     <color name="bluetooth_dialog_bg">#FFF3F4F6</color>
     <color name="bluetooth_surface">#FFFFFFFF</color>
+    <color name="connection_dialog_header_bg">#FFE8ECF2</color>
 
     <!-- Presentation Mode Colors (Light) -->
     <color name="presentation_bg">#FFF5F7FA</color>

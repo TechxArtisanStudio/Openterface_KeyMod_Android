@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
@@ -19,7 +20,6 @@ import android.view.ViewGroup;
 import android.widget.CheckBox;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -111,8 +111,11 @@ public class ConnectionDialogFragment extends DialogFragment {
         // Set dialog width and transparent window background so rounded corners render cleanly.
         if (getDialog() != null && getDialog().getWindow() != null) {
             getDialog().setCanceledOnTouchOutside(true);
-            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.9);
-            getDialog().getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+            boolean isLandscape = getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+            int widthFactor = isLandscape ? 92 : 90;
+            int width = (getResources().getDisplayMetrics().widthPixels * widthFactor) / 100;
+            int height = isLandscape ? (getResources().getDisplayMetrics().heightPixels * 88) / 100 : ViewGroup.LayoutParams.WRAP_CONTENT;
+            getDialog().getWindow().setLayout(width, height);
             getDialog().getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
         }
     }
@@ -154,13 +157,11 @@ public class ConnectionDialogFragment extends DialogFragment {
     private void setupListeners() {
         usbCard.setOnClickListener(v -> {
             Log.d(TAG, "USB card clicked");
-            Toast.makeText(requireContext(), "USB card clicked", Toast.LENGTH_SHORT).show();
             handleUsbConnection();
         });
 
         bluetoothCard.setOnClickListener(v -> {
             Log.d(TAG, "Bluetooth card clicked");
-            Toast.makeText(requireContext(), "Bluetooth card clicked", Toast.LENGTH_SHORT).show();
             handleBluetoothConnection();
         });
 
@@ -189,7 +190,7 @@ public class ConnectionDialogFragment extends DialogFragment {
                 public void onConnectionError(String error) {
                     if (getActivity() != null) {
                         getActivity().runOnUiThread(() -> 
-                            Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show()
+                            UiToastLimiter.show(requireContext(), "connection_error", error, android.widget.Toast.LENGTH_SHORT, 1800)
                         );
                     }
                 }
@@ -206,7 +207,7 @@ public class ConnectionDialogFragment extends DialogFragment {
             connectionManager.getCurrentConnectionState() == ConnectionManager.ConnectionState.CONNECTED) {
             // Disconnect USB
             connectionManager.disconnect();
-            Toast.makeText(requireContext(), "USB disconnected", Toast.LENGTH_SHORT).show();
+            UiToastLimiter.show(requireContext(), "usb_disconnected", "USB disconnected", android.widget.Toast.LENGTH_SHORT, 1800);
         } else {
             // Disconnect Bluetooth if connected
             if (currentType == ConnectionManager.ConnectionType.BLUETOOTH && isServiceBound && bluetoothService != null) {
@@ -216,7 +217,7 @@ public class ConnectionDialogFragment extends DialogFragment {
             // Connect USB
             boolean success = connectionManager.connectUsb();
             if (success) {
-                Toast.makeText(requireContext(), "USB connected", Toast.LENGTH_SHORT).show();
+                UiToastLimiter.show(requireContext(), "usb_connected", "USB connected", android.widget.Toast.LENGTH_SHORT, 1800);
             }
         }
         
@@ -236,7 +237,7 @@ public class ConnectionDialogFragment extends DialogFragment {
             if (isServiceBound && bluetoothService != null) {
                 bluetoothService.disconnect();
                 connectionManager.disconnect();
-                Toast.makeText(requireContext(), "Bluetooth disconnected", Toast.LENGTH_SHORT).show();
+                UiToastLimiter.show(requireContext(), "bt_disconnected", "Bluetooth disconnected", android.widget.Toast.LENGTH_SHORT, 1800);
             }
         } else {
             // Disconnect USB if connected
@@ -261,6 +262,10 @@ public class ConnectionDialogFragment extends DialogFragment {
 
     private void showBluetoothDeviceDialog() {
         Log.d(TAG, "showBluetoothDeviceDialog called");
+        if (getParentFragmentManager().findFragmentByTag("BluetoothDialog") != null) {
+            Log.d(TAG, "Bluetooth dialog already shown; skipping duplicate show");
+            return;
+        }
         // Show the existing BluetoothDialogFragment
         BluetoothDialogFragment dialog = new BluetoothDialogFragment();
         dialog.setRxBleClient(rxBleClient);
@@ -274,7 +279,6 @@ public class ConnectionDialogFragment extends DialogFragment {
                         if (connectedDevice != null) {
                             Log.d(TAG, "Updating ConnectionManager with BLE device: " + connectedDevice.getMacAddress());
                             connectionManager.connectBluetooth(connectedDevice);
-                            Toast.makeText(requireContext(), "Bluetooth connected", Toast.LENGTH_SHORT).show();
                         } else {
                             Log.w(TAG, "Connected device is null");
                         }
@@ -297,7 +301,7 @@ public class ConnectionDialogFragment extends DialogFragment {
             dialog.show(getParentFragmentManager(), "BluetoothDialog");
         } catch (Exception e) {
             Log.e(TAG, "Error showing BluetoothDialogFragment: " + e.getMessage(), e);
-            Toast.makeText(requireContext(), "Error opening Bluetooth dialog: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            UiToastLimiter.show(requireContext(), "bt_dialog_open_error", "Error opening Bluetooth dialog: " + e.getMessage(), android.widget.Toast.LENGTH_LONG, 2500);
         }
     }
 
@@ -314,7 +318,7 @@ public class ConnectionDialogFragment extends DialogFragment {
 
     private void requestBluetoothPermissions() {
         Log.d(TAG, "Requesting permissions from Fragment");
-        Toast.makeText(requireContext(), "Requesting Bluetooth permissions...", Toast.LENGTH_SHORT).show();
+        UiToastLimiter.show(requireContext(), "bt_permission_request", "Requesting Bluetooth permissions...", android.widget.Toast.LENGTH_SHORT, 2000);
         
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
             // Android 12 and above
@@ -471,13 +475,15 @@ public class ConnectionDialogFragment extends DialogFragment {
             
             if (allGranted) {
                 Log.d(TAG, "Bluetooth permissions GRANTED, showing device dialog");
-                Toast.makeText(requireContext(), "Bluetooth permission granted!", Toast.LENGTH_SHORT).show();
+                UiToastLimiter.show(requireContext(), "bt_permission_granted", "Bluetooth permission granted!", android.widget.Toast.LENGTH_SHORT, 2000);
                 showBluetoothDeviceDialog();
             } else {
                 Log.d(TAG, "Bluetooth permissions DENIED");
-                Toast.makeText(requireContext(), 
-                    "Bluetooth permission is required to scan and connect to devices. Please grant permission in app settings.", 
-                    Toast.LENGTH_LONG).show();
+                UiToastLimiter.show(requireContext(),
+                    "bt_permission_denied",
+                    "Bluetooth permission is required to scan and connect to devices. Please grant permission in app settings.",
+                    android.widget.Toast.LENGTH_LONG,
+                    2500);
             }
         }
     }

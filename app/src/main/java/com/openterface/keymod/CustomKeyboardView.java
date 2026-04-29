@@ -4615,8 +4615,8 @@ public class CustomKeyboardView extends LinearLayout {
             imeCaptureSendButton.setLayoutParams(sendLp);
 
             imeCaptureToolbar.addView(imeCaptureTouchpadButton);
-            imeCaptureToolbar.addView(imeCaptureDirectModeHint);
             imeCaptureToolbar.addView(imeSubComposeModeToggle);
+            imeCaptureToolbar.addView(imeCaptureDirectModeHint);
             imeCaptureToolbar.addView(imeCaptureUndoButton);
             imeCaptureToolbar.addView(imeCaptureClearButton);
             imeCaptureToolbar.addView(imeCaptureSendButton);

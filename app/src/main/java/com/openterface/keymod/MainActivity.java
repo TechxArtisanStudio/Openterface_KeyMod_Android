@@ -191,7 +191,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 if (connectionManager != null && 
                     connectionManager.getCurrentConnectionType() == ConnectionManager.ConnectionType.USB) {
                     connectionManager.disconnect();
-                    Toast.makeText(context, "USB device disconnected", Toast.LENGTH_SHORT).show();
+                    UiToastLimiter.show(context, "usb_device_disconnected", "USB device disconnected", Toast.LENGTH_SHORT, 1800);
                 }
             }
         }
@@ -210,7 +210,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                             connectionManager.connectUsb();
                         }
                     } else {
-                        Toast.makeText(context, "USB permission denied", Toast.LENGTH_SHORT).show();
+                        UiToastLimiter.show(context, "usb_permission_denied", "USB permission denied", Toast.LENGTH_SHORT, 1800);
                     }
                 }
             }
@@ -497,9 +497,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     }
 
     private void refreshHeaderModeSlotButtons() {
-        int tint = connectionManager != null
-                ? headerConnectionClusterTint(connectionManager.getCurrentConnectionState())
-                : ContextCompat.getColor(this, R.color.header_connection_idle);
+        int tint = headerNeutralActionTint();
         for (int i = 0; i < headerModeSlotButtons.length; i++) {
             ImageButton button = headerModeSlotButtons[i];
             if (button == null) {
@@ -561,7 +559,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             @Override
             public void onConnectionError(String error) {
                 runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, error, Toast.LENGTH_SHORT).show();
+                    UiToastLimiter.show(MainActivity.this, "main_connection_error", error, Toast.LENGTH_SHORT, 1800);
                 });
             }
         });
@@ -579,7 +577,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             public void onAutoConnectStarted() {
                 Log.d(TAG, "Auto-connect started");
                 runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, "Auto-connecting to Bluetooth...", Toast.LENGTH_SHORT).show();
+                    UiToastLimiter.show(MainActivity.this, "auto_connect_started", "Auto-connecting to Bluetooth...", Toast.LENGTH_SHORT, 2200);
                 });
             }
 
@@ -595,7 +593,12 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                     // Dismiss any open dialogs (Connection dialog or Bluetooth dialog)
                     dismissAllDialogs();
                     
-                    Toast.makeText(MainActivity.this, "Auto-connected to " + device.getName(), Toast.LENGTH_SHORT).show();
+                    UiToastLimiter.show(
+                            MainActivity.this,
+                            "bluetooth_connected",
+                            "Auto-connected to " + device.getName(),
+                            Toast.LENGTH_SHORT,
+                            3000);
                 });
             }
 
@@ -603,16 +606,21 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             public void onAutoConnectFailed(String reason) {
                 Log.e(TAG, "Auto-connect failed: " + reason);
                 runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, "Auto-connect failed: " + reason, Toast.LENGTH_SHORT).show();
+                    UiToastLimiter.show(MainActivity.this, "auto_connect_failed", "Auto-connect failed: " + reason, Toast.LENGTH_SHORT, 2500);
                 });
             }
 
             @Override
             public void onAutoConnectRetrying(int retryCount) {
                 Log.d(TAG, "Auto-connect retrying: attempt " + retryCount);
-                runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, "Retrying Bluetooth connection (" + retryCount + "/3)...", Toast.LENGTH_SHORT).show();
-                });
+                if (retryCount == 1) {
+                    runOnUiThread(() -> UiToastLimiter.show(
+                            MainActivity.this,
+                            "auto_connect_retry",
+                            "Retrying Bluetooth connection...",
+                            Toast.LENGTH_SHORT,
+                            3000));
+                }
             }
         });
         
@@ -636,18 +644,24 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         }
     }
 
+    /** Neutral tint for non-connection actions in the header strip. */
+    private int headerNeutralActionTint() {
+        return ContextCompat.getColor(this, R.color.text_secondary);
+    }
+
     private void updateConnectionButton(ConnectionManager.ConnectionType type, ConnectionManager.ConnectionState state) {
         if (connectionButton == null) return;
 
-        int tint = headerConnectionClusterTint(state);
+        int connectionTint = headerConnectionClusterTint(state);
+        int neutralTint = headerNeutralActionTint();
         connectionButton.setImageResource(R.drawable.ic_bluetooth);
-        connectionButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+        connectionButton.setColorFilter(connectionTint, PorterDuff.Mode.SRC_IN);
         if (targetOsHeaderButton != null) {
-            targetOsHeaderButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+            targetOsHeaderButton.setColorFilter(neutralTint, PorterDuff.Mode.SRC_IN);
         }
         for (ImageButton slotButton : headerModeSlotButtons) {
             if (slotButton != null) {
-                slotButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+                slotButton.setColorFilter(neutralTint, PorterDuff.Mode.SRC_IN);
             }
         }
 
@@ -655,7 +669,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             case CONNECTED:
                 if (signalBars != null) {
                     signalBars.setVisibility(View.VISIBLE);
-                    signalBars.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+                    signalBars.setColorFilter(connectionTint, PorterDuff.Mode.SRC_IN);
                 }
                 break;
             case CONNECTING:
@@ -913,10 +927,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         targetOsHeaderButton.setImageResource(iconRes);
         targetOsHeaderButton.setContentDescription(
                 getString(R.string.target_os_header_cd_selected, getString(nameRes)));
-        if (connectionManager != null) {
-            int tint = headerConnectionClusterTint(connectionManager.getCurrentConnectionState());
-            targetOsHeaderButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
-        }
+        targetOsHeaderButton.setColorFilter(headerNeutralActionTint(), PorterDuff.Mode.SRC_IN);
     }
 
     private void showTargetOsPickerDialog() {
@@ -1192,9 +1203,9 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         }
         
         if (isConnected) {
-            Toast.makeText(this, "Bluetooth connected", Toast.LENGTH_SHORT).show();
+            UiToastLimiter.show(this, "bluetooth_connected", "Bluetooth connected", Toast.LENGTH_SHORT, 2500);
         } else {
-            Toast.makeText(this, "Bluetooth disconnected", Toast.LENGTH_SHORT).show();
+            UiToastLimiter.show(this, "bluetooth_disconnected", "Bluetooth disconnected", Toast.LENGTH_SHORT, 1800);
         }
     }
 
