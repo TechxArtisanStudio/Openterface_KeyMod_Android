@@ -2766,24 +2766,24 @@ public class CustomKeyboardView extends LinearLayout {
 
     private List<Key> buildFixedTopRowsPage1() {
         List<Key> keys = new ArrayList<>(TOP_PANEL_COLUMNS * 2);
-        // Row 2: ESC, Shift(icon), DEL(icon), TAB(icon), Up, keyboard toggle, local Fn toggle
+        // Row 2: ESC, Shift(icon), DEL(icon), TAB(icon), Up, Enter(icon), local Fn toggle
         keys.add(markFixedRowKey(new Key("ESC", "", 0x29, "29", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("SHIFT", "", 0xE1, "E1", 1f, R.drawable.shift_24px, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("DEL", "", 0x4C, "4C", 1f, R.drawable.backspace_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("TAB", "", 0x2B, "2B", 1f, R.drawable.keyboard_tab_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("UP", "", 0x52, "52", 1f, R.drawable.keyboard_arrow_up_24, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("PH1", "", KEY_IME_TOGGLE, "", 1f,
-                systemImeCaptureMode ? R.drawable.ic_keyboard_ime_24 : R.drawable.ic_keyboard_keymod_24,
-                0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("ENTER", "", 0x28, "28", 1f, R.drawable.keyboard_return_24px, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f, R.drawable.ic_swap_horiz_24, 0f, false, false, -1, true)));
-        // Row 3: CTRL, ALT, WIN(icon), Left(icon), Down(icon), Right(icon), Enter(icon)
+        // Row 3: CTRL, ALT, WIN(icon), Left(icon), Down(icon), Right(icon), keyboard toggle
         keys.add(markFixedRowKey(new Key("CTRL", "", 0xE0, "E0", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("ALT", "", 0xE2, "E2", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("WIN", "", 0xE3, "E3", 1f, R.drawable.windows, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("LEFT", "", 0x50, "50", 1f, R.drawable.keyboard_arrow_left_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("DOWN", "", 0x51, "51", 1f, R.drawable.keyboard_arrow_down_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("RIGHT", "", 0x4F, "4F", 1f, R.drawable.keyboard_arrow_right_24, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("ENTER", "", 0x28, "28", 1f, R.drawable.keyboard_return_24px, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("PH1", "", KEY_IME_TOGGLE, "", 1f,
+                systemImeCaptureMode ? R.drawable.ic_keyboard_ime_24 : R.drawable.ic_keyboard_keymod_24,
+                0f, false, false, -1, true)));
         return keys;
     }
 
@@ -2957,6 +2957,8 @@ public class CustomKeyboardView extends LinearLayout {
                     || (k.code == 0xE1 && isShiftLeftLocked)
                     || (k.code == 0xE2 && isAltLeftLocked)
                     || (k.code == 0xE3 && isWinLeftLocked);
+                boolean fixedTopFnLocked = isFixedTopLocalFnKey(k) && fixedTopLocalFnLocked;
+                boolean keyLockedVisualState = modifierLocked || fixedTopFnLocked;
                 FnMapping fixedTopLocalFn = resolveFixedTopLocalFnMapping(k);
                 int effectiveTopIconResId = resolveFixedTopLocalFnIconRes(k, fixedTopLocalFn);
                 String effectiveTopLabel = fixedTopLocalFn != null ? fixedTopLocalFn.label : k.label;
@@ -2970,10 +2972,10 @@ public class CustomKeyboardView extends LinearLayout {
                     ImageButton ib = new ImageButton(getContext());
                     applyFlatKeyStyle(ib);
                     ib.setLayoutParams(p);
-                    ib.setBackgroundResource(modifierLocked
+                    ib.setBackgroundResource(keyLockedVisualState
                             ? R.drawable.press_button_background
                             : R.drawable.function_button_background);
-                    ib.setSelected(modifierLocked);
+                    ib.setSelected(keyLockedVisualState);
                     ib.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
                     ib.setPadding(0, 0, 0, 0);
                     ib.setImageResource(effectiveTopIconResId);
@@ -3007,10 +3009,10 @@ public class CustomKeyboardView extends LinearLayout {
                     Button iconTextButton = new Button(getContext());
                     applyFlatKeyStyle(iconTextButton);
                     iconTextButton.setLayoutParams(p);
-                    iconTextButton.setBackgroundResource(modifierLocked
+                    iconTextButton.setBackgroundResource(keyLockedVisualState
                             ? R.drawable.press_button_background
                             : R.drawable.function_button_background);
-                    iconTextButton.setSelected(modifierLocked);
+                    iconTextButton.setSelected(keyLockedVisualState);
                     iconTextButton.setGravity(Gravity.CENTER);
                     iconTextButton.setTextSize(18);
                     iconTextButton.setTypeface(Typeface.DEFAULT_BOLD);
@@ -3026,10 +3028,10 @@ public class CustomKeyboardView extends LinearLayout {
                     Button b = new Button(getContext());
                     applyFlatKeyStyle(b);
                     b.setLayoutParams(p);
-                    b.setBackgroundResource(modifierLocked
+                    b.setBackgroundResource(keyLockedVisualState
                         ? R.drawable.press_button_background
                         : R.drawable.function_button_background);
-                    b.setSelected(modifierLocked);
+                    b.setSelected(keyLockedVisualState);
                     b.setGravity(Gravity.CENTER);
                     b.setTextSize(10);
                     b.setPadding(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
@@ -3787,10 +3789,12 @@ public class CustomKeyboardView extends LinearLayout {
                         || (key.code == 0xE1 && isShiftLeftLocked)
                         || (key.code == 0xE2 && isAltLeftLocked)
                         || (key.code == 0xE3 && isWinLeftLocked);
-                view.setBackgroundResource(modifierLocked
+                boolean fixedTopFnLocked = isFixedTopLocalFnKey(key) && fixedTopLocalFnLocked;
+                boolean keyLockedVisualState = modifierLocked || fixedTopFnLocked;
+                view.setBackgroundResource(keyLockedVisualState
                         ? R.drawable.press_button_background
                         : R.drawable.function_button_background);
-                view.setSelected(modifierLocked);
+                view.setSelected(keyLockedVisualState);
             }
             return;
         }
