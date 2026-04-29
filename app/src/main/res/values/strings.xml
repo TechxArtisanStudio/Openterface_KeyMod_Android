@@ -131,6 +131,13 @@ by TechxArtisan</string>
     <string name="Win">Win</string>
     <string name="Cmd">Cmd</string>
     <string name="Super">Super</string>
+    <string name="modifier_control">Ctrl</string>
+    <string name="modifier_option">Opt</string>
+    <string name="modifier_command">Cmd</string>
+    <string name="modifier_ctrl">CTRL</string>
+    <string name="modifier_alt">ALT</string>
+    <string name="modifier_win">WIN</string>
+    <string name="modifier_sup">SUP</string>
     <string name="Fn">Fn</string>
     <string name="Symbols_123">\?123</string>
     <string name="BackSpace">BackSpace</string>

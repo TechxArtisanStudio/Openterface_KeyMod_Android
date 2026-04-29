@@ -696,6 +696,13 @@ public class CustomKeyboardView extends LinearLayout {
         return key.shortcutModifiers >= 0 || key.code == 0x2B;
     }
 
+    private boolean isTopPanelModifierKey(Key key) {
+        if (key == null || !key.isTopPanelKey) {
+            return false;
+        }
+        return key.code == 0xE0 || key.code == 0xE2 || key.code == 0xE3;
+    }
+
     private void setTopShortcutShowActionLabels(boolean enabled) {
         if (topShortcutShowActionLabels == enabled) {
             return;
@@ -2528,13 +2535,51 @@ public class CustomKeyboardView extends LinearLayout {
                 topShortcutShowActionLabels ? R.drawable.toggle_on_24px : R.drawable.toggle_off_24px,
                 0f, false, false, -1, true));
         keys.add(new Key("ESC",    "", 0x29, "29", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("CTRL",   "", 0xE0, "E0", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("ALT",    "", 0xE2, "E2", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH2",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(buildTopPanelModifierKey(0xE0));
+        keys.add(buildTopPanelModifierKey(0xE2));
+        keys.add(buildTopPanelModifierKey(0xE3));
         keys.add(new Key("LEFT",   "", 0x50, "50", 1f, R.drawable.keyboard_arrow_left_24, 0f, false, false, -1, true));
         keys.add(new Key("DOWN",   "", 0x51, "51", 1f, R.drawable.keyboard_arrow_down_24, 0f, false, false, -1, true));
         keys.add(new Key("RIGHT",  "", 0x4F, "4F", 1f, R.drawable.keyboard_arrow_right_24, 0f, false, false, -1, true));
         return keys;
+    }
+
+    private Key buildTopPanelModifierKey(int code) {
+        String targetOs = getTargetOs();
+        Context ctx = getContext();
+        String label;
+        int iconResId = 0;
+        if ("macos".equals(targetOs)) {
+            if (code == 0xE0) {
+                label = ctx != null ? ctx.getString(R.string.modifier_control) : "Control";
+                iconResId = R.drawable.keyboard_control_key_24px;
+            } else if (code == 0xE2) {
+                label = ctx != null ? ctx.getString(R.string.modifier_option) : "Option";
+                iconResId = R.drawable.keyboard_option_key_24px;
+            } else {
+                label = ctx != null ? ctx.getString(R.string.modifier_command) : "Command";
+                iconResId = R.drawable.keyboard_command_key_24px;
+            }
+        } else if ("linux".equals(targetOs)) {
+            if (code == 0xE0) {
+                label = ctx != null ? ctx.getString(R.string.modifier_ctrl) : "CTRL";
+            } else if (code == 0xE2) {
+                label = ctx != null ? ctx.getString(R.string.modifier_alt) : "ALT";
+            } else {
+                label = ctx != null ? ctx.getString(R.string.modifier_sup) : "SUP";
+            }
+        } else {
+            if (code == 0xE0) {
+                label = ctx != null ? ctx.getString(R.string.modifier_ctrl) : "CTRL";
+            } else if (code == 0xE2) {
+                label = ctx != null ? ctx.getString(R.string.modifier_alt) : "ALT";
+            } else {
+                label = ctx != null ? ctx.getString(R.string.modifier_win) : "WIN";
+                iconResId = R.drawable.windows;
+            }
+        }
+        // Make these keys action-label eligible so row-2-col-7 toggle can switch icon/text.
+        return new Key(label, "", code, String.format("%02X", code), 1f, iconResId, 0f, false, false, 0, true);
     }
 
     private List<Key> buildStandardTopPanelPage2Keys() {
@@ -2691,7 +2736,8 @@ public class CustomKeyboardView extends LinearLayout {
                             || "HOME".equals(k.label)
                             || "END".equals(k.label)
                             || "PGUP".equals(k.label)
-                            || "PGDN".equals(k.label)) {
+                            || "PGDN".equals(k.label)
+                            || isTopPanelModifierKey(k)) {
                         b.setTypeface(b.getTypeface(), android.graphics.Typeface.BOLD);
                     }
                     b.setTag(k);

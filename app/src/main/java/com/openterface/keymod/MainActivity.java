@@ -759,7 +759,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private int headerConnectionClusterTint(ConnectionManager.ConnectionState state) {
         switch (state) {
             case CONNECTED:
-                return ContextCompat.getColor(this, R.color.connected);
+                return ThemeManager.getColorPrimary(this);
             case CONNECTING:
                 return ContextCompat.getColor(this, R.color.connecting);
             default:
