@@ -169,11 +169,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
 
                 @Override
                 public void onBluetoothRssiChanged(int rssi) {
-                    runOnUiThread(
-                            () ->
-                                    updateConnectionButton(
-                                            connectionManager.getCurrentConnectionType(),
-                                            connectionManager.getCurrentConnectionState()));
+                    // Top header intentionally does not render RSSI bars.
                 }
             };
 
@@ -800,13 +796,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
 
         switch (state) {
             case CONNECTED:
-                if (signalBars != null && type == ConnectionManager.ConnectionType.BLUETOOTH) {
-                    if (connectionManager != null) {
-                        signalBars.setImageResource(connectionManager.getBleSignalDrawableRes());
-                    }
-                    signalBars.setVisibility(View.VISIBLE);
-                    signalBars.setColorFilter(connectionTint, PorterDuff.Mode.SRC_IN);
-                } else if (signalBars != null) {
+                if (signalBars != null) {
                     signalBars.setVisibility(View.GONE);
                 }
                 break;

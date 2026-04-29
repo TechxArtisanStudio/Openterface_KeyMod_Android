@@ -4466,10 +4466,8 @@ public class CustomKeyboardView extends LinearLayout {
                     Toast.makeText(getContext(), R.string.compose_cancelled, Toast.LENGTH_SHORT).show();
                 } else {
                     imeCaptureUndoSnapshot = null;
-                    String msg = getContext().getString(R.string.compose_sent, sentLen)
-                            + "\n\n"
-                            + getContext().getString(R.string.ime_capture_send_flush_note);
-                    Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
+                    String msg = getContext().getString(R.string.compose_sent, sentLen);
+                    Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
                 }
             });
         });
