@@ -108,6 +108,65 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private ImageButton targetOsHeaderButton;
     private HorizontalScrollView headerEndScroll;
     private final ImageButton[] headerModeSlotButtons = new ImageButton[3];
+    private final ConnectionManager.ConnectionStateListener connectionStateListener =
+            new ConnectionManager.ConnectionStateListener() {
+                @Override
+                public void onConnectionStateChanged(
+                        ConnectionManager.ConnectionType type,
+                        ConnectionManager.ConnectionState state) {
+                    runOnUiThread(() -> {
+                        updateConnectionButton(type, state);
+
+                        // Update fragments with new port if USB connected.
+                        if (type == ConnectionManager.ConnectionType.USB
+                                && state == ConnectionManager.ConnectionState.CONNECTED) {
+                            port = connectionManager.getUsbPort();
+                            isUsbConnected = true;
+                            isBluetoothConnected = false;
+                            updateFragmentsWithPort(port);
+                            startReading();
+                        } else if (type == ConnectionManager.ConnectionType.BLUETOOTH
+                                && state == ConnectionManager.ConnectionState.CONNECTED) {
+                            isUsbConnected = false;
+                            isBluetoothConnected = true;
+                            if (port != null) {
+                                try {
+                                    port.close();
+                                } catch (IOException e) {
+                                    Log.e(TAG, "Error closing port: " + e.getMessage());
+                                }
+                                port = null;
+                                updateFragmentsWithPort(null);
+                            }
+                        } else if (state == ConnectionManager.ConnectionState.DISCONNECTED
+                                || state == ConnectionManager.ConnectionState.ERROR) {
+                            isUsbConnected = false;
+                            isBluetoothConnected = false;
+                            if (port != null) {
+                                try {
+                                    port.close();
+                                } catch (IOException e) {
+                                    Log.e(TAG, "Error closing port: " + e.getMessage());
+                                }
+                                port = null;
+                                updateFragmentsWithPort(null);
+                            }
+                        }
+                    });
+                }
+
+                @Override
+                public void onConnectionError(String error) {
+                    runOnUiThread(
+                            () ->
+                                    UiToastLimiter.show(
+                                            MainActivity.this,
+                                            "main_connection_error",
+                                            error,
+                                            Toast.LENGTH_SHORT,
+                                            1800));
+                }
+            };
 
     /** Global target OS preference key */
     private static final String PREF_TARGET_OS = "target_os";
@@ -368,6 +427,9 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
 
     @Override
     protected void onDestroy() {
+        if (connectionManager != null) {
+            connectionManager.removeConnectionStateListener(connectionStateListener);
+        }
         super.onDestroy();
         if (scanSubscription != null && !scanSubscription.isDisposed()) {
             scanSubscription.dispose();
@@ -618,56 +680,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     }
     
     private void setupConnectionStateListener() {
-        connectionManager.setConnectionStateListener(new ConnectionManager.ConnectionStateListener() {
-            @Override
-            public void onConnectionStateChanged(ConnectionManager.ConnectionType type, ConnectionManager.ConnectionState state) {
-                runOnUiThread(() -> {
-                    updateConnectionButton(type, state);
-                    
-                    // Update fragments with new port if USB connected
-                    if (type == ConnectionManager.ConnectionType.USB && 
-                        state == ConnectionManager.ConnectionState.CONNECTED) {
-                        port = connectionManager.getUsbPort();
-                        isUsbConnected = true;
-                        isBluetoothConnected = false;
-                        updateFragmentsWithPort(port);
-                        startReading();
-                    } else if (type == ConnectionManager.ConnectionType.BLUETOOTH && 
-                               state == ConnectionManager.ConnectionState.CONNECTED) {
-                        isUsbConnected = false;
-                        isBluetoothConnected = true;
-                        if (port != null) {
-                            try {
-                                port.close();
-                            } catch (IOException e) {
-                                Log.e(TAG, "Error closing port: " + e.getMessage());
-                            }
-                            port = null;
-                            updateFragmentsWithPort(null);
-                        }
-                    } else if (state == ConnectionManager.ConnectionState.DISCONNECTED) {
-                        isUsbConnected = false;
-                        isBluetoothConnected = false;
-                        if (port != null) {
-                            try {
-                                port.close();
-                            } catch (IOException e) {
-                                Log.e(TAG, "Error closing port: " + e.getMessage());
-                            }
-                            port = null;
-                            updateFragmentsWithPort(null);
-                        }
-                    }
-                });
-            }
-
-            @Override
-            public void onConnectionError(String error) {
-                runOnUiThread(() -> {
-                    UiToastLimiter.show(MainActivity.this, "main_connection_error", error, Toast.LENGTH_SHORT, 1800);
-                });
-            }
-        });
+        connectionManager.addConnectionStateListener(connectionStateListener);
     }
     
     private void initializeAutoConnect() {
@@ -780,6 +793,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             case CONNECTING:
                 if (signalBars != null) signalBars.setVisibility(View.GONE);
                 break;
+            case ERROR:
             case DISCONNECTED:
                 if (signalBars != null) signalBars.setVisibility(View.GONE);
                 break;
@@ -1294,12 +1308,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             connectionManager.setBluetoothService(bluetoothService);
             connectionManager.syncBluetoothConnectionState(isConnected);
         }
-
-        // Ensure top connection icon reflects actual BLE callback state immediately.
-        updateConnectionButton(
-                isConnected ? ConnectionManager.ConnectionType.BLUETOOTH : ConnectionManager.ConnectionType.NONE,
-                isConnected ? ConnectionManager.ConnectionState.CONNECTED : ConnectionManager.ConnectionState.DISCONNECTED
-        );
         
         // Update ConnectionManager if Bluetooth is connected
         if (isConnected && bluetoothService != null && connectionManager != null) {

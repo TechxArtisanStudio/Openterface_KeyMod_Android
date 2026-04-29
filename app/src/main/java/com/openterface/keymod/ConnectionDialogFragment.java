@@ -55,6 +55,39 @@ public class ConnectionDialogFragment extends DialogFragment {
     private ImageView bluetoothSignal;
     private CheckBox autoConnectCheckbox;
     private TextView lastConnectedInfo;
+    private final ConnectionManager.ConnectionStateListener connectionStateListener =
+            new ConnectionManager.ConnectionStateListener() {
+                @Override
+                public void onConnectionStateChanged(
+                        ConnectionManager.ConnectionType type,
+                        ConnectionManager.ConnectionState state) {
+                    if (getActivity() != null) {
+                        getActivity()
+                                .runOnUiThread(
+                                        () -> {
+                                            updateUI();
+                                            if (listener != null) {
+                                                listener.onConnectionChanged(type, state);
+                                            }
+                                        });
+                    }
+                }
+
+                @Override
+                public void onConnectionError(String error) {
+                    if (getActivity() != null) {
+                        getActivity()
+                                .runOnUiThread(
+                                        () ->
+                                                UiToastLimiter.show(
+                                                        requireContext(),
+                                                        "connection_error",
+                                                        error,
+                                                        android.widget.Toast.LENGTH_SHORT,
+                                                        1800));
+                    }
+                }
+            };
 
     public interface ConnectionDialogListener {
         void onConnectionChanged(ConnectionManager.ConnectionType type, ConnectionManager.ConnectionState state);
@@ -171,30 +204,9 @@ public class ConnectionDialogFragment extends DialogFragment {
             }
         });
 
-        // Setup connection state listener
+        // Observe connection state without replacing activity listeners.
         if (connectionManager != null) {
-            connectionManager.setConnectionStateListener(new ConnectionManager.ConnectionStateListener() {
-                @Override
-                public void onConnectionStateChanged(ConnectionManager.ConnectionType type, ConnectionManager.ConnectionState state) {
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(() -> {
-                            updateUI();
-                            if (listener != null) {
-                                listener.onConnectionChanged(type, state);
-                            }
-                        });
-                    }
-                }
-
-                @Override
-                public void onConnectionError(String error) {
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(() -> 
-                            UiToastLimiter.show(requireContext(), "connection_error", error, android.widget.Toast.LENGTH_SHORT, 1800)
-                        );
-                    }
-                }
-            });
+            connectionManager.addConnectionStateListener(connectionStateListener);
         }
     }
 
@@ -447,6 +459,9 @@ public class ConnectionDialogFragment extends DialogFragment {
 
     @Override
     public void onDestroyView() {
+        if (connectionManager != null) {
+            connectionManager.removeConnectionStateListener(connectionStateListener);
+        }
         super.onDestroyView();
         if (isServiceBound) {
             requireContext().unbindService(serviceConnection);

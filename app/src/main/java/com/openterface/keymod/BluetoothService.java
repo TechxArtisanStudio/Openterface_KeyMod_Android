@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,6 +43,14 @@ public class BluetoothService extends Service {
     private final Set<String> connectingDevices = new HashSet<>();
     private RxBleDevice connectedDevice;
     private Disposable reconnectDisposable;
+    private final Set<ConnectionStateListener> connectionStateListeners = new CopyOnWriteArraySet<>();
+
+    public interface ConnectionStateListener {
+        void onBluetoothConnecting(RxBleDevice device);
+        void onBluetoothConnected(RxBleDevice device);
+        void onBluetoothDisconnected(RxBleDevice device);
+        void onBluetoothError(RxBleDevice device, String error);
+    }
 
     public class BluetoothBinder extends Binder {
         public BluetoothService getService() {
@@ -57,6 +66,42 @@ public class BluetoothService extends Service {
 
     public void setRxBleClient(RxBleClient client) {
         this.rxBleClient = client;
+    }
+
+    public void addConnectionStateListener(ConnectionStateListener listener) {
+        if (listener != null) {
+            connectionStateListeners.add(listener);
+        }
+    }
+
+    public void removeConnectionStateListener(ConnectionStateListener listener) {
+        if (listener != null) {
+            connectionStateListeners.remove(listener);
+        }
+    }
+
+    private void notifyBluetoothConnecting(RxBleDevice device) {
+        for (ConnectionStateListener listener : connectionStateListeners) {
+            listener.onBluetoothConnecting(device);
+        }
+    }
+
+    private void notifyBluetoothConnected(RxBleDevice device) {
+        for (ConnectionStateListener listener : connectionStateListeners) {
+            listener.onBluetoothConnected(device);
+        }
+    }
+
+    private void notifyBluetoothDisconnected(RxBleDevice device) {
+        for (ConnectionStateListener listener : connectionStateListeners) {
+            listener.onBluetoothDisconnected(device);
+        }
+    }
+
+    private void notifyBluetoothError(RxBleDevice device, String error) {
+        for (ConnectionStateListener listener : connectionStateListeners) {
+            listener.onBluetoothError(device, error);
+        }
     }
 
     public void connectToDevice(RxBleDevice device) {
@@ -84,6 +129,7 @@ public class BluetoothService extends Service {
 
         stopReconnect(); // Clear previous reconnect attempts
         connectedDevice = device;
+        notifyBluetoothConnecting(device);
 
         Disposable connectionDisposable = device.establishConnection(false)
                 .doOnDispose(() -> {
@@ -99,6 +145,7 @@ public class BluetoothService extends Service {
                             }
                             activeConnection = connection;
                             Log.d(TAG, LOG_PREFIX + "Connected to " + sanitizeDeviceName(device.getName()) + " (" + deviceAddress + ")");
+                            notifyBluetoothConnected(device);
                             // Persist this device so auto-connect can use it on next launch
                             getSharedPreferences("ConnectionPrefs", MODE_PRIVATE)
                                     .edit()
@@ -112,6 +159,8 @@ public class BluetoothService extends Service {
                             }
                             Log.e(TAG, LOG_PREFIX + "Connection error for device " + sanitizeDeviceName(device.getName()) + " (" + deviceAddress + "): " + throwable.toString());
                             activeConnection = null;
+                            notifyBluetoothError(device, throwable.toString());
+                            notifyBluetoothDisconnected(device);
                             // Check if the error is a BleDisconnectedException with status 255
                             if (throwable instanceof BleDisconnectedException) {
                                 String errorMessage = throwable.toString();
@@ -215,6 +264,9 @@ public class BluetoothService extends Service {
     public void onDestroy() {
         super.onDestroy();
         connectionDisposables.dispose();
+        if (connectedDevice != null) {
+            notifyBluetoothDisconnected(connectedDevice);
+        }
         activeConnection = null;
         connectedDevice = null;
         stopReconnect();
@@ -223,9 +275,13 @@ public class BluetoothService extends Service {
 
     public void disconnect() {
         if (activeConnection != null) {
+            RxBleDevice previousDevice = connectedDevice;
             connectionDisposables.clear();
             activeConnection = null;
             connectedDevice = null;
+            if (previousDevice != null) {
+                notifyBluetoothDisconnected(previousDevice);
+            }
             Log.d(TAG, LOG_PREFIX + "Bluetooth disconnected");
         }
     }

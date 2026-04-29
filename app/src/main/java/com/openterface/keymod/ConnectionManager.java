@@ -20,6 +20,8 @@ import com.polidea.rxandroidble2.RxBleDevice;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
  * Centralized connection manager for handling USB and BLE connections
@@ -56,7 +58,8 @@ public class ConnectionManager {
     private BluetoothService bluetoothService;
     private MainActivity mainActivity; // Reference to activity for retrieving services
     private final MacrosManager macrosManager;
-    private ConnectionStateListener stateListener;
+    private final Set<ConnectionStateListener> stateListeners = new CopyOnWriteArraySet<>();
+    private BluetoothService.ConnectionStateListener bluetoothServiceStateListener;
     private final Handler timeoutHandler = new Handler(Looper.getMainLooper());
 
     public interface ConnectionStateListener {
@@ -71,7 +74,22 @@ public class ConnectionManager {
     }
 
     public void setConnectionStateListener(ConnectionStateListener listener) {
-        this.stateListener = listener;
+        stateListeners.clear();
+        if (listener != null) {
+            stateListeners.add(listener);
+        }
+    }
+
+    public void addConnectionStateListener(ConnectionStateListener listener) {
+        if (listener != null) {
+            stateListeners.add(listener);
+        }
+    }
+
+    public void removeConnectionStateListener(ConnectionStateListener listener) {
+        if (listener != null) {
+            stateListeners.remove(listener);
+        }
     }
 
     public ConnectionType getCurrentConnectionType() {
@@ -264,8 +282,8 @@ public class ConnectionManager {
         this.currentConnectionType = type;
         this.currentConnectionState = state;
         
-        if (stateListener != null) {
-            stateListener.onConnectionStateChanged(type, state);
+        for (ConnectionStateListener listener : stateListeners) {
+            listener.onConnectionStateChanged(type, state);
         }
     }
 
@@ -286,8 +304,8 @@ public class ConnectionManager {
      * Notify error to listener
      */
     private void notifyError(String error) {
-        if (stateListener != null) {
-            stateListener.onConnectionError(error);
+        for (ConnectionStateListener listener : stateListeners) {
+            listener.onConnectionError(error);
         }
     }
 
@@ -356,7 +374,42 @@ public class ConnectionManager {
      * Set BluetoothService for BLE HID sending
      */
     public void setBluetoothService(BluetoothService service) {
+        if (this.bluetoothService != null && bluetoothServiceStateListener != null) {
+            this.bluetoothService.removeConnectionStateListener(bluetoothServiceStateListener);
+        }
         this.bluetoothService = service;
+        if (this.bluetoothService != null) {
+            bluetoothServiceStateListener = new BluetoothService.ConnectionStateListener() {
+                @Override
+                public void onBluetoothConnecting(RxBleDevice device) {
+                    bleDevice = device;
+                    updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.CONNECTING);
+                }
+
+                @Override
+                public void onBluetoothConnected(RxBleDevice device) {
+                    bleDevice = device;
+                    saveLastConnection(ConnectionType.BLUETOOTH, device.getMacAddress(), device.getName());
+                    updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.CONNECTED);
+                }
+
+                @Override
+                public void onBluetoothDisconnected(RxBleDevice device) {
+                    if (currentConnectionType == ConnectionType.BLUETOOTH) {
+                        updateConnectionState(ConnectionType.NONE, ConnectionState.DISCONNECTED);
+                    }
+                }
+
+                @Override
+                public void onBluetoothError(RxBleDevice device, String error) {
+                    updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.ERROR);
+                    notifyError(error);
+                }
+            };
+            this.bluetoothService.addConnectionStateListener(bluetoothServiceStateListener);
+        } else {
+            bluetoothServiceStateListener = null;
+        }
         Log.d(TAG, "BluetoothService set for HID sending: " + (service != null ? "valid" : "NULL"));
     }
 
