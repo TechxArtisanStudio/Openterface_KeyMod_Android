@@ -82,6 +82,10 @@ public class CustomKeyboardView extends LinearLayout {
     private static final float TOP_PANEL_SCROLLABLE_ROW_WEIGHT = TOP_PANEL_ROW_WEIGHT;
     private static final float TOP_PANEL_FIXED_ROWS_WEIGHT = TOP_PANEL_ROW_WEIGHT * 2f;
     private static final float TOP_PANEL_TOTAL_WEIGHT = TOP_PANEL_ROWS * TOP_PANEL_ROW_WEIGHT;
+    /** Top shortcut strip (row 1 profile + rows 2–3 fixed): label text (sp). */
+    private static final float TOP_SHORTCUT_PANEL_TEXT_SP = 12f;
+    private static final float TOP_SHORTCUT_PANEL_ACTION_LABEL_SP = 13f;
+    private static final float TOP_SHORTCUT_PANEL_CUSTOM_GLYPH_SP = 20f;
     /** Single-pane IME: shortcut strip vs text vs space for soft keyboard (sum ~5.15). */
     private static final float IME_SINGLE_TOP_STRIP_WEIGHT = 1.35f;
     private static final float IME_SINGLE_TEXT_WEIGHT = 0.95f;
@@ -762,6 +766,9 @@ public class CustomKeyboardView extends LinearLayout {
                     .putBoolean(KEY_TOP_SHORTCUT_SHOW_ACTION_LABELS, enabled)
                     .apply();
         }
+        // Page-0 DISPLAY key bakes icon choice into Key.iconResId; rebuild fixed rows so tap toggles
+        // text_on vs icon_on (syncTopPanelViewportContent only rebuilds fixed rows when list is empty).
+        rebuildFixedTopRowsPanels();
         rebuildTopShortcutPanels();
         syncTopPanelViewportContent();
         if (splitPartner != null) {
@@ -2755,21 +2762,21 @@ public class CustomKeyboardView extends LinearLayout {
 
     private List<Key> buildFixedTopRowsPage0() {
         List<Key> keys = new ArrayList<>(TOP_PANEL_COLUMNS * 2);
-        // Row 2: F1..F6, local Fn toggle
-        keys.add(markFixedRowKey(new Key("F1", "", 0x3A, "3A", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("F2", "", 0x3B, "3B", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("F3", "", 0x3C, "3C", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("F4", "", 0x3D, "3D", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("F5", "", 0x3E, "3E", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("F6", "", 0x3F, "3F", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f, R.drawable.ic_swap_horiz_24, 0f, false, false, -1, true)));
-        // Row 3: F7..F12, display toggle
+        // Row 2: F7..F12, local Fn toggle (Fn on → 6 7 8 9 0 +)
         keys.add(markFixedRowKey(new Key("F7", "", 0x40, "40", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F8", "", 0x41, "41", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F9", "", 0x42, "42", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F10", "", 0x43, "43", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F11", "", 0x44, "44", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F12", "", 0x45, "45", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f, R.drawable.ic_swap_horiz_24, 0f, false, false, -1, true)));
+        // Row 3: F1..F6, display toggle (Fn on → 1 2 3 4 5 - =)
+        keys.add(markFixedRowKey(new Key("F1", "", 0x3A, "3A", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F2", "", 0x3B, "3B", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F3", "", 0x3C, "3C", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F4", "", 0x3D, "3D", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F5", "", 0x3E, "3E", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F6", "", 0x3F, "3F", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("DISPLAY", "", KEY_TOP_SHORTCUT_DISPLAY_TOGGLE, "", 1f,
                 topShortcutShowActionLabels ? R.drawable.text_on_24 : R.drawable.icon_on_24,
                 0f, false, false, -1, true)));
@@ -2824,6 +2831,10 @@ public class CustomKeyboardView extends LinearLayout {
     private int resolveFixedTopLocalFnIconRes(Key key, FnMapping mapping) {
         if (mapping == null) {
             return key != null ? key.iconResId : 0;
+        }
+        // Page-0 display toggle under local Fn shows "=" as text, not the icon/text mode glyphs.
+        if (key != null && key.code == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE) {
+            return 0;
         }
         if (mapping.keyCode == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE) {
             return topShortcutShowActionLabels ? R.drawable.text_on_24 : R.drawable.icon_on_24;
@@ -3029,7 +3040,7 @@ public class CustomKeyboardView extends LinearLayout {
                             : R.drawable.function_button_background);
                     iconTextButton.setSelected(keyLockedVisualState);
                     iconTextButton.setGravity(Gravity.CENTER);
-                    iconTextButton.setTextSize(18);
+                    iconTextButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, TOP_SHORTCUT_PANEL_CUSTOM_GLYPH_SP);
                     iconTextButton.setTypeface(Typeface.DEFAULT_BOLD);
                     iconTextButton.setText(k.customIconGlyph);
                     iconTextButton.setTextColor(resolveThemeTextColor());
@@ -3048,7 +3059,7 @@ public class CustomKeyboardView extends LinearLayout {
                         : R.drawable.function_button_background);
                     b.setSelected(keyLockedVisualState);
                     b.setGravity(Gravity.CENTER);
-                    b.setTextSize(10);
+                    b.setTextSize(TypedValue.COMPLEX_UNIT_SP, TOP_SHORTCUT_PANEL_TEXT_SP);
                     b.setPadding(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
                     String topButtonText = renderAsActionLabel
                         ? formatTopShortcutActionLabel(k)
@@ -3059,7 +3070,7 @@ public class CustomKeyboardView extends LinearLayout {
                         : k.label);
                     b.setText(topButtonText);
                     if (renderAsActionLabel) {
-                        b.setTextSize(11);
+                        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, TOP_SHORTCUT_PANEL_ACTION_LABEL_SP);
                         b.setTypeface(Typeface.DEFAULT_BOLD);
                     }
                     b.setTextColor(resolveThemeTextColor());
@@ -4368,12 +4379,25 @@ public class CustomKeyboardView extends LinearLayout {
     private FnMapping resolveFixedTopLocalFnMapping(Key key) {
         if (!fixedTopLocalFnLocked || key == null || !isFixedTopRowKey(key)
                 || isFixedTopLocalFnKey(key)
-                || isTopModeSlotKey(key)
-                || isTopShortcutToggleKey(key)) {
+                || isTopModeSlotKey(key)) {
             return null;
         }
 
         switch (key.code) {
+            // Fixed-top page 0 (row2 F7–F12, row3 F1–F6 + display): Fn layer matches rearranged layout.
+            case 0x40: return new FnMapping("6", 0x23, 0);
+            case 0x41: return new FnMapping("7", 0x24, 0);
+            case 0x42: return new FnMapping("8", 0x25, 0);
+            case 0x43: return new FnMapping("9", 0x26, 0);
+            case 0x44: return new FnMapping("0", 0x27, 0);
+            case 0x45: return new FnMapping("+", 0x2E, MOD_SHIFT);
+            case 0x3A: return new FnMapping("1", 0x1E, 0);
+            case 0x3B: return new FnMapping("2", 0x1F, 0);
+            case 0x3C: return new FnMapping("3", 0x20, 0);
+            case 0x3D: return new FnMapping("4", 0x21, 0);
+            case 0x3E: return new FnMapping("5", 0x22, 0);
+            case 0x3F: return new FnMapping("-", 0x2D, 0);
+            case KEY_TOP_SHORTCUT_DISPLAY_TOGGLE: return new FnMapping("=", 0x2E, 0);
             case 0x4A: return new FnMapping("F1", 0x3A, 0);
             case 0x4D: return new FnMapping("F2", 0x3B, 0);
             case 0x4B: return new FnMapping("F3", 0x3C, 0);
@@ -4584,8 +4608,11 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         if (isTopShortcutToggleKey(key)) {
-            setTopShortcutShowActionLabels(!topShortcutShowActionLabels);
-            return;
+            if (fixedTopLocalFn == null) {
+                setTopShortcutShowActionLabels(!topShortcutShowActionLabels);
+                return;
+            }
+            // Local Fn on (page 0): keycap shows "=" and sends '=' HID; do not cycle shortcut display mode.
         }
 
         if (key.code == KEY_NOOP_PLACEHOLDER) {
