@@ -668,6 +668,12 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         return modifiers;
     }
 
+    private String getTargetOs() {
+        return requireContext()
+                .getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+                .getString("target_os", "macos");
+    }
+
     private void showCreateProfileDialog() {
         EditText input = new EditText(getContext());
         input.setHint("Profile name (e.g., 'My App')");

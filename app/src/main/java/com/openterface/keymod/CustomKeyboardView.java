@@ -144,6 +144,8 @@ public class CustomKeyboardView extends LinearLayout {
     /** PH1: toggle system IME capture vs KeyMod HID keyboard. */
     private static final int KEY_IME_TOGGLE = 0xF00A;
     private static final int KEY_TOP_SHORTCUT_DISPLAY_TOGGLE = 0xF00B;
+    /** Local Fn latch for fixed top rows 2-3 only. */
+    private static final int KEY_FIXED_TOP_LOCAL_FN = 0xF00C;
     private static final int KEY_NOOP_PLACEHOLDER = -1;
     private static final String APP_PREFS_NAME = "AppPrefs";
     private static final String KEY_SYSTEM_IME_CAPTURE = "system_ime_capture_mode";
@@ -160,6 +162,7 @@ public class CustomKeyboardView extends LinearLayout {
     private boolean isSymbolMode = false;
     private boolean isFnLocked = false;
     private boolean extraNumpadFnLocked = false;
+    private boolean fixedTopLocalFnLocked = false;
     /** Extra numpad NumLock visual state: false = State A(default text), true = State B(theme accent). */
     private boolean extraNumpadNumStateB = false;
     private GridLayout extraNumpadGrid;
@@ -690,6 +693,12 @@ public class CustomKeyboardView extends LinearLayout {
                 && key.code == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE;
     }
 
+    private static boolean isFixedTopLocalFnKey(Key key) {
+        return key != null
+                && key.isTopPanelKey
+                && key.code == KEY_FIXED_TOP_LOCAL_FN;
+    }
+
     private static boolean isTopImeToggleKey(Key key) {
         return key != null
                 && key.isTopPanelKey
@@ -698,7 +707,9 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private static boolean isTopShortcutActionLabelEligible(Key key) {
-        if (key == null || !key.isTopPanelKey || key.code == KEY_NOOP_PLACEHOLDER || key.code == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE) {
+        if (key == null || !key.isTopPanelKey || key.code == KEY_NOOP_PLACEHOLDER
+                || key.code == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE
+                || key.code == KEY_FIXED_TOP_LOCAL_FN) {
             return false;
         }
         return key.shortcutModifiers >= 0 || key.code == 0x2B;
@@ -2622,18 +2633,33 @@ public class CustomKeyboardView extends LinearLayout {
                 systemImeCaptureMode ? R.drawable.ic_keyboard_ime_24 : R.drawable.ic_keyboard_keymod_24,
                 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("UP",     "", 0x52, "52", 1f, R.drawable.keyboard_arrow_up_24, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("DISPLAY",   "", KEY_TOP_SHORTCUT_DISPLAY_TOGGLE, "", 1f,
-                topShortcutShowActionLabels ? R.drawable.toggle_on_24px : R.drawable.toggle_off_24px,
-                0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f,
+                R.drawable.change_circle_24px, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("ESC",    "", 0x29, "29", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE0)));
         keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE2)));
         keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE3)));
         keys.add(markFixedRowKey(new Key("LEFT",   "", 0x50, "50", 1f, R.drawable.keyboard_arrow_left_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("DOWN",   "", 0x51, "51", 1f, R.drawable.keyboard_arrow_down_24, 0f, false, false, -1, true)));
-        // Temporarily clear row-2 col-7 slot; keep display-toggle feature code for later relocation.
-        keys.add(markFixedRowKey(new Key("", "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("RIGHT",  "", 0x4F, "4F", 1f, R.drawable.keyboard_arrow_right_24, 0f, false, false, -1, true)));
         return keys;
+    }
+
+    private int resolveFixedTopLocalFnIconRes(Key key, FnMapping mapping) {
+        if (mapping == null) {
+            return key != null ? key.iconResId : 0;
+        }
+        if (mapping.keyCode == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE) {
+            return topShortcutShowActionLabels ? R.drawable.toggle_on_24px : R.drawable.toggle_off_24px;
+        }
+        return mapping.iconResId != 0 ? mapping.iconResId : (key != null ? key.iconResId : 0);
+    }
+
+    private boolean isFixedTopLocalFnDisplayMapping(Key key, FnMapping mapping) {
+        return key != null
+                && isTopImeToggleKey(key)
+                && mapping != null
+                && mapping.keyCode == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE;
     }
 
     private Key markFixedRowKey(Key key) {
@@ -2771,13 +2797,18 @@ public class CustomKeyboardView extends LinearLayout {
                 boolean modifierLocked = (k.code == 0xE0 && isCtrlLeftLocked)
                     || (k.code == 0xE1 && isShiftLeftLocked)
                     || (k.code == 0xE2 && isAltLeftLocked)
-                    || (k.code == 0xE3 && isWinLeftLocked);
+                    || (k.code == 0xE3 && isWinLeftLocked)
+                    || (k.code == KEY_FIXED_TOP_LOCAL_FN && fixedTopLocalFnLocked);
+                FnMapping fixedTopLocalFn = resolveFixedTopLocalFnMapping(k);
+                int effectiveTopIconResId = resolveFixedTopLocalFnIconRes(k, fixedTopLocalFn);
+                String effectiveTopLabel = fixedTopLocalFn != null ? fixedTopLocalFn.label : k.label;
                 boolean renderAsActionLabel = topShortcutShowActionLabels
                         && isTopShortcutActionLabelEligible(k);
                 boolean renderAsCustomIconText = !renderAsActionLabel
+                        && fixedTopLocalFn == null
                         && k.customIconGlyph != null
                         && !k.customIconGlyph.trim().isEmpty();
-                if (k.iconResId != 0 && !renderAsActionLabel) {
+                if (effectiveTopIconResId != 0 && !renderAsActionLabel) {
                     ImageButton ib = new ImageButton(getContext());
                     applyFlatKeyStyle(ib);
                     ib.setLayoutParams(p);
@@ -2787,7 +2818,7 @@ public class CustomKeyboardView extends LinearLayout {
                     ib.setSelected(modifierLocked);
                     ib.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
                     ib.setPadding(0, 0, 0, 0);
-                    ib.setImageResource(k.iconResId);
+                    ib.setImageResource(effectiveTopIconResId);
                     ib.setColorFilter(resolveThemeTextColor());
                     if (isTopModeSlotKey(k)) {
                         Context ctx = getContext();
@@ -2795,6 +2826,11 @@ public class CustomKeyboardView extends LinearLayout {
                             int slot = topModeSlotIndexFromKeyCode(k.code);
                             String mode = TopModeShortcutPrefs.getModeForSlot(ctx, slot);
                             ib.setContentDescription(ctx.getString(TopModeShortcutPrefs.labelResForMode(mode)));
+                        }
+                    } else if (isFixedTopLocalFnDisplayMapping(k, fixedTopLocalFn)) {
+                        Context ctx = getContext();
+                        if (ctx != null) {
+                            ib.setContentDescription(ctx.getString(R.string.top_shortcut_toggle_display_mode));
                         }
                     } else if (isTopImeToggleKey(k)) {
                         Context ctx = getContext();
@@ -2842,9 +2878,11 @@ public class CustomKeyboardView extends LinearLayout {
                     b.setPadding(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
                     String topButtonText = renderAsActionLabel
                         ? formatTopShortcutActionLabel(k)
+                        : (fixedTopLocalFn != null
+                        ? effectiveTopLabel
                         : k.symbolLabel != null && !k.symbolLabel.isEmpty()
                         ? k.symbolLabel + "\n" + k.label
-                        : k.label;
+                        : k.label);
                     b.setText(topButtonText);
                     if (renderAsActionLabel) {
                         b.setTextSize(11);
@@ -3267,7 +3305,8 @@ public class CustomKeyboardView extends LinearLayout {
                 boolean modifierLocked = (key.code == 0xE0 && isCtrlLeftLocked)
                         || (key.code == 0xE1 && isShiftLeftLocked)
                         || (key.code == 0xE2 && isAltLeftLocked)
-                        || (key.code == 0xE3 && isWinLeftLocked);
+                        || (key.code == 0xE3 && isWinLeftLocked)
+                        || (key.code == KEY_FIXED_TOP_LOCAL_FN && fixedTopLocalFnLocked);
                 view.setBackgroundResource(modifierLocked
                         ? R.drawable.press_button_background
                         : R.drawable.function_button_background);
@@ -3696,6 +3735,36 @@ public class CustomKeyboardView extends LinearLayout {
         }
     }
 
+    private boolean isFixedTopRowKey(Key key) {
+        return key != null && key.isTopPanelKey && !key.allowTopPanelPagingGesture;
+    }
+
+    private FnMapping resolveFixedTopLocalFnMapping(Key key) {
+        if (!fixedTopLocalFnLocked || key == null || !isFixedTopRowKey(key)
+                || isFixedTopLocalFnKey(key)
+                || isTopModeSlotKey(key)
+                || isTopShortcutToggleKey(key)) {
+            return null;
+        }
+
+        switch (key.code) {
+            case 0x4A: return new FnMapping("F1", 0x3A, 0);
+            case 0x4D: return new FnMapping("F2", 0x3B, 0);
+            case 0x4B: return new FnMapping("F3", 0x3C, 0);
+            case 0x4E: return new FnMapping("F4", 0x3D, 0);
+            case KEY_IME_TOGGLE: return new FnMapping("DISPLAY", KEY_TOP_SHORTCUT_DISPLAY_TOGGLE, 0);
+            case 0x52: return new FnMapping("INS", 0x49, 0);
+            case 0x29: return new FnMapping("F5", 0x3E, 0);
+            case 0xE0: return new FnMapping("TAB", 0x2B, 0);
+            case 0xE2: return new FnMapping("DEL", 0x4C, 0, R.drawable.backspace_24);
+            case 0xE3: return new FnMapping("ENTER", 0x28, 0);
+            case 0x50: return new FnMapping("HOME", 0x4A, 0);
+            case 0x51: return new FnMapping("END", 0x4D, 0);
+            default:
+                return null;
+        }
+    }
+
     private void refreshExtraNumpadGridUi() {
         if (extraNumpadGrid == null) {
             return;
@@ -3879,6 +3948,12 @@ public class CustomKeyboardView extends LinearLayout {
             return;
         }
 
+        FnMapping fixedTopLocalFn = resolveFixedTopLocalFnMapping(key);
+        if (isFixedTopLocalFnDisplayMapping(key, fixedTopLocalFn)) {
+            setTopShortcutShowActionLabels(!topShortcutShowActionLabels);
+            return;
+        }
+
         if (isTopImeToggleKey(key)) {
             toggleSystemImeCaptureFromUser();
             return;
@@ -3899,6 +3974,16 @@ public class CustomKeyboardView extends LinearLayout {
             if (splitPartner != null) {
                 splitPartner.extraNumpadFnLocked = extraNumpadFnLocked;
                 splitPartner.refreshExtraNumpadGridUi();
+            }
+            return;
+        }
+
+        if (key.code == KEY_FIXED_TOP_LOCAL_FN) {
+            fixedTopLocalFnLocked = !fixedTopLocalFnLocked;
+            syncTopPanelViewportContent();
+            if (splitPartner != null) {
+                splitPartner.fixedTopLocalFnLocked = fixedTopLocalFnLocked;
+                splitPartner.syncTopPanelViewportContent();
             }
             return;
         }
@@ -3968,7 +4053,9 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         FnMapping extraNumpadFn = resolveExtraNumpadFnMapping(key);
-        FnMapping fnMapping = extraNumpadFn != null ? extraNumpadFn : resolveFnMapping(key);
+        FnMapping fnMapping = fixedTopLocalFn != null
+                ? fixedTopLocalFn
+                : (extraNumpadFn != null ? extraNumpadFn : resolveFnMapping(key));
         int effectiveKeyCode = fnMapping != null ? fnMapping.keyCode : key.code;
         boolean effectiveShiftLocked = isShiftLeftLocked;
         int fnModifierMask = fnMapping != null ? fnMapping.modifierMask : 0;
