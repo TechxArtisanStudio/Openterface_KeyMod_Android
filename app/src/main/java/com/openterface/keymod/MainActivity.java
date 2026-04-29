@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.hardware.usb.UsbDevice;
@@ -24,6 +25,7 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -92,6 +94,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private LinearLayout navVoice;
     private LinearLayout navPresentation;
     private ImageButton targetOsHeaderButton;
+    private HorizontalScrollView headerEndScroll;
     private final ImageButton[] headerModeSlotButtons = new ImageButton[3];
 
     /** Global target OS preference key */
@@ -393,10 +396,12 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         navPresentation = findViewById(R.id.nav_presentation);
 
         targetOsHeaderButton = findViewById(R.id.target_os_header_button);
+        headerEndScroll = findViewById(R.id.header_end_scroll);
         if (targetOsHeaderButton != null) {
             targetOsHeaderButton.setOnClickListener(v -> showTargetOsPickerDialog());
             updateTargetOsHeaderIcon();
         }
+        applyHeaderEndScrollLayoutForOrientation();
         setupHeaderModeSlotButtons();
 
         // Display app version in sidebar footer
@@ -420,6 +425,31 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (shortcut != null) shortcutDrawable = shortcut.getCompoundDrawables()[1];
 
         setupButtonListeners();
+    }
+
+    private void applyHeaderEndScrollLayoutForOrientation() {
+        if (headerEndScroll == null) {
+            return;
+        }
+        ViewGroup.LayoutParams lp = headerEndScroll.getLayoutParams();
+        if (lp == null) {
+            return;
+        }
+        lp.width = getResources().getDimensionPixelSize(R.dimen.header_end_scroll_width);
+        headerEndScroll.setLayoutParams(lp);
+        headerEndScroll.post(() -> {
+            boolean isLandscape =
+                    getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+            // Landscape target: show all header buttons by default.
+            // Portrait target: keep right-side actions visible first.
+            headerEndScroll.fullScroll(isLandscape ? View.FOCUS_LEFT : View.FOCUS_RIGHT);
+        });
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        applyHeaderEndScrollLayoutForOrientation();
     }
 
     private void setupHeaderModeSlotButtons() {
