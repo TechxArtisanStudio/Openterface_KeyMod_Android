@@ -4,6 +4,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.ServiceConnection;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -80,6 +81,7 @@ public class CustomKeyboardView extends LinearLayout {
     private static final float IME_SINGLE_TOP_STRIP_WEIGHT = 1.35f;
     private static final float IME_SINGLE_TEXT_WEIGHT = 0.95f;
     private static final String KEY_IME_SUB_COMPOSE_EXPANDED = "ime_sub_compose_expanded";
+    private static final String KEY_IME_SUB_COMPOSE_DIRECT_HID = "ime_sub_compose_direct_hid";
     /** Portrait IME sub-compose: max field length (same order of magnitude as Compose). */
     public static final int IME_CAPTURE_MAX_TEXT_LEN = 10_000;
     /**
@@ -160,6 +162,10 @@ public class CustomKeyboardView extends LinearLayout {
         void onImeSubComposeExpandedChanged(CustomKeyboardView source, boolean expanded);
 
         void onImeToolbarPopOutTouchpadRequested(CustomKeyboardView source);
+
+        /** Called when Direct HID vs Compose sub-mode changes (portrait IME only). */
+        default void onImeSubComposeDirectHidModeChanged(CustomKeyboardView source, boolean direct) {
+        }
     }
 
     public interface OnTopModeShortcutListener {
@@ -178,7 +184,13 @@ public class CustomKeyboardView extends LinearLayout {
     @Nullable
     private String imeCaptureUndoSnapshot;
     private ImageButton imeCaptureTouchpadButton;
+    private ImageButton imeSubComposeModeToggle;
     private ImageButton imeCaptureSendButton;
+    @Nullable
+    private TextView imeCaptureDirectModeHint;
+    @Nullable
+    private View imeCaptureAccentDivider;
+    private boolean imeSubComposeDirectHidMode;
     private final ExecutorService imeSubComposeSendExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "ImeCaptureSend");
         t.setDaemon(true);
@@ -567,6 +579,10 @@ public class CustomKeyboardView extends LinearLayout {
 
     public boolean isImeSubComposeExpanded() {
         return imeSubComposeExpanded;
+    }
+
+    public boolean isImeSubComposeDirectHidMode() {
+        return imeSubComposeDirectHidMode;
     }
 
     public boolean isSystemImeCaptureMode() {
@@ -4003,7 +4019,10 @@ public class CustomKeyboardView extends LinearLayout {
         imeCaptureClearButton = null;
         imeCaptureUndoSnapshot = null;
         imeCaptureTouchpadButton = null;
+        imeSubComposeModeToggle = null;
         imeCaptureSendButton = null;
+        imeCaptureDirectModeHint = null;
+        imeCaptureAccentDivider = null;
         imeSubComposeExpanded = false;
         if (wasExpanded && onImeSubComposeChromeListener != null) {
             onImeSubComposeChromeListener.onImeSubComposeExpandedChanged(this, false);
@@ -4066,6 +4085,9 @@ public class CustomKeyboardView extends LinearLayout {
         if (!isImeSubComposePortraitContext()) {
             return;
         }
+        if (imeSubComposeDirectHidMode) {
+            return;
+        }
         boolean next = !imeSubComposeExpanded;
         persistImeSubComposeExpanded(next);
         applyImeTopStripVisibilityForSubCompose();
@@ -4081,7 +4103,12 @@ public class CustomKeyboardView extends LinearLayout {
         if (imeCaptureEditorRow == null) {
             return;
         }
+        if (imeSubComposeDirectHidMode) {
+            imeCaptureEditorRow.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(1), 0f));
+            return;
+        }
         LayoutParams lp = (LayoutParams) imeCaptureEditorRow.getLayoutParams();
+        lp.height = 0;
         lp.weight = imeSubComposeExpanded ? IME_SUB_COMPOSE_EDITOR_WEIGHT_EXPANDED : IME_SINGLE_TEXT_WEIGHT;
         imeCaptureEditorRow.setLayoutParams(lp);
     }
@@ -4100,6 +4127,131 @@ public class CustomKeyboardView extends LinearLayout {
         imeSubComposeExpandButton.setColorFilter(resolveThemeTextColor());
     }
 
+    private void persistImeSubComposeDirectHid(boolean direct) {
+        imeSubComposeDirectHidMode = direct;
+        Context ctx = getContext();
+        if (ctx != null) {
+            ctx.getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_IME_SUB_COMPOSE_DIRECT_HID, direct)
+                    .apply();
+        }
+    }
+
+    private void notifyImeSubComposeDirectHidModeChanged() {
+        if (onImeSubComposeChromeListener == null || !isImeSubComposePortraitContext()) {
+            return;
+        }
+        onImeSubComposeChromeListener.onImeSubComposeDirectHidModeChanged(this, imeSubComposeDirectHidMode);
+    }
+
+    private void onImeSubComposeModeToggleClicked() {
+        if (imeCaptureEdit == null || imeSubComposeSending) {
+            return;
+        }
+        boolean next = !imeSubComposeDirectHidMode;
+        if (next) {
+            collapseImeSubComposePersistedForChrome();
+        }
+        persistImeSubComposeDirectHid(next);
+        ImeTextForwarder.detach(imeCaptureEdit);
+        imeCaptureEdit.setText("");
+        if (next) {
+            ImeTextForwarder.attach(
+                    imeCaptureEdit,
+                    this::peekConnectionManager,
+                    this::getTargetOs,
+                    imeTextExecutor);
+            postShowLocalImeSoftKeyboard();
+        }
+        applyImeSubComposeDirectHidUi();
+        updateImeCaptureToolbarState();
+        post(this::notifyImeSubComposeDirectHidModeChanged);
+    }
+
+    private void refreshImeSubComposeModeToggleIcon() {
+        if (imeSubComposeModeToggle == null || getContext() == null) {
+            return;
+        }
+        if (imeSubComposeDirectHidMode) {
+            imeSubComposeModeToggle.setImageResource(R.drawable.ic_ime_direct_hid_road_24);
+            imeSubComposeModeToggle.setContentDescription(
+                    getContext().getString(R.string.ime_sub_compose_mode_toggle_compose));
+        } else {
+            imeSubComposeModeToggle.setImageResource(R.drawable.ic_ime_compose_mode_note_24);
+            imeSubComposeModeToggle.setContentDescription(
+                    getContext().getString(R.string.ime_sub_compose_mode_toggle_direct));
+        }
+        imeSubComposeModeToggle.setColorFilter(resolveThemeTextColor());
+    }
+
+    private void setImeToolbarCellWeight(View v, int keyMargin, float weight) {
+        if (v == null) {
+            return;
+        }
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) v.getLayoutParams();
+        lp.width = 0;
+        lp.height = LayoutParams.MATCH_PARENT;
+        lp.weight = weight;
+        lp.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
+        v.setLayoutParams(lp);
+    }
+
+    private void applyImeSubComposeDirectHidUi() {
+        if (!isImeSubComposePortraitContext() || imeCaptureToolbar == null || imeCaptureEdit == null) {
+            return;
+        }
+        int keyMargin = dpToPx(KEY_OUTER_MARGIN_DP);
+        if (imeSubComposeDirectHidMode) {
+            collapseImeSubComposePersistedForChrome();
+            applyImeTopStripVisibilityForSubCompose();
+
+            imeCaptureEdit.setVisibility(INVISIBLE);
+            if (imeSubComposeExpandButton != null) {
+                imeSubComposeExpandButton.setVisibility(GONE);
+            }
+            if (imeCaptureAccentDivider != null) {
+                imeCaptureAccentDivider.setVisibility(GONE);
+            }
+
+            imeCaptureUndoButton.setVisibility(GONE);
+            imeCaptureClearButton.setVisibility(GONE);
+            imeCaptureSendButton.setVisibility(GONE);
+            imeCaptureDirectModeHint.setVisibility(VISIBLE);
+
+            setImeToolbarCellWeight(imeCaptureTouchpadButton, keyMargin, 1f);
+            setImeToolbarCellWeight(imeSubComposeModeToggle, keyMargin, 1f);
+            setImeToolbarCellWeight(imeCaptureDirectModeHint, keyMargin, 5f);
+            setImeToolbarCellWeight(imeCaptureUndoButton, keyMargin, 0f);
+            setImeToolbarCellWeight(imeCaptureClearButton, keyMargin, 0f);
+            setImeToolbarCellWeight(imeCaptureSendButton, keyMargin, 0f);
+        } else {
+            applyImeTopStripVisibilityForSubCompose();
+            imeCaptureEdit.setVisibility(VISIBLE);
+            if (imeSubComposeExpandButton != null) {
+                imeSubComposeExpandButton.setVisibility(VISIBLE);
+            }
+            if (imeCaptureAccentDivider != null) {
+                imeCaptureAccentDivider.setVisibility(VISIBLE);
+            }
+
+            imeCaptureUndoButton.setVisibility(VISIBLE);
+            imeCaptureClearButton.setVisibility(VISIBLE);
+            imeCaptureSendButton.setVisibility(VISIBLE);
+            imeCaptureDirectModeHint.setVisibility(GONE);
+
+            setImeToolbarCellWeight(imeCaptureTouchpadButton, keyMargin, 1f);
+            setImeToolbarCellWeight(imeSubComposeModeToggle, keyMargin, 1f);
+            setImeToolbarCellWeight(imeCaptureUndoButton, keyMargin, 1f);
+            setImeToolbarCellWeight(imeCaptureClearButton, keyMargin, 1f);
+            setImeToolbarCellWeight(imeCaptureSendButton, keyMargin, 3f);
+            setImeToolbarCellWeight(imeCaptureDirectModeHint, keyMargin, 0f);
+        }
+        refreshImeSubComposeEditorRowWeight();
+        refreshImeSubComposeModeToggleIcon();
+        imeCaptureToolbar.requestLayout();
+    }
+
     private static boolean imeCaptureTextContainsNonAscii(String s) {
         for (int i = 0; i < s.length(); ) {
             int cp = s.codePointAt(i);
@@ -4113,6 +4265,19 @@ public class CustomKeyboardView extends LinearLayout {
 
     private void updateImeCaptureToolbarState() {
         if (imeCaptureEdit == null || imeCaptureClearButton == null || imeCaptureSendButton == null) {
+            return;
+        }
+        if (imeSubComposeDirectHidMode) {
+            ConnectionManager cm0 = peekConnectionManager();
+            boolean connected0 = cm0 != null && cm0.isConnected();
+            if (imeCaptureTouchpadButton != null) {
+                imeCaptureTouchpadButton.setEnabled(!imeSubComposeSending && connected0);
+                imeCaptureTouchpadButton.setAlpha(imeCaptureTouchpadButton.isEnabled() ? 1f : 0.45f);
+            }
+            if (imeSubComposeModeToggle != null) {
+                imeSubComposeModeToggle.setEnabled(!imeSubComposeSending);
+                imeSubComposeModeToggle.setAlpha(imeSubComposeModeToggle.isEnabled() ? 1f : 0.45f);
+            }
             return;
         }
         String t = imeCaptureEdit.getText() != null ? imeCaptureEdit.getText().toString() : "";
@@ -4254,13 +4419,22 @@ public class CustomKeyboardView extends LinearLayout {
             imeCaptureTouchpadButton.setEnabled(enabled);
             imeCaptureTouchpadButton.setAlpha(enabled ? 1f : 0.45f);
         }
+        if (imeSubComposeModeToggle != null) {
+            imeSubComposeModeToggle.setEnabled(enabled);
+            imeSubComposeModeToggle.setAlpha(enabled ? 1f : 0.45f);
+        }
     }
 
     private void addImeCaptureEditorBelowTopStrip() {
         if (isImeSubComposePortraitContext()) {
-            imeSubComposeExpanded = getContext()
-                    .getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
-                    .getBoolean(KEY_IME_SUB_COMPOSE_EXPANDED, false);
+            SharedPreferences portraitImePrefs =
+                    getContext().getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE);
+            imeSubComposeExpanded = portraitImePrefs.getBoolean(KEY_IME_SUB_COMPOSE_EXPANDED, false);
+            imeSubComposeDirectHidMode = portraitImePrefs.getBoolean(KEY_IME_SUB_COMPOSE_DIRECT_HID, false);
+            if (imeSubComposeDirectHidMode) {
+                imeSubComposeExpanded = false;
+                portraitImePrefs.edit().putBoolean(KEY_IME_SUB_COMPOSE_EXPANDED, false).apply();
+            }
             applyImeTopStripVisibilityForSubCompose();
 
             imeCaptureEditorRow = new LinearLayout(getContext());
@@ -4307,7 +4481,7 @@ public class CustomKeyboardView extends LinearLayout {
 
             addView(imeCaptureEditorRow);
 
-            View imeCaptureAccentDivider = new View(getContext());
+            imeCaptureAccentDivider = new View(getContext());
             imeCaptureAccentDivider.setLayoutParams(
                     new LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(2)));
             imeCaptureAccentDivider.setBackgroundColor(ThemeManager.getColorPrimary(getContext()));
@@ -4321,7 +4495,39 @@ public class CustomKeyboardView extends LinearLayout {
             imeCaptureToolbar.setPadding(0, 0, 0, 0);
             int keyMargin = dpToPx(KEY_OUTER_MARGIN_DP);
 
-            // Seven logical columns matching top strip: Undo, Clear, Touchpad, Send = 1+1+1+4.
+            imeCaptureTouchpadButton = new ImageButton(getContext());
+            styleImeToolbarLikeTopShortcutIconButton(
+                    imeCaptureTouchpadButton, R.drawable.ic_compose_touchpad_24, R.string.compose_touchpad);
+            imeCaptureTouchpadButton.setOnClickListener(v -> {
+                if (onImeSubComposeChromeListener != null) {
+                    onImeSubComposeChromeListener.onImeToolbarPopOutTouchpadRequested(CustomKeyboardView.this);
+                }
+            });
+            LinearLayout.LayoutParams tpLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
+            tpLp.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
+            imeCaptureTouchpadButton.setLayoutParams(tpLp);
+
+            imeSubComposeModeToggle = new ImageButton(getContext());
+            styleImeToolbarLikeTopShortcutIconButton(
+                    imeSubComposeModeToggle,
+                    R.drawable.ic_ime_compose_mode_note_24,
+                    R.string.ime_sub_compose_mode_toggle_direct);
+            imeSubComposeModeToggle.setOnClickListener(v -> onImeSubComposeModeToggleClicked());
+            LinearLayout.LayoutParams modeLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
+            modeLp.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
+            imeSubComposeModeToggle.setLayoutParams(modeLp);
+
+            imeCaptureDirectModeHint = new TextView(getContext());
+            imeCaptureDirectModeHint.setText(R.string.ime_sub_compose_direct_hid_hint);
+            imeCaptureDirectModeHint.setTextColor(ContextCompat.getColor(getContext(), R.color.text_secondary));
+            imeCaptureDirectModeHint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
+            imeCaptureDirectModeHint.setMaxLines(2);
+            imeCaptureDirectModeHint.setEllipsize(TextUtils.TruncateAt.END);
+            imeCaptureDirectModeHint.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+            LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
+            hintLp.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
+            imeCaptureDirectModeHint.setLayoutParams(hintLp);
+
             imeCaptureUndoButton = new ImageButton(getContext());
             styleImeToolbarLikeTopShortcutIconButton(
                     imeCaptureUndoButton, R.drawable.ic_compose_undo_24, R.string.compose_undo);
@@ -4338,29 +4544,19 @@ public class CustomKeyboardView extends LinearLayout {
             clearLp.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
             imeCaptureClearButton.setLayoutParams(clearLp);
 
-            imeCaptureTouchpadButton = new ImageButton(getContext());
-            styleImeToolbarLikeTopShortcutIconButton(
-                    imeCaptureTouchpadButton, R.drawable.ic_compose_touchpad_24, R.string.compose_touchpad);
-            imeCaptureTouchpadButton.setOnClickListener(v -> {
-                if (onImeSubComposeChromeListener != null) {
-                    onImeSubComposeChromeListener.onImeToolbarPopOutTouchpadRequested(CustomKeyboardView.this);
-                }
-            });
-            LinearLayout.LayoutParams tpLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
-            tpLp.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
-            imeCaptureTouchpadButton.setLayoutParams(tpLp);
-
             imeCaptureSendButton = new ImageButton(getContext());
             styleImeToolbarLikeTopShortcutIconButton(
                     imeCaptureSendButton, R.drawable.ic_compose_send_24, R.string.compose_send);
             imeCaptureSendButton.setOnClickListener(v -> onImeCaptureSendClicked());
-            LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 4f);
+            LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 3f);
             sendLp.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
             imeCaptureSendButton.setLayoutParams(sendLp);
 
+            imeCaptureToolbar.addView(imeSubComposeModeToggle);
+            imeCaptureToolbar.addView(imeCaptureTouchpadButton);
+            imeCaptureToolbar.addView(imeCaptureDirectModeHint);
             imeCaptureToolbar.addView(imeCaptureUndoButton);
             imeCaptureToolbar.addView(imeCaptureClearButton);
-            imeCaptureToolbar.addView(imeCaptureTouchpadButton);
             imeCaptureToolbar.addView(imeCaptureSendButton);
             addView(imeCaptureToolbar);
 
@@ -4377,12 +4573,19 @@ public class CustomKeyboardView extends LinearLayout {
                 }
             });
 
-            ImeTextForwarder.attach(
-                    et,
-                    this::peekConnectionManager,
-                    this::getTargetOs,
-                    imeTextExecutor);
+            if (imeSubComposeDirectHidMode) {
+                ImeTextForwarder.attach(
+                        et,
+                        this::peekConnectionManager,
+                        this::getTargetOs,
+                        imeTextExecutor);
+            } else {
+                ImeTextForwarder.detach(et);
+            }
+            refreshImeSubComposeModeToggleIcon();
+            applyImeSubComposeDirectHidUi();
             updateImeCaptureToolbarState();
+            post(this::notifyImeSubComposeDirectHidModeChanged);
             if (imeSubComposeExpanded && onImeSubComposeChromeListener != null) {
                 post(() ->
                         onImeSubComposeChromeListener.onImeSubComposeExpandedChanged(CustomKeyboardView.this, true));

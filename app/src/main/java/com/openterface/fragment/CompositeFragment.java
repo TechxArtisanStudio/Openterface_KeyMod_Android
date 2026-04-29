@@ -121,6 +121,13 @@ public class CompositeFragment extends Fragment {
      */
     private static final float PORTRAIT_IME_SUB_COMPOSE_COLLAPSED_TOUCHPAD_WEIGHT = 0.9f;
     private static final float PORTRAIT_IME_SUB_COMPOSE_COLLAPSED_KEYBOARD_WEIGHT = 1.7f;
+    /**
+     * Portrait BOTH + IME Direct HID: more touchpad, less keyboard column than collapsed compose
+     * so the shortcut strip + toolbar do not stretch when the editor row collapses.
+     * Sum matches collapsed pair (2.6f) for similar balance with the toggle handle.
+     */
+    private static final float PORTRAIT_IME_DIRECT_HID_TOUCHPAD_WEIGHT = 1.35f;
+    private static final float PORTRAIT_IME_DIRECT_HID_KEYBOARD_WEIGHT = 1.25f;
     private final ExecutorService imeSplitTextExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "ImeSplitTextForward");
         t.setDaemon(true);
@@ -476,6 +483,14 @@ public class CompositeFragment extends Fragment {
                     return;
                 }
                 applyImeSubComposeFragmentChrome(expanded);
+                applyOrientationLayout();
+            }
+
+            @Override
+            public void onImeSubComposeDirectHidModeChanged(CustomKeyboardView source, boolean direct) {
+                if (!isAdded()) {
+                    return;
+                }
                 applyOrientationLayout();
             }
 
@@ -1447,8 +1462,13 @@ public class CompositeFragment extends Fragment {
             if (displayMode != DisplayMode.KEYBOARD
                     && keyboardView.isSystemImeCaptureMode()
                     && !keyboardView.isImeSubComposeExpanded()) {
-                touchpadWeight = PORTRAIT_IME_SUB_COMPOSE_COLLAPSED_TOUCHPAD_WEIGHT;
-                keyboardWeight = PORTRAIT_IME_SUB_COMPOSE_COLLAPSED_KEYBOARD_WEIGHT;
+                if (keyboardView.isImeSubComposeDirectHidMode()) {
+                    touchpadWeight = PORTRAIT_IME_DIRECT_HID_TOUCHPAD_WEIGHT;
+                    keyboardWeight = PORTRAIT_IME_DIRECT_HID_KEYBOARD_WEIGHT;
+                } else {
+                    touchpadWeight = PORTRAIT_IME_SUB_COMPOSE_COLLAPSED_TOUCHPAD_WEIGHT;
+                    keyboardWeight = PORTRAIT_IME_SUB_COMPOSE_COLLAPSED_KEYBOARD_WEIGHT;
+                }
             }
 
             touchpadSection.setLayoutParams(new LinearLayout.LayoutParams(

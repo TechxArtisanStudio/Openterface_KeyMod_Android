@@ -268,7 +268,10 @@ by TechxArtisan</string>
     <string name="ime_not_connected">Connect USB or Bluetooth to send keystrokes.</string>
     <string name="ime_sub_compose_expand">Expand text area</string>
     <string name="ime_sub_compose_collapse">Show touchpad and shortcuts</string>
-    <string name="ime_capture_send_flush_note">Send types the full text again on the host. Edits also stream while you type.</string>
+    <string name="ime_capture_send_flush_note">Send types the buffered text on the host. In Compose mode, keystrokes are not sent until you tap Send.</string>
+    <string name="ime_sub_compose_mode_toggle_direct">Switch to direct HID: each key sends as you type</string>
+    <string name="ime_sub_compose_mode_toggle_compose">Switch to compose: type a buffer, then tap Send</string>
+    <string name="ime_sub_compose_direct_hid_hint">Keys send to the host as you type</string>
 
     <!-- Presentation Mode Strings -->
     <string name="presentation_mode">Presentation</string>
