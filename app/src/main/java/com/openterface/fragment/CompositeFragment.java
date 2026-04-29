@@ -386,17 +386,16 @@ public class CompositeFragment extends Fragment {
         if (touchPadTips == null || splitRoot != null) {
             return;
         }
-        if (isPortraitImeCaptureSubComposeNormal()) {
-            touchPadTips.setVisibility(View.GONE);
-            return;
-        }
         touchPadTips.setVisibility(View.VISIBLE);
-        // Portrait numpad: keep title + live button/touch status only (no gesture-tutorial overlay access).
+        // Portrait numpad / IME capture: status line only; info button is hidden separately when IME is on.
         touchPadTips.setText(
                 TouchPadTipsFormatter.buildCompact(requireContext(), isDragMode, pointerPhase));
     }
 
-    /** Portrait BOTH, normal (non-split) layout, IME capture on, sub-compose strip not expanded. */
+    /**
+     * Portrait BOTH, normal (non-split) layout, IME capture on, sub-compose strip not expanded.
+     * Used to dismiss the full-screen help overlay in this mode (tips stay visible; no info button).
+     */
     private boolean isPortraitImeCaptureSubComposeNormal() {
         if (splitRoot != null) {
             return false;
