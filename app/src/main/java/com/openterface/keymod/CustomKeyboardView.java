@@ -4584,7 +4584,8 @@ public class CustomKeyboardView extends LinearLayout {
             imeCaptureDirectModeHint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
             imeCaptureDirectModeHint.setMaxLines(2);
             imeCaptureDirectModeHint.setEllipsize(TextUtils.TruncateAt.END);
-            imeCaptureDirectModeHint.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+            imeCaptureDirectModeHint.setGravity(Gravity.CENTER);
+            imeCaptureDirectModeHint.setTextAlignment(TEXT_ALIGNMENT_CENTER);
             LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
             hintLp.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
             imeCaptureDirectModeHint.setLayoutParams(hintLp);
