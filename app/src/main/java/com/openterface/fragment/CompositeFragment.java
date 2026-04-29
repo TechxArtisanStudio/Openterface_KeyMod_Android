@@ -44,6 +44,7 @@ import com.openterface.keymod.R;
 import com.openterface.keymod.ThemeManager;
 import com.openterface.keymod.TouchPadView;
 import com.openterface.keymod.util.ImeTextForwarder;
+import com.openterface.keymod.util.PopOutTouchPadDialog;
 import com.openterface.keymod.util.TouchPadHaptics;
 import com.openterface.keymod.util.TouchPadHelpOverlay;
 import com.openterface.keymod.util.TouchPadPointerPhase;
@@ -106,6 +107,20 @@ public class CompositeFragment extends Fragment {
     private static final float SPLIT_TOUCHPAD_SECTION_WEIGHT_NORMAL = 1.2f;
     private static final float SPLIT_TOUCHPAD_SECTION_WEIGHT_IME_FULL_WIDTH = 1f;
     private View splitTouchPadInfoButton;
+    @Nullable
+    private PopOutTouchPadDialog imePopOutTouchPad;
+    private boolean imeSubComposeChromeSnapshotValid;
+    private float imeSubComposeSavedKeyboardWeight = 2.15f;
+    private int imeSubComposeSavedTouchpadVisibility = View.VISIBLE;
+    private int imeSubComposeSavedToggleVisibility = View.VISIBLE;
+    /** Portrait IME sub-compose expanded: keyboard column consumes upper stack. */
+    private static final float IME_SUB_COMPOSE_KEYBOARD_WEIGHT_EXPANDED = 24f;
+    /**
+     * Portrait BOTH + IME capture (sub-compose collapsed): favor the keyboard column (~35% / ~65%)
+     * so the shortcut strip and IME row are less cramped than the default 1.5 : 1.0 touchpad-heavy split.
+     */
+    private static final float PORTRAIT_IME_SUB_COMPOSE_COLLAPSED_TOUCHPAD_WEIGHT = 0.9f;
+    private static final float PORTRAIT_IME_SUB_COMPOSE_COLLAPSED_KEYBOARD_WEIGHT = 1.7f;
     private final ExecutorService imeSplitTextExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "ImeSplitTextForward");
         t.setDaemon(true);
@@ -368,10 +383,34 @@ public class CompositeFragment extends Fragment {
     }
 
     private void updateTouchPadTips() {
-        if (touchPadTips == null) return;
+        if (touchPadTips == null || splitRoot != null) {
+            return;
+        }
+        if (isPortraitImeCaptureSubComposeNormal()) {
+            touchPadTips.setVisibility(View.GONE);
+            return;
+        }
+        touchPadTips.setVisibility(View.VISIBLE);
         // Portrait numpad: keep title + live button/touch status only (no gesture-tutorial overlay access).
         touchPadTips.setText(
                 TouchPadTipsFormatter.buildCompact(requireContext(), isDragMode, pointerPhase));
+    }
+
+    /** Portrait BOTH, normal (non-split) layout, IME capture on, sub-compose strip not expanded. */
+    private boolean isPortraitImeCaptureSubComposeNormal() {
+        if (splitRoot != null) {
+            return false;
+        }
+        if (getResources().getConfiguration().orientation != Configuration.ORIENTATION_PORTRAIT) {
+            return false;
+        }
+        if (displayMode == DisplayMode.KEYBOARD) {
+            return false;
+        }
+        if (keyboardView == null) {
+            return false;
+        }
+        return keyboardView.isSystemImeCaptureMode() && !keyboardView.isImeSubComposeExpanded();
     }
 
     /** Portrait keyboard-only strip: touchpad + numpad; gesture help UI is suppressed. */
@@ -387,7 +426,6 @@ public class CompositeFragment extends Fragment {
         if (isPortraitNumpadTouchpadMode() && touchPadHelpOverlay != null) {
             TouchPadHelpOverlay.hideImmediately(touchPadHelpOverlay);
         }
-        updateTouchPadTips();
     }
 
     private void applyTouchpadInfoVisibility() {
@@ -399,6 +437,12 @@ public class CompositeFragment extends Fragment {
         }
         if (splitTouchPadInfoButton != null) {
             splitTouchPadInfoButton.setVisibility(hide ? View.GONE : View.VISIBLE);
+        }
+        if (splitRoot == null) {
+            if (isPortraitImeCaptureSubComposeNormal() && touchPadHelpOverlay != null) {
+                TouchPadHelpOverlay.hideImmediately(touchPadHelpOverlay);
+            }
+            updateTouchPadTips();
         }
     }
 
@@ -422,11 +466,84 @@ public class CompositeFragment extends Fragment {
         kbd.setOnImeCaptureModeChangedListener(this::onKeyboardImeCaptureModeChanged);
     }
 
+    private void registerImeSubComposeChromeListener(@Nullable CustomKeyboardView kbd) {
+        if (kbd == null) {
+            return;
+        }
+        kbd.setOnImeSubComposeChromeListener(new CustomKeyboardView.OnImeSubComposeChromeListener() {
+            @Override
+            public void onImeSubComposeExpandedChanged(CustomKeyboardView source, boolean expanded) {
+                if (!isAdded()) {
+                    return;
+                }
+                applyImeSubComposeFragmentChrome(expanded);
+                applyOrientationLayout();
+            }
+
+            @Override
+            public void onImeToolbarPopOutTouchpadRequested(CustomKeyboardView source) {
+                if (!isAdded()) {
+                    return;
+                }
+                if (imePopOutTouchPad == null) {
+                    imePopOutTouchPad = new PopOutTouchPadDialog(CompositeFragment.this, false);
+                }
+                imePopOutTouchPad.show();
+            }
+        });
+    }
+
+    private void applyImeSubComposeFragmentChrome(boolean expanded) {
+        if (splitRoot != null) {
+            return;
+        }
+        if (!isAdded()) {
+            return;
+        }
+        if (getResources().getConfiguration().orientation != Configuration.ORIENTATION_PORTRAIT) {
+            return;
+        }
+        if (touchpadSection == null || toggleHandle == null || keyboardView == null) {
+            return;
+        }
+        if (expanded) {
+            if (!imeSubComposeChromeSnapshotValid) {
+                imeSubComposeSavedTouchpadVisibility = touchpadSection.getVisibility();
+                imeSubComposeSavedToggleVisibility = toggleHandle.getVisibility();
+                ViewGroup.LayoutParams lp = keyboardView.getLayoutParams();
+                if (lp instanceof LinearLayout.LayoutParams) {
+                    imeSubComposeSavedKeyboardWeight = ((LinearLayout.LayoutParams) lp).weight;
+                }
+                imeSubComposeChromeSnapshotValid = true;
+            }
+            touchpadSection.setVisibility(View.GONE);
+            toggleHandle.setVisibility(View.GONE);
+            keyboardView.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, IME_SUB_COMPOSE_KEYBOARD_WEIGHT_EXPANDED));
+        } else {
+            if (imeSubComposeChromeSnapshotValid) {
+                touchpadSection.setVisibility(imeSubComposeSavedTouchpadVisibility);
+                toggleHandle.setVisibility(imeSubComposeSavedToggleVisibility);
+                keyboardView.setLayoutParams(new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, 0, imeSubComposeSavedKeyboardWeight));
+                imeSubComposeChromeSnapshotValid = false;
+            }
+        }
+        if (rootLayout != null) {
+            rootLayout.requestLayout();
+        }
+        applyTouchpadInfoVisibility();
+    }
+
     private void onKeyboardImeCaptureModeChanged(CustomKeyboardView source, boolean enabled) {
         applyTouchpadInfoVisibility();
+        if (!enabled) {
+            applyImeSubComposeFragmentChrome(false);
+        }
         if (splitImeHost != null) {
             applySplitImeLayout(enabled);
         }
+        applyOrientationLayout();
         requestCompositeImeInsetsAfterImeChange();
     }
 
@@ -858,6 +975,7 @@ public class CompositeFragment extends Fragment {
         registerKeyboardOsListener(keyboardView);
         registerTopModeShortcutListener(keyboardView);
         registerImeCaptureListener(keyboardView);
+        registerImeSubComposeChromeListener(keyboardView);
         if (keyboardView != null) {
             keyboardView.post(this::syncNormalImeChromeFromPrefs);
         }
@@ -876,6 +994,11 @@ public class CompositeFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
+        if (imePopOutTouchPad != null) {
+            imePopOutTouchPad.dismissIfShowing();
+            imePopOutTouchPad = null;
+        }
+        imeSubComposeChromeSnapshotValid = false;
         undockSplitShortcutsFromIme();
         ImeTextForwarder.detach(splitImeEdit);
         tipHandler.removeCallbacks(pointerIdleRunnable);
@@ -1242,6 +1365,7 @@ public class CompositeFragment extends Fragment {
 
     private void ensureNormalLayout() {
         if (splitRoot != null) {
+            imeSubComposeChromeSnapshotValid = false;
             undockSplitShortcutsFromIme();
             if (splitImeEdit != null) {
                 ImeTextForwarder.detach(splitImeEdit);
@@ -1278,6 +1402,7 @@ public class CompositeFragment extends Fragment {
             }
             registerTopModeShortcutListener(keyboardView);
             registerImeCaptureListener(keyboardView);
+            registerImeSubComposeChromeListener(keyboardView);
             setupTouchPad(touchPad, touchPadTips, touchPadInfoButton);
             if (keyboardView != null) {
                 keyboardView.post(this::syncNormalImeChromeFromPrefs);
@@ -1287,6 +1412,9 @@ public class CompositeFragment extends Fragment {
     }
 
     private void applyOrientationLayout() {
+        if (splitRoot != null) {
+            return;
+        }
         if (rootLayout == null || touchpadSection == null || toggleHandle == null || keyboardView == null) {
             return;
         }
@@ -1313,9 +1441,16 @@ public class CompositeFragment extends Fragment {
             rootLayout.setOrientation(LinearLayout.VERTICAL);
 
             // Portrait numpad + touchpad: touchpad : numpad (keyboard strip) = 1 : 4.
-            // Portrait BOTH (full keyboard): keep previous 1.5 : 1.0 balance.
+            // Portrait BOTH (full keyboard): default 1.5 : 1.0; IME capture collapsed sub-compose uses
+            // PORTRAIT_IME_SUB_COMPOSE_COLLAPSED_* so the strip + editor row get more vertical space.
             float touchpadWeight = displayMode == DisplayMode.KEYBOARD ? 1f : 1.5f;
             float keyboardWeight = displayMode == DisplayMode.KEYBOARD ? 4f : 1.0f;
+            if (displayMode != DisplayMode.KEYBOARD
+                    && keyboardView.isSystemImeCaptureMode()
+                    && !keyboardView.isImeSubComposeExpanded()) {
+                touchpadWeight = PORTRAIT_IME_SUB_COMPOSE_COLLAPSED_TOUCHPAD_WEIGHT;
+                keyboardWeight = PORTRAIT_IME_SUB_COMPOSE_COLLAPSED_KEYBOARD_WEIGHT;
+            }
 
             touchpadSection.setLayoutParams(new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 0, touchpadWeight));
@@ -1331,6 +1466,12 @@ public class CompositeFragment extends Fragment {
             if (toggleHandlePill != null) {
                 toggleHandlePill.setLayoutParams(new LinearLayout.LayoutParams(dpToPx(40), dpToPx(4)));
             }
+        }
+        if (!isLandscape
+                && keyboardView != null
+                && keyboardView.isSystemImeCaptureMode()
+                && keyboardView.isImeSubComposeExpanded()) {
+            applyImeSubComposeFragmentChrome(true);
         }
     }
 

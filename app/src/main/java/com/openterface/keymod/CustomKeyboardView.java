@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -14,8 +15,12 @@ import android.graphics.drawable.LayerDrawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
+import android.text.Editable;
+import android.text.InputFilter;
 import android.text.SpannableString;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.TypedValue;
@@ -34,13 +39,16 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.core.widget.TextViewCompat;
 import androidx.preference.PreferenceManager;
 
+import com.openterface.keymod.util.HidTextKeystrokeSender;
 import com.openterface.keymod.util.ImeTextForwarder;
 import com.openterface.keymod.util.TopModeShortcutPrefs;
 import com.openterface.target.CH9329MSKBMap;
@@ -56,6 +64,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class CustomKeyboardView extends LinearLayout {
     private static final String TAG = "CustomKeyboardView";
@@ -71,6 +80,11 @@ public class CustomKeyboardView extends LinearLayout {
     /** Single-pane IME: shortcut strip vs text vs space for soft keyboard (sum ~5.15). */
     private static final float IME_SINGLE_TOP_STRIP_WEIGHT = 1.35f;
     private static final float IME_SINGLE_TEXT_WEIGHT = 0.95f;
+    private static final String KEY_IME_SUB_COMPOSE_EXPANDED = "ime_sub_compose_expanded";
+    /** Portrait IME sub-compose: max field length (same order of magnitude as Compose). */
+    public static final int IME_CAPTURE_MAX_TEXT_LEN = 10_000;
+    private static final int IME_CAPTURE_TOOLBAR_HEIGHT_DP = 52;
+    private static final float IME_SUB_COMPOSE_EDITOR_WEIGHT_EXPANDED = 12f;
     /** Extra numpad Fn-arrow overlay (dp); larger than top strip 24dp icons for the taller grid cells. */
     private static final int EXTRA_NUMPAD_FN_ARROW_ICON_DP = 36;
     /** Fn-layer Save / Undo / Tab icons — match top shortcut row visual weight (24dp assets, modest cell size). */
@@ -136,11 +150,35 @@ public class CustomKeyboardView extends LinearLayout {
         void onImeCaptureModeChanged(CustomKeyboardView source, boolean enabled);
     }
 
+    /** Portrait IME capture: expand/collapse chrome and pop-out touchpad from the edit toolbar. */
+    public interface OnImeSubComposeChromeListener {
+        void onImeSubComposeExpandedChanged(CustomKeyboardView source, boolean expanded);
+
+        void onImeToolbarPopOutTouchpadRequested(CustomKeyboardView source);
+    }
+
     public interface OnTopModeShortcutListener {
         void onRequestSwitchToMode(String launchPanelMode);
     }
 
     private OnTopModeShortcutListener onTopModeShortcutListener;
+    @Nullable
+    private OnImeSubComposeChromeListener onImeSubComposeChromeListener;
+    private boolean imeSubComposeExpanded;
+    private LinearLayout imeCaptureEditorRow;
+    private ImageButton imeSubComposeExpandButton;
+    private LinearLayout imeCaptureToolbar;
+    private Button imeCaptureClearButton;
+    private Button imeCaptureTouchpadButton;
+    private Button imeCaptureSendButton;
+    private final ExecutorService imeSubComposeSendExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "ImeCaptureSend");
+        t.setDaemon(true);
+        return t;
+    });
+    private final AtomicBoolean imeSubComposeCancelSend = new AtomicBoolean(false);
+    private volatile boolean imeSubComposeSending;
+    private final Handler imeSubComposeMainHandler = new Handler(Looper.getMainLooper());
     private List<List<Key>> lowerKeys;
     private UsbSerialPort port;
     private Handler repeatHandler = new Handler();
@@ -365,7 +403,8 @@ public class CustomKeyboardView extends LinearLayout {
     @Override
     protected void onConfigurationChanged(android.content.res.Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        
+        collapseImeSubComposePersistedForChrome();
+
         // Reload keyboard layout when orientation changes
         boolean isLandscape = newConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
         Log.d(TAG, "Orientation changed: landscape=" + isLandscape + ", reloading keyboard");
@@ -522,6 +561,14 @@ public class CustomKeyboardView extends LinearLayout {
         onImeCaptureModeChangedListener = listener;
     }
 
+    public void setOnImeSubComposeChromeListener(@Nullable OnImeSubComposeChromeListener listener) {
+        onImeSubComposeChromeListener = listener;
+    }
+
+    public boolean isImeSubComposeExpanded() {
+        return imeSubComposeExpanded;
+    }
+
     public boolean isSystemImeCaptureMode() {
         return systemImeCaptureMode;
     }
@@ -537,6 +584,9 @@ public class CustomKeyboardView extends LinearLayout {
             syncTopPanelViewportContent();
             updateKeyboard();
             return;
+        }
+        if (!enabled) {
+            collapseImeSubComposePersistedForChrome();
         }
         systemImeCaptureMode = enabled;
         Context ctx = getContext();
@@ -1333,7 +1383,7 @@ public class CustomKeyboardView extends LinearLayout {
                         }
                         if ("Win".equals(key.label) || "Cmd".equals(key.label) || "Super".equals(key.label)
                                 || "BackSpace".equals(key.label) || "Shift".equals(key.label)
-                                || "Enter".equals(key.label)) {
+                                || "Enter".equals(key.label) || "Space".equals(key.label)) {
                             imageButton.setColorFilter(resolveThemeTextColor());
                         }
                     }
@@ -3858,6 +3908,9 @@ public class CustomKeyboardView extends LinearLayout {
 
     private void toggleSystemImeCaptureFromUser() {
         boolean next = !systemImeCaptureMode;
+        if (!next) {
+            collapseImeSubComposePersistedForChrome();
+        }
         systemImeCaptureMode = next;
         Context ctx = getContext();
         if (ctx != null) {
@@ -3906,6 +3959,8 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void detachLocalImeFieldQuiet() {
+        boolean wasExpanded = imeSubComposeExpanded;
+        imeSubComposeCancelSend.set(true);
         if (imeCaptureEdit != null && getContext() != null) {
             InputMethodManager imm =
                     (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -3915,33 +3970,389 @@ public class CustomKeyboardView extends LinearLayout {
             ImeTextForwarder.detach(imeCaptureEdit);
             imeCaptureEdit = null;
         }
+        imeCaptureEditorRow = null;
+        imeSubComposeExpandButton = null;
+        imeCaptureToolbar = null;
+        imeCaptureClearButton = null;
+        imeCaptureTouchpadButton = null;
+        imeCaptureSendButton = null;
+        imeSubComposeExpanded = false;
+        if (wasExpanded && onImeSubComposeChromeListener != null) {
+            onImeSubComposeChromeListener.onImeSubComposeExpandedChanged(this, false);
+        }
+    }
+
+    private boolean isImeSubComposePortraitContext() {
+        Context ctx = getContext();
+        return ctx != null
+                && splitPart == SPLIT_NONE
+                && ctx.getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT;
+    }
+
+    private void collapseImeSubComposePersistedForChrome() {
+        if (!imeSubComposeExpanded) {
+            return;
+        }
+        imeSubComposeExpanded = false;
+        Context ctx = getContext();
+        if (ctx != null) {
+            ctx.getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_IME_SUB_COMPOSE_EXPANDED, false)
+                    .apply();
+        }
+        if (onImeSubComposeChromeListener != null) {
+            onImeSubComposeChromeListener.onImeSubComposeExpandedChanged(this, false);
+        }
+    }
+
+    private void applyImeTopStripVisibilityForSubCompose() {
+        if (topPanelViewport == null) {
+            return;
+        }
+        LayoutParams lp = (LayoutParams) topPanelViewport.getLayoutParams();
+        if (imeSubComposeExpanded) {
+            topPanelViewport.setVisibility(GONE);
+            lp.height = 0;
+            lp.weight = 0f;
+        } else {
+            topPanelViewport.setVisibility(VISIBLE);
+            lp.height = 0;
+            lp.weight = IME_SINGLE_TOP_STRIP_WEIGHT;
+        }
+        topPanelViewport.setLayoutParams(lp);
+    }
+
+    private void persistImeSubComposeExpanded(boolean expanded) {
+        imeSubComposeExpanded = expanded;
+        Context ctx = getContext();
+        if (ctx != null) {
+            ctx.getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_IME_SUB_COMPOSE_EXPANDED, expanded)
+                    .apply();
+        }
+    }
+
+    private void onImeSubComposeExpandToggleClicked() {
+        if (!isImeSubComposePortraitContext()) {
+            return;
+        }
+        boolean next = !imeSubComposeExpanded;
+        persistImeSubComposeExpanded(next);
+        applyImeTopStripVisibilityForSubCompose();
+        refreshImeSubComposeEditorRowWeight();
+        refreshImeSubComposeExpandIcon();
+        updateImeCaptureToolbarState();
+        if (onImeSubComposeChromeListener != null) {
+            onImeSubComposeChromeListener.onImeSubComposeExpandedChanged(this, next);
+        }
+    }
+
+    private void refreshImeSubComposeEditorRowWeight() {
+        if (imeCaptureEditorRow == null) {
+            return;
+        }
+        LayoutParams lp = (LayoutParams) imeCaptureEditorRow.getLayoutParams();
+        lp.weight = imeSubComposeExpanded ? IME_SUB_COMPOSE_EDITOR_WEIGHT_EXPANDED : IME_SINGLE_TEXT_WEIGHT;
+        imeCaptureEditorRow.setLayoutParams(lp);
+    }
+
+    private void refreshImeSubComposeExpandIcon() {
+        if (imeSubComposeExpandButton == null || getContext() == null) {
+            return;
+        }
+        if (imeSubComposeExpanded) {
+            imeSubComposeExpandButton.setImageResource(R.drawable.ic_ime_sub_compose_collapse_24);
+            imeSubComposeExpandButton.setContentDescription(getContext().getString(R.string.ime_sub_compose_collapse));
+        } else {
+            imeSubComposeExpandButton.setImageResource(R.drawable.ic_ime_sub_compose_expand_24);
+            imeSubComposeExpandButton.setContentDescription(getContext().getString(R.string.ime_sub_compose_expand));
+        }
+        imeSubComposeExpandButton.setColorFilter(resolveThemeTextColor());
+    }
+
+    private static boolean imeCaptureTextContainsNonAscii(String s) {
+        for (int i = 0; i < s.length(); ) {
+            int cp = s.codePointAt(i);
+            if (cp > 127) {
+                return true;
+            }
+            i += Character.charCount(cp);
+        }
+        return false;
+    }
+
+    private void updateImeCaptureToolbarState() {
+        if (imeCaptureEdit == null || imeCaptureClearButton == null || imeCaptureSendButton == null) {
+            return;
+        }
+        String t = imeCaptureEdit.getText() != null ? imeCaptureEdit.getText().toString() : "";
+        boolean bad = imeCaptureTextContainsNonAscii(t);
+        ConnectionManager cm = peekConnectionManager();
+        boolean connected = cm != null && cm.isConnected();
+
+        boolean canClear = !imeSubComposeSending && !t.isEmpty();
+        imeCaptureClearButton.setEnabled(canClear);
+        imeCaptureClearButton.setAlpha(canClear ? 1f : 0.45f);
+
+        if (imeSubComposeSending) {
+            TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    imeCaptureSendButton, 0, R.drawable.ic_compose_stop_24, 0, 0);
+            imeCaptureSendButton.setContentDescription(getContext().getString(R.string.compose_stop));
+            imeCaptureSendButton.setEnabled(true);
+            imeCaptureSendButton.setAlpha(1f);
+        } else {
+            TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    imeCaptureSendButton, 0, R.drawable.ic_compose_send_24, 0, 0);
+            imeCaptureSendButton.setContentDescription(getContext().getString(R.string.compose_send));
+            boolean canSend = connected && !bad && !t.isEmpty();
+            imeCaptureSendButton.setEnabled(canSend);
+            imeCaptureSendButton.setAlpha(canSend ? 1f : 0.45f);
+        }
+    }
+
+    private void onImeCaptureClearClicked() {
+        if (imeCaptureEdit == null || imeSubComposeSending) {
+            return;
+        }
+        imeCaptureEdit.setText("");
+        updateImeCaptureToolbarState();
+    }
+
+    private void onImeCaptureSendClicked() {
+        if (imeCaptureEdit == null) {
+            return;
+        }
+        if (imeSubComposeSending) {
+            imeSubComposeCancelSend.set(true);
+            return;
+        }
+        AppCompatActivity act = unwrapAppCompatActivity(getContext());
+        if (!(act instanceof MainActivity)) {
+            return;
+        }
+        MainActivity ma = (MainActivity) act;
+        ConnectionManager cm = ma.getConnectionManager();
+        if (cm == null || !cm.isConnected()) {
+            Toast.makeText(getContext(), R.string.compose_no_connection, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String text = imeCaptureEdit.getText() != null ? imeCaptureEdit.getText().toString() : "";
+        if (text.isEmpty()) {
+            Toast.makeText(getContext(), R.string.compose_empty, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (imeCaptureTextContainsNonAscii(text)) {
+            Toast.makeText(getContext(), R.string.compose_ascii_warning, Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        imeSubComposeCancelSend.set(false);
+        imeSubComposeSending = true;
+        imeCaptureEdit.setEnabled(false);
+        setImeCaptureToolbarEnabledWhileSending(false);
+        updateImeCaptureToolbarState();
+
+        final String targetOs = ma.getTargetOs();
+        final int sentLen = text.length();
+
+        imeSubComposeSendExecutor.execute(() -> {
+            HidTextKeystrokeSender.Result result;
+            try {
+                result = HidTextKeystrokeSender.send(text, cm, targetOs, false, imeSubComposeCancelSend);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                result = HidTextKeystrokeSender.Result.CANCELLED;
+            }
+            HidTextKeystrokeSender.Result finalResult = result;
+            imeSubComposeMainHandler.post(() -> {
+                imeSubComposeSending = false;
+                if (imeCaptureEdit != null) {
+                    imeCaptureEdit.setEnabled(true);
+                }
+                setImeCaptureToolbarEnabledWhileSending(true);
+                updateImeCaptureToolbarState();
+                if (getContext() == null) {
+                    return;
+                }
+                if (finalResult == HidTextKeystrokeSender.Result.CANCELLED) {
+                    Toast.makeText(getContext(), R.string.compose_cancelled, Toast.LENGTH_SHORT).show();
+                } else {
+                    String msg = getContext().getString(R.string.compose_sent, sentLen)
+                            + "\n\n"
+                            + getContext().getString(R.string.ime_capture_send_flush_note);
+                    Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
+                }
+            });
+        });
+    }
+
+    private void setImeCaptureToolbarEnabledWhileSending(boolean enabled) {
+        if (imeCaptureClearButton != null) {
+            imeCaptureClearButton.setEnabled(enabled && imeCaptureEdit != null
+                    && imeCaptureEdit.getText() != null
+                    && imeCaptureEdit.getText().length() > 0);
+        }
+        if (imeCaptureTouchpadButton != null) {
+            imeCaptureTouchpadButton.setEnabled(enabled);
+            imeCaptureTouchpadButton.setAlpha(enabled ? 1f : 0.45f);
+        }
     }
 
     private void addImeCaptureEditorBelowTopStrip() {
-        EditText et = new EditText(getContext());
-        imeCaptureEdit = et;
-        et.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, IME_SINGLE_TEXT_WEIGHT));
-        et.setFocusable(true);
-        et.setFocusableInTouchMode(true);
-        et.setClickable(true);
-        et.setGravity(Gravity.TOP | Gravity.START);
-        et.setHint(R.string.ime_capture_hint);
-        et.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
-        et.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-        int pad = dpToPx(8);
-        et.setPadding(pad, pad, pad, pad);
-        et.setTextColor(resolveThemeTextColor());
-        et.setHintTextColor(ContextCompat.getColor(getContext(), R.color.text_secondary));
-        et.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
-        addView(et);
-        ImeTextForwarder.attach(
-                et,
-                this::peekConnectionManager,
-                this::getTargetOs,
-                imeTextExecutor);
+        if (isImeSubComposePortraitContext()) {
+            imeSubComposeExpanded = getContext()
+                    .getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
+                    .getBoolean(KEY_IME_SUB_COMPOSE_EXPANDED, false);
+            applyImeTopStripVisibilityForSubCompose();
+
+            imeCaptureEditorRow = new LinearLayout(getContext());
+            imeCaptureEditorRow.setOrientation(HORIZONTAL);
+            float editorRowWeight =
+                    imeSubComposeExpanded ? IME_SUB_COMPOSE_EDITOR_WEIGHT_EXPANDED : IME_SINGLE_TEXT_WEIGHT;
+            imeCaptureEditorRow.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, editorRowWeight));
+
+            EditText et = new EditText(getContext());
+            imeCaptureEdit = et;
+            LinearLayout.LayoutParams etLp =
+                    new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
+            et.setLayoutParams(etLp);
+            et.setFocusable(true);
+            et.setFocusableInTouchMode(true);
+            et.setClickable(true);
+            et.setGravity(Gravity.TOP | Gravity.START);
+            et.setHint(R.string.ime_capture_hint);
+            et.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+            et.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                    | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                    | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+            et.setFilters(new InputFilter[]{new InputFilter.LengthFilter(IME_CAPTURE_MAX_TEXT_LEN)});
+            int pad = dpToPx(8);
+            et.setPadding(pad, pad, pad, pad);
+            et.setTextColor(resolveThemeTextColor());
+            et.setHintTextColor(ContextCompat.getColor(getContext(), R.color.text_secondary));
+            et.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
+            et.setBackground(null);
+            imeCaptureEditorRow.addView(et);
+
+            imeSubComposeExpandButton = new ImageButton(getContext());
+            int btnPx = dpToPx(48);
+            LinearLayout.LayoutParams expLp = new LinearLayout.LayoutParams(btnPx, LayoutParams.MATCH_PARENT);
+            imeSubComposeExpandButton.setLayoutParams(expLp);
+            imeSubComposeExpandButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
+            imeSubComposeExpandButton.setBackgroundResource(R.drawable.key_background);
+            applyFlatKeyStyle(imeSubComposeExpandButton);
+            imeSubComposeExpandButton.setOnClickListener(v -> onImeSubComposeExpandToggleClicked());
+            refreshImeSubComposeExpandIcon();
+            imeCaptureEditorRow.addView(imeSubComposeExpandButton);
+
+            addView(imeCaptureEditorRow);
+
+            View imeCaptureAccentDivider = new View(getContext());
+            imeCaptureAccentDivider.setLayoutParams(
+                    new LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(2)));
+            imeCaptureAccentDivider.setBackgroundColor(ThemeManager.getColorPrimary(getContext()));
+            addView(imeCaptureAccentDivider);
+
+            imeCaptureToolbar = new LinearLayout(getContext());
+            imeCaptureToolbar.setOrientation(HORIZONTAL);
+            int tbH = dpToPx(IME_CAPTURE_TOOLBAR_HEIGHT_DP);
+            imeCaptureToolbar.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, tbH));
+            imeCaptureToolbar.setGravity(Gravity.CENTER_VERTICAL);
+            int hPad = dpToPx(12);
+            imeCaptureToolbar.setPadding(hPad, dpToPx(4), hPad, dpToPx(4));
+
+            imeCaptureClearButton = new Button(getContext());
+            styleImeToolbarIconButton(imeCaptureClearButton, R.drawable.ic_compose_clear_24, R.string.compose_clear);
+            imeCaptureClearButton.setOnClickListener(v -> onImeCaptureClearClicked());
+            LinearLayout.LayoutParams clearLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
+            clearLp.setMargins(0, 0, dpToPx(8), 0);
+            imeCaptureClearButton.setLayoutParams(clearLp);
+
+            imeCaptureTouchpadButton = new Button(getContext());
+            styleImeToolbarIconButton(
+                    imeCaptureTouchpadButton, R.drawable.ic_compose_touchpad_24, R.string.compose_touchpad);
+            imeCaptureTouchpadButton.setOnClickListener(v -> {
+                if (onImeSubComposeChromeListener != null) {
+                    onImeSubComposeChromeListener.onImeToolbarPopOutTouchpadRequested(CustomKeyboardView.this);
+                }
+            });
+            LinearLayout.LayoutParams tpLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
+            tpLp.setMargins(0, 0, dpToPx(8), 0);
+            imeCaptureTouchpadButton.setLayoutParams(tpLp);
+
+            imeCaptureSendButton = new Button(getContext());
+            styleImeToolbarIconButton(imeCaptureSendButton, R.drawable.ic_compose_send_24, R.string.compose_send);
+            imeCaptureSendButton.setOnClickListener(v -> onImeCaptureSendClicked());
+            LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 3f);
+            imeCaptureSendButton.setLayoutParams(sendLp);
+
+            imeCaptureToolbar.addView(imeCaptureClearButton);
+            imeCaptureToolbar.addView(imeCaptureTouchpadButton);
+            imeCaptureToolbar.addView(imeCaptureSendButton);
+            addView(imeCaptureToolbar);
+
+            et.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+                @Override
+                public void afterTextChanged(Editable s) {
+                    updateImeCaptureToolbarState();
+                }
+            });
+
+            ImeTextForwarder.attach(
+                    et,
+                    this::peekConnectionManager,
+                    this::getTargetOs,
+                    imeTextExecutor);
+            updateImeCaptureToolbarState();
+            if (imeSubComposeExpanded && onImeSubComposeChromeListener != null) {
+                post(() ->
+                        onImeSubComposeChromeListener.onImeSubComposeExpandedChanged(CustomKeyboardView.this, true));
+            }
+        } else {
+            EditText et = new EditText(getContext());
+            imeCaptureEdit = et;
+            et.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, IME_SINGLE_TEXT_WEIGHT));
+            et.setFocusable(true);
+            et.setFocusableInTouchMode(true);
+            et.setClickable(true);
+            et.setGravity(Gravity.TOP | Gravity.START);
+            et.setHint(R.string.ime_capture_hint);
+            et.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+            et.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                    | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                    | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+            int pad = dpToPx(8);
+            et.setPadding(pad, pad, pad, pad);
+            et.setTextColor(resolveThemeTextColor());
+            et.setHintTextColor(ContextCompat.getColor(getContext(), R.color.text_secondary));
+            et.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
+            addView(et);
+            ImeTextForwarder.attach(
+                    et,
+                    this::peekConnectionManager,
+                    this::getTargetOs,
+                    imeTextExecutor);
+        }
         postShowLocalImeSoftKeyboard();
+    }
+
+    private void styleImeToolbarIconButton(Button b, int drawableTop, int labelRes) {
+        b.setText("");
+        b.setAllCaps(false);
+        b.setGravity(Gravity.CENTER);
+        int padV = dpToPx(10);
+        b.setPadding(0, padV, 0, padV);
+        TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(b, 0, drawableTop, 0, 0);
+        b.setCompoundDrawablePadding(0);
+        b.setContentDescription(getContext().getString(labelRes));
     }
 
     @Nullable
@@ -3956,6 +4367,7 @@ public class CustomKeyboardView extends LinearLayout {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        imeSubComposeSendExecutor.shutdownNow();
         detachLocalImeFieldQuiet();
         longPressHandler.removeCallbacksAndMessages(null);
         stopRepeatingDelete();
