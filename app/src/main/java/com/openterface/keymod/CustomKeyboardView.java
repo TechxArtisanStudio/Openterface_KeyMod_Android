@@ -45,7 +45,6 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
-import androidx.core.widget.TextViewCompat;
 import androidx.preference.PreferenceManager;
 
 import com.openterface.keymod.util.HidTextKeystrokeSender;
@@ -168,12 +167,12 @@ public class CustomKeyboardView extends LinearLayout {
     private LinearLayout imeCaptureEditorRow;
     private ImageButton imeSubComposeExpandButton;
     private LinearLayout imeCaptureToolbar;
-    private Button imeCaptureUndoButton;
-    private Button imeCaptureClearButton;
+    private ImageButton imeCaptureUndoButton;
+    private ImageButton imeCaptureClearButton;
     @Nullable
     private String imeCaptureUndoSnapshot;
-    private Button imeCaptureTouchpadButton;
-    private Button imeCaptureSendButton;
+    private ImageButton imeCaptureTouchpadButton;
+    private ImageButton imeCaptureSendButton;
     private final ExecutorService imeSubComposeSendExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "ImeCaptureSend");
         t.setDaemon(true);
@@ -4109,14 +4108,14 @@ public class CustomKeyboardView extends LinearLayout {
         imeCaptureClearButton.setAlpha(canClear ? 1f : 0.45f);
 
         if (imeSubComposeSending) {
-            TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(
-                    imeCaptureSendButton, 0, R.drawable.ic_compose_stop_24, 0, 0);
+            imeCaptureSendButton.setImageResource(R.drawable.ic_compose_stop_24);
+            imeCaptureSendButton.setColorFilter(resolveThemeTextColor());
             imeCaptureSendButton.setContentDescription(getContext().getString(R.string.compose_stop));
             imeCaptureSendButton.setEnabled(true);
             imeCaptureSendButton.setAlpha(1f);
         } else {
-            TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(
-                    imeCaptureSendButton, 0, R.drawable.ic_compose_send_24, 0, 0);
+            imeCaptureSendButton.setImageResource(R.drawable.ic_compose_send_24);
+            imeCaptureSendButton.setColorFilter(resolveThemeTextColor());
             imeCaptureSendButton.setContentDescription(getContext().getString(R.string.compose_send));
             boolean canSend = connected && !bad && !t.isEmpty();
             imeCaptureSendButton.setEnabled(canSend);
@@ -4271,8 +4270,10 @@ public class CustomKeyboardView extends LinearLayout {
 
             imeSubComposeExpandButton = new ImageButton(getContext());
             int btnPx = dpToPx(48);
-            LinearLayout.LayoutParams expLp = new LinearLayout.LayoutParams(btnPx, LayoutParams.MATCH_PARENT);
+            LinearLayout.LayoutParams expLp = new LinearLayout.LayoutParams(btnPx, LayoutParams.WRAP_CONTENT);
+            expLp.gravity = Gravity.BOTTOM;
             imeSubComposeExpandButton.setLayoutParams(expLp);
+            imeSubComposeExpandButton.setMinimumHeight(btnPx);
             imeSubComposeExpandButton.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
             imeSubComposeExpandButton.setBackgroundResource(R.drawable.key_background);
             applyFlatKeyStyle(imeSubComposeExpandButton);
@@ -4294,24 +4295,27 @@ public class CustomKeyboardView extends LinearLayout {
             imeCaptureToolbar.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, tbH));
             imeCaptureToolbar.setGravity(Gravity.CENTER_VERTICAL);
             int hPad = dpToPx(12);
-            imeCaptureToolbar.setPadding(hPad, dpToPx(4), hPad, dpToPx(4));
+            int keyMargin = dpToPx(KEY_OUTER_MARGIN_DP);
+            imeCaptureToolbar.setPadding(hPad, keyMargin, hPad, keyMargin);
 
-            imeCaptureUndoButton = new Button(getContext());
-            styleImeToolbarIconButton(imeCaptureUndoButton, R.drawable.ic_compose_undo_24, R.string.compose_undo);
+            imeCaptureUndoButton = new ImageButton(getContext());
+            styleImeToolbarLikeTopShortcutIconButton(
+                    imeCaptureUndoButton, R.drawable.ic_compose_undo_24, R.string.compose_undo);
             imeCaptureUndoButton.setOnClickListener(v -> onImeCaptureUndoClicked());
             LinearLayout.LayoutParams undoLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
-            undoLp.setMargins(0, 0, dpToPx(8), 0);
+            undoLp.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
             imeCaptureUndoButton.setLayoutParams(undoLp);
 
-            imeCaptureClearButton = new Button(getContext());
-            styleImeToolbarIconButton(imeCaptureClearButton, R.drawable.ic_compose_clear_24, R.string.compose_clear);
+            imeCaptureClearButton = new ImageButton(getContext());
+            styleImeToolbarLikeTopShortcutIconButton(
+                    imeCaptureClearButton, R.drawable.ic_compose_clear_24, R.string.compose_clear);
             imeCaptureClearButton.setOnClickListener(v -> onImeCaptureClearClicked());
             LinearLayout.LayoutParams clearLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
-            clearLp.setMargins(0, 0, dpToPx(8), 0);
+            clearLp.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
             imeCaptureClearButton.setLayoutParams(clearLp);
 
-            imeCaptureTouchpadButton = new Button(getContext());
-            styleImeToolbarIconButton(
+            imeCaptureTouchpadButton = new ImageButton(getContext());
+            styleImeToolbarLikeTopShortcutIconButton(
                     imeCaptureTouchpadButton, R.drawable.ic_compose_touchpad_24, R.string.compose_touchpad);
             imeCaptureTouchpadButton.setOnClickListener(v -> {
                 if (onImeSubComposeChromeListener != null) {
@@ -4319,13 +4323,15 @@ public class CustomKeyboardView extends LinearLayout {
                 }
             });
             LinearLayout.LayoutParams tpLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
-            tpLp.setMargins(0, 0, dpToPx(8), 0);
+            tpLp.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
             imeCaptureTouchpadButton.setLayoutParams(tpLp);
 
-            imeCaptureSendButton = new Button(getContext());
-            styleImeToolbarIconButton(imeCaptureSendButton, R.drawable.ic_compose_send_24, R.string.compose_send);
+            imeCaptureSendButton = new ImageButton(getContext());
+            styleImeToolbarLikeTopShortcutIconButton(
+                    imeCaptureSendButton, R.drawable.ic_compose_send_24, R.string.compose_send);
             imeCaptureSendButton.setOnClickListener(v -> onImeCaptureSendClicked());
             LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 3f);
+            sendLp.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
             imeCaptureSendButton.setLayoutParams(sendLp);
 
             imeCaptureToolbar.addView(imeCaptureUndoButton);
@@ -4385,15 +4391,15 @@ public class CustomKeyboardView extends LinearLayout {
         postShowLocalImeSoftKeyboard();
     }
 
-    private void styleImeToolbarIconButton(Button b, int drawableTop, int labelRes) {
-        b.setText("");
-        b.setAllCaps(false);
-        b.setGravity(Gravity.CENTER);
-        int padV = dpToPx(10);
-        b.setPadding(0, padV, 0, padV);
-        TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(b, 0, drawableTop, 0, 0);
-        b.setCompoundDrawablePadding(0);
-        b.setContentDescription(getContext().getString(labelRes));
+    /** Match {@link #addShortcutPanelRows} icon keys: function face, flat elevation, theme tint. */
+    private void styleImeToolbarLikeTopShortcutIconButton(ImageButton ib, int imageRes, int labelRes) {
+        applyFlatKeyStyle(ib);
+        ib.setBackgroundResource(R.drawable.function_button_background);
+        ib.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
+        ib.setPadding(0, 0, 0, 0);
+        ib.setImageResource(imageRes);
+        ib.setColorFilter(resolveThemeTextColor());
+        ib.setContentDescription(getContext().getString(labelRes));
     }
 
     @Nullable
