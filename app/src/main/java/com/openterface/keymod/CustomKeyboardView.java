@@ -4324,6 +4324,22 @@ public class CustomKeyboardView extends LinearLayout {
         return false;
     }
 
+    @Nullable
+    private Integer resolveImeCaptureSendBlockedReason(
+            @Nullable ConnectionManager connectionManager,
+            String text) {
+        if (connectionManager == null || !connectionManager.isConnected()) {
+            return R.string.compose_no_connection;
+        }
+        if (text.isEmpty()) {
+            return R.string.compose_empty;
+        }
+        if (imeCaptureTextContainsNonAscii(text)) {
+            return R.string.compose_ascii_warning;
+        }
+        return null;
+    }
+
     private void updateImeCaptureToolbarState() {
         if (imeCaptureEdit == null || imeCaptureClearButton == null || imeCaptureSendButton == null) {
             return;
@@ -4342,9 +4358,8 @@ public class CustomKeyboardView extends LinearLayout {
             return;
         }
         String t = imeCaptureEdit.getText() != null ? imeCaptureEdit.getText().toString() : "";
-        boolean bad = imeCaptureTextContainsNonAscii(t);
         ConnectionManager cm = peekConnectionManager();
-        boolean connected = cm != null && cm.isConnected();
+        Integer blockedReasonResId = resolveImeCaptureSendBlockedReason(cm, t);
 
         if (imeCaptureUndoButton != null) {
             boolean canUndo =
@@ -4367,8 +4382,9 @@ public class CustomKeyboardView extends LinearLayout {
             imeCaptureSendButton.setImageResource(R.drawable.ic_compose_send_24);
             imeCaptureSendButton.setColorFilter(resolveThemeTextColor());
             imeCaptureSendButton.setContentDescription(getContext().getString(R.string.compose_send));
-            boolean canSend = connected && !bad && !t.isEmpty();
-            imeCaptureSendButton.setEnabled(canSend);
+            boolean canSend = blockedReasonResId == null;
+            // Keep Send tappable even when blocked so we can explain why sending is not allowed.
+            imeCaptureSendButton.setEnabled(true);
             imeCaptureSendButton.setAlpha(canSend ? 1f : 0.45f);
         }
     }
@@ -4408,17 +4424,13 @@ public class CustomKeyboardView extends LinearLayout {
         }
         MainActivity ma = (MainActivity) act;
         ConnectionManager cm = ma.getConnectionManager();
-        if (cm == null || !cm.isConnected()) {
-            Toast.makeText(getContext(), R.string.compose_no_connection, Toast.LENGTH_SHORT).show();
-            return;
-        }
         String text = imeCaptureEdit.getText() != null ? imeCaptureEdit.getText().toString() : "";
-        if (text.isEmpty()) {
-            Toast.makeText(getContext(), R.string.compose_empty, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (imeCaptureTextContainsNonAscii(text)) {
-            Toast.makeText(getContext(), R.string.compose_ascii_warning, Toast.LENGTH_LONG).show();
+        Integer blockedReasonResId = resolveImeCaptureSendBlockedReason(cm, text);
+        if (blockedReasonResId != null) {
+            int duration = blockedReasonResId == R.string.compose_ascii_warning
+                    ? Toast.LENGTH_LONG
+                    : Toast.LENGTH_SHORT;
+            Toast.makeText(getContext(), blockedReasonResId, duration).show();
             return;
         }
 
