@@ -4380,9 +4380,11 @@ public class CustomKeyboardView extends LinearLayout {
             case 0x4E: return new FnMapping("F4", 0x3D, 0);
             case KEY_IME_TOGGLE: return null;
             case 0x52: return new FnMapping("INS", 0x49, 0);
-            case 0x29: return new FnMapping("F5", 0x3E, 0);
+            // Keep ESC as ESC under local Fn (no F5 remap).
+            case 0x29: return null;
             case 0xE0: return new FnMapping("TAB", 0x2B, 0);
-            case 0xE2: return new FnMapping("DEL", 0x4C, 0, R.drawable.backspace_24);
+            // Row3 col2 (Alt): no Fn-layer remap — keep OS-aware Alt as-is when toggle has no mapping.
+            case 0xE2: return null;
             case 0xE3: return new FnMapping("ENTER", 0x28, 0);
             case 0x50: return new FnMapping("HOME", 0x4A, 0);
             case 0x51: return new FnMapping("END", 0x4D, 0);
