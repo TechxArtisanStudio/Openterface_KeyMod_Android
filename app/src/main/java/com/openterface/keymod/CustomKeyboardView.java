@@ -25,7 +25,9 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.ImageButton;
@@ -39,6 +41,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
 
+import com.openterface.keymod.util.ImeTextForwarder;
 import com.openterface.keymod.util.TopModeShortcutPrefs;
 import com.openterface.target.CH9329MSKBMap;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
@@ -51,6 +54,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class CustomKeyboardView extends LinearLayout {
     private static final String TAG = "CustomKeyboardView";
@@ -63,6 +68,9 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int TOP_PANEL_RIGHT_END_COL = TOP_PANEL_COLUMNS;
     private static final float TOP_PANEL_ROW_WEIGHT = 0.8f;
     private static final float TOP_PANEL_TOTAL_WEIGHT = TOP_PANEL_ROWS * TOP_PANEL_ROW_WEIGHT;
+    /** Single-pane IME: shortcut strip vs text vs space for soft keyboard (sum ~5.15). */
+    private static final float IME_SINGLE_TOP_STRIP_WEIGHT = 1.35f;
+    private static final float IME_SINGLE_TEXT_WEIGHT = 0.95f;
     /** Extra numpad Fn-arrow overlay (dp); larger than top strip 24dp icons for the taller grid cells. */
     private static final int EXTRA_NUMPAD_FN_ARROW_ICON_DP = 36;
     /** Fn-layer Save / Undo / Tab icons — match top shortcut row visual weight (24dp assets, modest cell size). */
@@ -79,8 +87,11 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int KEY_TOP_MODE_SLOT_1 = 0xF007;
     private static final int KEY_TOP_MODE_SLOT_2 = 0xF008;
     private static final int KEY_TOP_MODE_SLOT_3 = 0xF009;
+    /** PH1: toggle system IME capture vs KeyMod HID keyboard. */
+    private static final int KEY_IME_TOGGLE = 0xF00A;
     private static final int KEY_NOOP_PLACEHOLDER = -1;
     private static final String APP_PREFS_NAME = "AppPrefs";
+    private static final String KEY_SYSTEM_IME_CAPTURE = "system_ime_capture_mode";
     private static final String KEY_TOP_SHORTCUT_SHOW_ACTION_LABELS = "top_shortcut_show_action_labels";
     private static final int MOD_CTRL = 1;
     private static final int MOD_SHIFT = 2;
@@ -111,6 +122,19 @@ public class CustomKeyboardView extends LinearLayout {
     private int splitPart = SPLIT_NONE;
     /** The paired keyboard view in split mode, for syncing modifier states */
     private CustomKeyboardView splitPartner;
+
+    private boolean systemImeCaptureMode;
+    private EditText imeCaptureEdit;
+    private final ExecutorService imeTextExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "ImeTextForward");
+        t.setDaemon(true);
+        return t;
+    });
+    private OnImeCaptureModeChangedListener onImeCaptureModeChangedListener;
+
+    public interface OnImeCaptureModeChangedListener {
+        void onImeCaptureModeChanged(CustomKeyboardView source, boolean enabled);
+    }
 
     public interface OnTopModeShortcutListener {
         void onRequestSwitchToMode(String launchPanelMode);
@@ -352,11 +376,15 @@ public class CustomKeyboardView extends LinearLayout {
 
     private void init(Context context) {
         setOrientation(VERTICAL);
+        setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
         shortcutProfileManager = new ShortcutProfileManager(context.getApplicationContext());
         topShortcutShowActionLabels = context
                 .getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
                 .getBoolean(KEY_TOP_SHORTCUT_SHOW_ACTION_LABELS, false);
-        
+        systemImeCaptureMode = context
+                .getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_SYSTEM_IME_CAPTURE, false);
+
         // Load keyboard layout based on orientation (matching iOS behavior)
         reloadForCurrentOrientation();
         
@@ -420,6 +448,23 @@ public class CustomKeyboardView extends LinearLayout {
         if (showExtraPortraitKeys == enabled) return;
         if (!enabled) {
             extraNumpadFnLocked = false;
+        } else if (systemImeCaptureMode) {
+            systemImeCaptureMode = false;
+            Context ctx = getContext();
+            if (ctx != null) {
+                ctx.getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean(KEY_SYSTEM_IME_CAPTURE, false)
+                        .apply();
+            }
+            if (splitPartner != null) {
+                splitPartner.applyImeCaptureFromPartner(false);
+            }
+            rebuildTopShortcutPanels();
+            syncTopPanelViewportContent();
+            if (onImeCaptureModeChangedListener != null) {
+                onImeCaptureModeChangedListener.onImeCaptureModeChanged(this, false);
+            }
         }
         showExtraPortraitKeys = enabled;
         removeAllViews();
@@ -431,6 +476,24 @@ public class CustomKeyboardView extends LinearLayout {
      */
     public void setShortcutsStripOnly(boolean enabled) {
         if (shortcutsStripOnly == enabled) return;
+        if (enabled && systemImeCaptureMode) {
+            systemImeCaptureMode = false;
+            Context ctx = getContext();
+            if (ctx != null) {
+                ctx.getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean(KEY_SYSTEM_IME_CAPTURE, false)
+                        .apply();
+            }
+            if (splitPartner != null) {
+                splitPartner.applyImeCaptureFromPartner(false);
+            }
+            rebuildTopShortcutPanels();
+            syncTopPanelViewportContent();
+            if (onImeCaptureModeChangedListener != null) {
+                onImeCaptureModeChangedListener.onImeCaptureModeChanged(this, false);
+            }
+        }
         shortcutsStripOnly = enabled;
         removeAllViews();
         updateKeyboard();
@@ -453,6 +516,39 @@ public class CustomKeyboardView extends LinearLayout {
 
     public void setOnTopModeShortcutListener(OnTopModeShortcutListener listener) {
         onTopModeShortcutListener = listener;
+    }
+
+    public void setOnImeCaptureModeChangedListener(OnImeCaptureModeChangedListener listener) {
+        onImeCaptureModeChangedListener = listener;
+    }
+
+    public boolean isSystemImeCaptureMode() {
+        return systemImeCaptureMode;
+    }
+
+    /**
+     * Split partner sync: apply the same IME capture flag without firing
+     * {@link OnImeCaptureModeChangedListener} (the originating view already notified).
+     */
+    public void applyImeCaptureFromPartner(boolean enabled) {
+        if (systemImeCaptureMode == enabled) {
+            // Still rebind: partner may have updated shared prefs / strip assets before we mirrored.
+            rebuildTopShortcutPanels();
+            syncTopPanelViewportContent();
+            updateKeyboard();
+            return;
+        }
+        systemImeCaptureMode = enabled;
+        Context ctx = getContext();
+        if (ctx != null) {
+            ctx.getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_SYSTEM_IME_CAPTURE, enabled)
+                    .apply();
+        }
+        rebuildTopShortcutPanels();
+        syncTopPanelViewportContent();
+        updateKeyboard();
     }
 
     /** Rebuild top shortcut panels after PH slot mode prefs change (no full keyboard reload). */
@@ -486,6 +582,13 @@ public class CustomKeyboardView extends LinearLayout {
                 && key.isTopPanelKey
                 && "PH3".equals(key.label)
                 && key.code == KEY_NOOP_PLACEHOLDER;
+    }
+
+    private static boolean isTopImeToggleKey(Key key) {
+        return key != null
+                && key.isTopPanelKey
+                && "PH1".equals(key.label)
+                && key.code == KEY_IME_TOGGLE;
     }
 
     private static boolean isTopShortcutActionLabelEligible(Key key) {
@@ -1085,6 +1188,7 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void updateKeyboard() {
+        detachLocalImeFieldQuiet();
         removeAllViews();
 
         if (shortcutsStripOnly && splitPart == SPLIT_NONE) {
@@ -1157,6 +1261,13 @@ public class CustomKeyboardView extends LinearLayout {
         // In landscape fullscreen mode, always show the top scrolling panel
         if (showExtraPortraitKeys && isLandscape(getContext()) && splitPart == SPLIT_NONE) {
             addTopFunctionRows();
+        }
+
+        if (systemImeCaptureMode && !shortcutsStripOnly) {
+            if (splitPart == SPLIT_NONE) {
+                addImeCaptureEditorBelowTopStrip();
+            }
+            return;
         }
 
         String[] functionalKeyCodes = {"46", "47", "48", "49", "4A", "4B", "4C", "4D", "4E", "3B", "3C", "3D", "3E", "3F", "29", "3A", "40", "41", "42", "43", "44", "45", "3D", "3F"};
@@ -2114,7 +2225,11 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         FrameLayout viewport = new FrameLayout(getContext());
-        viewport.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, TOP_PANEL_TOTAL_WEIGHT));
+        float topStripWeight = TOP_PANEL_TOTAL_WEIGHT;
+        if (systemImeCaptureMode && !shortcutsStripOnly && splitPart == SPLIT_NONE) {
+            topStripWeight = IME_SINGLE_TOP_STRIP_WEIGHT;
+        }
+        viewport.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, topStripWeight));
         topPanelViewport = viewport;
         initializeTopPanelViewport();
         addView(viewport);
@@ -2306,7 +2421,10 @@ public class CustomKeyboardView extends LinearLayout {
         keys.add(new Key("END",    "", 0x4D, "4D", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("PGUP",   "", 0x4B, "4B", 1f, 0, 0f, false, false, -1, true));
         keys.add(new Key("PGDN",   "", 0x4E, "4E", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH1",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+        keys.add(new Key("PH1", "", KEY_IME_TOGGLE, "",
+                1f,
+                systemImeCaptureMode ? R.drawable.ic_keyboard_ime_24 : R.drawable.ic_keyboard_keymod_24,
+                0f, false, false, -1, true));
         keys.add(new Key("UP",     "", 0x52, "52", 1f, R.drawable.keyboard_arrow_up_24, 0f, false, false, -1, true));
         keys.add(new Key("PH3",   "", KEY_NOOP_PLACEHOLDER, "", 1f,
                 topShortcutShowActionLabels ? R.drawable.toggle_on_24px : R.drawable.toggle_off_24px,
@@ -2429,6 +2547,13 @@ public class CustomKeyboardView extends LinearLayout {
                             int slot = topModeSlotIndexFromKeyCode(k.code);
                             String mode = TopModeShortcutPrefs.getModeForSlot(ctx, slot);
                             ib.setContentDescription(ctx.getString(TopModeShortcutPrefs.labelResForMode(mode)));
+                        }
+                    } else if (isTopImeToggleKey(k)) {
+                        Context ctx = getContext();
+                        if (ctx != null) {
+                            ib.setContentDescription(ctx.getString(systemImeCaptureMode
+                                    ? R.string.top_shortcut_ime_toggle_system
+                                    : R.string.top_shortcut_ime_toggle_keymod));
                         }
                     } else if (isTopShortcutToggleKey(k)) {
                         Context ctx = getContext();
@@ -3485,6 +3610,11 @@ public class CustomKeyboardView extends LinearLayout {
             return;
         }
 
+        if (isTopImeToggleKey(key)) {
+            toggleSystemImeCaptureFromUser();
+            return;
+        }
+
         if (isTopShortcutToggleKey(key)) {
             setTopShortcutShowActionLabels(!topShortcutShowActionLabels);
             return;
@@ -3726,9 +3856,107 @@ public class CustomKeyboardView extends LinearLayout {
         return nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES ? 0xFFFFFFFF : 0xFF000000;
     }
 
+    private void toggleSystemImeCaptureFromUser() {
+        boolean next = !systemImeCaptureMode;
+        systemImeCaptureMode = next;
+        Context ctx = getContext();
+        if (ctx != null) {
+            ctx.getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_SYSTEM_IME_CAPTURE, next)
+                    .apply();
+        }
+        // Landscape split: the visible top strip is bound from the partner (left) view.
+        if (splitPartner != null) {
+            splitPartner.applyImeCaptureFromPartner(next);
+        }
+        rebuildTopShortcutPanels();
+        syncTopPanelViewportContent();
+        updateKeyboard();
+        if (onImeCaptureModeChangedListener != null) {
+            onImeCaptureModeChangedListener.onImeCaptureModeChanged(this, next);
+        }
+        if (splitPart == SPLIT_NONE && next) {
+            postShowLocalImeSoftKeyboard();
+        }
+    }
+
+    private void postShowLocalImeSoftKeyboard() {
+        post(() -> {
+            if (imeCaptureEdit == null || getContext() == null) {
+                return;
+            }
+            imeCaptureEdit.requestFocus();
+            InputMethodManager imm =
+                    (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(imeCaptureEdit, InputMethodManager.SHOW_IMPLICIT);
+                imeCaptureEdit.post(() -> {
+                    if (imeCaptureEdit == null || getContext() == null) {
+                        return;
+                    }
+                    InputMethodManager imm2 =
+                            (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+                    if (imm2 != null) {
+                        imm2.showSoftInput(imeCaptureEdit, InputMethodManager.SHOW_IMPLICIT);
+                    }
+                });
+            }
+        });
+    }
+
+    private void detachLocalImeFieldQuiet() {
+        if (imeCaptureEdit != null && getContext() != null) {
+            InputMethodManager imm =
+                    (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(imeCaptureEdit.getWindowToken(), 0);
+            }
+            ImeTextForwarder.detach(imeCaptureEdit);
+            imeCaptureEdit = null;
+        }
+    }
+
+    private void addImeCaptureEditorBelowTopStrip() {
+        EditText et = new EditText(getContext());
+        imeCaptureEdit = et;
+        et.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, IME_SINGLE_TEXT_WEIGHT));
+        et.setFocusable(true);
+        et.setFocusableInTouchMode(true);
+        et.setClickable(true);
+        et.setGravity(Gravity.TOP | Gravity.START);
+        et.setHint(R.string.ime_capture_hint);
+        et.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        et.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        int pad = dpToPx(8);
+        et.setPadding(pad, pad, pad, pad);
+        et.setTextColor(resolveThemeTextColor());
+        et.setHintTextColor(ContextCompat.getColor(getContext(), R.color.text_secondary));
+        et.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
+        addView(et);
+        ImeTextForwarder.attach(
+                et,
+                this::peekConnectionManager,
+                this::getTargetOs,
+                imeTextExecutor);
+        postShowLocalImeSoftKeyboard();
+    }
+
+    @Nullable
+    private ConnectionManager peekConnectionManager() {
+        AppCompatActivity act = unwrapAppCompatActivity(getContext());
+        if (act instanceof MainActivity) {
+            return ((MainActivity) act).getConnectionManager();
+        }
+        return null;
+    }
+
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        detachLocalImeFieldQuiet();
         longPressHandler.removeCallbacksAndMessages(null);
         stopRepeatingDelete();
         dismissAlternatesPopup();

@@ -21,6 +21,8 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.LinearInterpolator;
 import android.widget.FrameLayout;
@@ -30,14 +32,18 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 
 import com.openterface.keymod.BluetoothService;
+import com.openterface.keymod.ConnectionManager;
 import com.openterface.keymod.CustomKeyboardView;
 import com.openterface.keymod.MainActivity;
 import com.openterface.keymod.R;
 import com.openterface.keymod.ThemeManager;
 import com.openterface.keymod.TouchPadView;
+import com.openterface.keymod.util.ImeTextForwarder;
 import com.openterface.keymod.util.TouchPadHaptics;
 import com.openterface.keymod.util.TouchPadHelpOverlay;
 import com.openterface.keymod.util.TouchPadPointerPhase;
@@ -48,6 +54,8 @@ import com.hoho.android.usbserial.driver.UsbSerialPort;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class CompositeFragment extends Fragment {
 
@@ -78,6 +86,31 @@ public class CompositeFragment extends Fragment {
     private TextView splitTouchPadHelpOverlay;
     /** Container to swap between normal and split layouts */
     private FrameLayout contentContainer;
+    /** Landscape split: full-width system IME host (below {@link #splitRoot}). */
+    private View splitImeHost;
+    private EditText splitImeEdit;
+    private LinearLayout splitLeftColumn;
+    private LinearLayout splitRightColumn;
+    private FrameLayout splitTopLeftFrame;
+    private FrameLayout splitTopRightFrame;
+    private LinearLayout splitImeShortcutsRow;
+    private boolean splitShortcutsReparentedForIme;
+    /** Inflated split layout root (landscape {@code fragment_composite_split}); IME padding target like Compose. */
+    private View splitLayoutRoot;
+    /** Outer vertical split: touchpad+toggles band vs IME stack (shortcuts + text; IME lift via root padding). */
+    private static final float SPLIT_IME_OUTER_UPPER_WEIGHT = 0.30f;
+    private static final float SPLIT_IME_OUTER_LOWER_WEIGHT = 0.70f;
+    /** Weights inside the landscape IME host (shortcuts row : text); bottom reserve uses IME inset height. */
+    private static final float SPLIT_IME_INNER_SHORTCUTS_WEIGHT = 2.0f;
+    private static final float SPLIT_IME_INNER_TEXT_WEIGHT = 1.0f;
+    private static final float SPLIT_TOUCHPAD_SECTION_WEIGHT_NORMAL = 1.2f;
+    private static final float SPLIT_TOUCHPAD_SECTION_WEIGHT_IME_FULL_WIDTH = 1f;
+    private View splitTouchPadInfoButton;
+    private final ExecutorService imeSplitTextExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "ImeSplitTextForward");
+        t.setDaemon(true);
+        return t;
+    });
     /** Track registered keyboard views for OS change listener cleanup */
     private final List<MainActivity.OnTargetOsChangeListener> osChangeListeners = new ArrayList<>();
     public UsbSerialPort port;
@@ -350,14 +383,265 @@ public class CompositeFragment extends Fragment {
     }
 
     private void applyPortraitNumpadTouchpadChrome() {
-        boolean numpad = isPortraitNumpadTouchpadMode();
-        if (touchPadInfoButton != null) {
-            touchPadInfoButton.setVisibility(numpad ? View.GONE : View.VISIBLE);
-        }
-        if (numpad && touchPadHelpOverlay != null) {
+        applyTouchpadInfoVisibility();
+        if (isPortraitNumpadTouchpadMode() && touchPadHelpOverlay != null) {
             TouchPadHelpOverlay.hideImmediately(touchPadHelpOverlay);
         }
         updateTouchPadTips();
+    }
+
+    private void applyTouchpadInfoVisibility() {
+        boolean numpad = isPortraitNumpadTouchpadMode();
+        boolean ime = isImeCaptureActive();
+        boolean hide = numpad || ime;
+        if (touchPadInfoButton != null) {
+            touchPadInfoButton.setVisibility(hide ? View.GONE : View.VISIBLE);
+        }
+        if (splitTouchPadInfoButton != null) {
+            splitTouchPadInfoButton.setVisibility(hide ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    private boolean isImeCaptureActive() {
+        if (keyboardView != null && keyboardView.isSystemImeCaptureMode()) {
+            return true;
+        }
+        if (keyboardViewLeft != null && keyboardViewLeft.isSystemImeCaptureMode()) {
+            return true;
+        }
+        if (keyboardViewRight != null && keyboardViewRight.isSystemImeCaptureMode()) {
+            return true;
+        }
+        return false;
+    }
+
+    private void registerImeCaptureListener(@Nullable CustomKeyboardView kbd) {
+        if (kbd == null) {
+            return;
+        }
+        kbd.setOnImeCaptureModeChangedListener(this::onKeyboardImeCaptureModeChanged);
+    }
+
+    private void onKeyboardImeCaptureModeChanged(CustomKeyboardView source, boolean enabled) {
+        applyTouchpadInfoVisibility();
+        if (splitImeHost != null) {
+            applySplitImeLayout(enabled);
+        }
+        requestCompositeImeInsetsAfterImeChange();
+    }
+
+    /**
+     * Same approach as {@link ComposeFragment}: lift the whole column above the soft keyboard.
+     * {@code DrawerLayout} + weighted {@code fragment_container} often prevent {@code adjustResize}
+     * alone from shrinking the fragment, so IME bottom insets are applied as root padding.
+     */
+    private void setupCompositeImeRootInsets(@NonNull View root) {
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, windowInsets) -> {
+            int imeBottom = windowInsets.getInsets(WindowInsetsCompat.Type.ime()).bottom;
+            v.setPadding(v.getPaddingLeft(), v.getPaddingTop(), v.getPaddingRight(), imeBottom);
+            return windowInsets;
+        });
+        root.post(() -> ViewCompat.requestApplyInsets(root));
+    }
+
+    @Nullable
+    private View compositeImeInsetRoot() {
+        if (splitLayoutRoot != null) {
+            return splitLayoutRoot;
+        }
+        return rootLayout;
+    }
+
+    private void requestCompositeImeInsetsAfterImeChange() {
+        View root = compositeImeInsetRoot();
+        if (root == null) {
+            return;
+        }
+        root.post(() -> ViewCompat.requestApplyInsets(root));
+        root.postDelayed(() -> ViewCompat.requestApplyInsets(root), 120);
+    }
+
+    private void applySplitImeHostInnerWeights() {
+        if (splitImeShortcutsRow == null || splitImeEdit == null) {
+            return;
+        }
+        LinearLayout.LayoutParams rowLp =
+                (LinearLayout.LayoutParams) splitImeShortcutsRow.getLayoutParams();
+        rowLp.height = 0;
+        rowLp.weight = SPLIT_IME_INNER_SHORTCUTS_WEIGHT;
+        splitImeShortcutsRow.setLayoutParams(rowLp);
+        LinearLayout.LayoutParams editLp =
+                (LinearLayout.LayoutParams) splitImeEdit.getLayoutParams();
+        editLp.height = 0;
+        editLp.weight = SPLIT_IME_INNER_TEXT_WEIGHT;
+        splitImeEdit.setLayoutParams(editLp);
+    }
+
+    private void dockSplitShortcutsForIme() {
+        if (splitShortcutsReparentedForIme
+                || splitTopLeftFrame == null
+                || splitTopRightFrame == null
+                || splitImeShortcutsRow == null
+                || splitLeftColumn == null
+                || splitRightColumn == null) {
+            return;
+        }
+        ViewGroup leftParent = (ViewGroup) splitTopLeftFrame.getParent();
+        if (leftParent != null) {
+            leftParent.removeView(splitTopLeftFrame);
+        }
+        ViewGroup rightParent = (ViewGroup) splitTopRightFrame.getParent();
+        if (rightParent != null) {
+            rightParent.removeView(splitTopRightFrame);
+        }
+        LinearLayout.LayoutParams half =
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+        splitImeShortcutsRow.addView(splitTopLeftFrame, half);
+        splitImeShortcutsRow.addView(splitTopRightFrame, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+        splitImeShortcutsRow.setVisibility(View.VISIBLE);
+        splitLeftColumn.setVisibility(View.GONE);
+        splitRightColumn.setVisibility(View.GONE);
+        LinearLayout.LayoutParams tpLp =
+                (LinearLayout.LayoutParams) splitTouchpadSection.getLayoutParams();
+        tpLp.weight = SPLIT_TOUCHPAD_SECTION_WEIGHT_IME_FULL_WIDTH;
+        splitTouchpadSection.setLayoutParams(tpLp);
+        splitShortcutsReparentedForIme = true;
+    }
+
+    private void undockSplitShortcutsFromIme() {
+        if (!splitShortcutsReparentedForIme
+                || splitTopLeftFrame == null
+                || splitTopRightFrame == null
+                || splitImeShortcutsRow == null
+                || splitLeftColumn == null
+                || splitRightColumn == null) {
+            return;
+        }
+        splitImeShortcutsRow.removeView(splitTopLeftFrame);
+        splitImeShortcutsRow.removeView(splitTopRightFrame);
+        LinearLayout.LayoutParams topLp =
+                new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 10f);
+        splitLeftColumn.addView(splitTopLeftFrame, 0, topLp);
+        splitRightColumn.addView(splitTopRightFrame, 0, topLp);
+        splitImeShortcutsRow.setVisibility(View.GONE);
+        splitLeftColumn.setVisibility(View.VISIBLE);
+        splitRightColumn.setVisibility(View.VISIBLE);
+        LinearLayout.LayoutParams tpLp =
+                (LinearLayout.LayoutParams) splitTouchpadSection.getLayoutParams();
+        tpLp.weight = SPLIT_TOUCHPAD_SECTION_WEIGHT_NORMAL;
+        splitTouchpadSection.setLayoutParams(tpLp);
+        splitShortcutsReparentedForIme = false;
+    }
+
+    private void applySplitImeLayout(boolean imeMode) {
+        if (splitImeHost == null || splitImeEdit == null || splitTouchpadSection == null || splitRoot == null) {
+            return;
+        }
+        ViewParent parent = splitRoot.getParent();
+        if (!(parent instanceof LinearLayout)) {
+            return;
+        }
+        LinearLayout outer = (LinearLayout) parent;
+        LinearLayout.LayoutParams rootLp = (LinearLayout.LayoutParams) splitRoot.getLayoutParams();
+        LinearLayout.LayoutParams imeLp = (LinearLayout.LayoutParams) splitImeHost.getLayoutParams();
+        LinearLayout.LayoutParams touchLp = (LinearLayout.LayoutParams) splitTouchpadSection.getLayoutParams();
+        InputMethodManager imm =
+                (InputMethodManager) requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+        if (imeMode) {
+            dockSplitShortcutsForIme();
+            rootLp.weight = SPLIT_IME_OUTER_UPPER_WEIGHT;
+            imeLp.weight = SPLIT_IME_OUTER_LOWER_WEIGHT;
+            splitImeHost.setVisibility(View.VISIBLE);
+            applySplitImeHostInnerWeights();
+            if (splitImeHost instanceof ViewGroup) {
+                ((ViewGroup) splitImeHost).setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
+            }
+            splitImeEdit.setFocusable(true);
+            splitImeEdit.setFocusableInTouchMode(true);
+            splitImeEdit.setClickable(true);
+            ImeTextForwarder.detach(splitImeEdit);
+            ImeTextForwarder.attach(
+                    splitImeEdit,
+                    this::getConnectionManagerForIme,
+                    this::getTargetOsForIme,
+                    imeSplitTextExecutor);
+            splitImeEdit.post(() -> {
+                splitImeEdit.requestFocus();
+                if (imm != null) {
+                    imm.showSoftInput(splitImeEdit, InputMethodManager.SHOW_IMPLICIT);
+                }
+                splitImeEdit.post(() -> {
+                    if (imm != null && splitImeEdit != null) {
+                        imm.showSoftInput(splitImeEdit, InputMethodManager.SHOW_IMPLICIT);
+                    }
+                    requestCompositeImeInsetsAfterImeChange();
+                });
+            });
+            requestCompositeImeInsetsAfterImeChange();
+        } else {
+            undockSplitShortcutsFromIme();
+            ImeTextForwarder.detach(splitImeEdit);
+            splitImeEdit.setText("");
+            imeLp.weight = 0f;
+            splitImeHost.setVisibility(View.GONE);
+            touchLp.weight = SPLIT_TOUCHPAD_SECTION_WEIGHT_NORMAL;
+            rootLp.weight = 1f;
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(splitImeEdit.getWindowToken(), 0);
+            }
+            requestCompositeImeInsetsAfterImeChange();
+        }
+        splitRoot.setLayoutParams(rootLp);
+        splitImeHost.setLayoutParams(imeLp);
+        splitTouchpadSection.setLayoutParams(touchLp);
+        setSplitKeyboardColumnWeight(imeMode ? 0f : 22f);
+        outer.requestLayout();
+    }
+
+    private void setSplitKeyboardColumnWeight(float keyboardWeight) {
+        if (keyboardViewLeft != null) {
+            LinearLayout.LayoutParams lpL = (LinearLayout.LayoutParams) keyboardViewLeft.getLayoutParams();
+            lpL.weight = keyboardWeight;
+            keyboardViewLeft.setLayoutParams(lpL);
+        }
+        if (keyboardViewRight != null) {
+            LinearLayout.LayoutParams lpR = (LinearLayout.LayoutParams) keyboardViewRight.getLayoutParams();
+            lpR.weight = keyboardWeight;
+            keyboardViewRight.setLayoutParams(lpR);
+        }
+    }
+
+    @Nullable
+    private ConnectionManager getConnectionManagerForIme() {
+        if (!(requireActivity() instanceof MainActivity)) {
+            return null;
+        }
+        return ((MainActivity) requireActivity()).getConnectionManager();
+    }
+
+    private String getTargetOsForIme() {
+        if (!(requireActivity() instanceof MainActivity)) {
+            return "macos";
+        }
+        return ((MainActivity) requireActivity()).getTargetOs();
+    }
+
+    private void syncSplitImeChromeFromPrefs() {
+        if (!isAdded() || keyboardViewRight == null) {
+            return;
+        }
+        if (keyboardViewRight.isSystemImeCaptureMode()) {
+            applySplitImeLayout(true);
+        }
+        applyTouchpadInfoVisibility();
+    }
+
+    private void syncNormalImeChromeFromPrefs() {
+        if (!isAdded()) {
+            return;
+        }
+        applyTouchpadInfoVisibility();
     }
 
     private void updateSplitTouchPadTips() {
@@ -573,6 +857,10 @@ public class CompositeFragment extends Fragment {
         // Register keyboard view for OS change updates
         registerKeyboardOsListener(keyboardView);
         registerTopModeShortcutListener(keyboardView);
+        registerImeCaptureListener(keyboardView);
+        if (keyboardView != null) {
+            keyboardView.post(this::syncNormalImeChromeFromPrefs);
+        }
 
         if (savedInstanceState == null && touchPad != null) {
             touchPad.post(() -> {
@@ -588,6 +876,8 @@ public class CompositeFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
+        undockSplitShortcutsFromIme();
+        ImeTextForwarder.detach(splitImeEdit);
         tipHandler.removeCallbacks(pointerIdleRunnable);
         cancelTouchPadButtonPulseAnimation();
         if (touchPadBottomWashOverlay != null) {
@@ -638,6 +928,7 @@ public class CompositeFragment extends Fragment {
 
     private void setupNormalViews(View view) {
         rootLayout = view.findViewById(R.id.composite_root);
+        setupCompositeImeRootInsets(rootLayout);
         keyboardView = view.findViewById(R.id.keyboard_view);
         touchPad = view.findViewById(R.id.touchPad);
         touchpadSection = view.findViewById(R.id.touchpad_section);
@@ -651,10 +942,16 @@ public class CompositeFragment extends Fragment {
     }
 
     private void setupSplitViews(View view) {
+        splitLayoutRoot = view;
+        setupCompositeImeRootInsets(view);
         splitRoot = view.findViewById(R.id.split_root);
         View topPanelContainer = view.findViewById(R.id.split_top_panel);
-        FrameLayout splitTopLeft = view.findViewById(R.id.split_top_left);
-        FrameLayout splitTopRight = view.findViewById(R.id.split_top_right);
+        splitTopLeftFrame = view.findViewById(R.id.split_top_left);
+        splitTopRightFrame = view.findViewById(R.id.split_top_right);
+        splitLeftColumn = view.findViewById(R.id.split_left_column);
+        splitRightColumn = view.findViewById(R.id.split_right_column);
+        splitImeShortcutsRow = view.findViewById(R.id.split_ime_shortcuts_row);
+        splitShortcutsReparentedForIme = false;
         keyboardViewLeft = view.findViewById(R.id.keyboard_view_left);
         keyboardViewRight = view.findViewById(R.id.keyboard_view_right);
         splitTouchpadSection = view.findViewById(R.id.touchpad_section);
@@ -684,11 +981,11 @@ public class CompositeFragment extends Fragment {
             registerKeyboardOsListener(keyboardViewLeft);
             registerTopModeShortcutListener(keyboardViewLeft);
             // Create shared top panel from the left keyboard
-            if (splitTopLeft != null && splitTopRight != null) {
+            if (splitTopLeftFrame != null && splitTopRightFrame != null) {
                 keyboardViewLeft.createSplitLandscapeTopPanel(
-                        splitTopLeft,
+                        splitTopLeftFrame,
                         null,
-                        splitTopRight
+                        splitTopRightFrame
                 );
             } else if (topPanelContainer instanceof FrameLayout) {
                 View topPanel = keyboardViewLeft.createTopPanel();
@@ -709,7 +1006,15 @@ public class CompositeFragment extends Fragment {
             registerTopModeShortcutListener(keyboardViewRight);
         }
 
-        setupTouchPad(splitTouchPad, splitTouchPadTips, view.findViewById(R.id.touchPadInfo));
+        splitImeHost = view.findViewById(R.id.composite_split_ime_host);
+        splitImeEdit = view.findViewById(R.id.composite_split_ime_edit);
+        splitTouchPadInfoButton = view.findViewById(R.id.touchPadInfo);
+        setupTouchPad(splitTouchPad, splitTouchPadTips, splitTouchPadInfoButton);
+        registerImeCaptureListener(keyboardViewLeft);
+        registerImeCaptureListener(keyboardViewRight);
+        if (keyboardViewRight != null) {
+            keyboardViewRight.post(this::syncSplitImeChromeFromPrefs);
+        }
     }
 
     private TextView helpOverlayForPad(TouchPadView pad) {
@@ -937,6 +1242,10 @@ public class CompositeFragment extends Fragment {
 
     private void ensureNormalLayout() {
         if (splitRoot != null) {
+            undockSplitShortcutsFromIme();
+            if (splitImeEdit != null) {
+                ImeTextForwarder.detach(splitImeEdit);
+            }
             TouchPadHelpOverlay.clear(splitTouchPadHelpOverlay);
             splitTouchPadHelpOverlay = null;
             View split = contentContainer.getChildAt(0);
@@ -946,6 +1255,16 @@ public class CompositeFragment extends Fragment {
             splitRoot = null;
             keyboardViewLeft = null;
             keyboardViewRight = null;
+            splitImeHost = null;
+            splitImeEdit = null;
+            splitLeftColumn = null;
+            splitRightColumn = null;
+            splitTopLeftFrame = null;
+            splitTopRightFrame = null;
+            splitImeShortcutsRow = null;
+            splitShortcutsReparentedForIme = false;
+            splitLayoutRoot = null;
+            splitTouchPadInfoButton = null;
 
             View normalView = LayoutInflater.from(requireContext()).inflate(
                     R.layout.fragment_composite, contentContainer, false);
@@ -958,7 +1277,11 @@ public class CompositeFragment extends Fragment {
                 keyboardView.setPort(port);
             }
             registerTopModeShortcutListener(keyboardView);
+            registerImeCaptureListener(keyboardView);
             setupTouchPad(touchPad, touchPadTips, touchPadInfoButton);
+            if (keyboardView != null) {
+                keyboardView.post(this::syncNormalImeChromeFromPrefs);
+            }
         }
         applyOrientationLayout();
     }
