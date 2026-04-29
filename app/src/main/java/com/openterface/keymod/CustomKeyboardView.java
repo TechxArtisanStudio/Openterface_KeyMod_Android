@@ -715,6 +715,18 @@ public class CustomKeyboardView extends LinearLayout {
                 && key.code == KEY_FIXED_TOP_LOCAL_FN;
     }
 
+    /**
+     * Fixed shortcut page 1: long-press lock targets these HID usages (layout is column order within
+     * the fixed two-row strip — row2 col2 Shift {@code 0xE1}, row3 col1 Ctrl {@code 0xE0}, col2 Alt
+     * {@code 0xE2}, col3 Win/Command {@code 0xE3}). Labels vary with target OS; logic must use
+     * {@code key.code} only.
+     */
+    private static boolean isTopModifierLockCandidate(Key key) {
+        return key != null
+                && key.isTopPanelKey
+                && (key.code == 0xE0 || key.code == 0xE1 || key.code == 0xE2 || key.code == 0xE3);
+    }
+
     private static boolean isTopImeToggleKey(Key key) {
         return key != null
                 && key.isTopPanelKey
@@ -2774,10 +2786,10 @@ public class CustomKeyboardView extends LinearLayout {
         keys.add(markFixedRowKey(new Key("UP", "", 0x52, "52", 1f, R.drawable.keyboard_arrow_up_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("ENTER", "", 0x28, "28", 1f, R.drawable.keyboard_return_24px, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f, R.drawable.ic_swap_horiz_24, 0f, false, false, -1, true)));
-        // Row 3: CTRL, ALT, WIN(icon), Left(icon), Down(icon), Right(icon), keyboard toggle
-        keys.add(markFixedRowKey(new Key("CTRL", "", 0xE0, "E0", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("ALT", "", 0xE2, "E2", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("WIN", "", 0xE3, "E3", 1f, R.drawable.windows, 0f, false, false, -1, true)));
+        // Row 3: CTRL, ALT, WIN/Command (target-OS aware), Left(icon), Down(icon), Right(icon), keyboard toggle
+        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE0)));
+        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE2)));
+        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE3)));
         keys.add(markFixedRowKey(new Key("LEFT", "", 0x50, "50", 1f, R.drawable.keyboard_arrow_left_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("DOWN", "", 0x51, "51", 1f, R.drawable.keyboard_arrow_down_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("RIGHT", "", 0x4F, "4F", 1f, R.drawable.keyboard_arrow_right_24, 0f, false, false, -1, true)));
@@ -2957,8 +2969,11 @@ public class CustomKeyboardView extends LinearLayout {
                     || (k.code == 0xE1 && isShiftLeftLocked)
                     || (k.code == 0xE2 && isAltLeftLocked)
                     || (k.code == 0xE3 && isWinLeftLocked);
-                boolean fixedTopFnLocked = isFixedTopLocalFnKey(k) && fixedTopLocalFnLocked;
-                boolean keyLockedVisualState = modifierLocked || fixedTopFnLocked;
+                // Fn-layer lock only tints the local Fn key — never other keys (modifier locks stay
+                // independent when Fn toggles).
+                boolean keyLockedVisualState = isFixedTopLocalFnKey(k)
+                        ? fixedTopLocalFnLocked
+                        : modifierLocked;
                 FnMapping fixedTopLocalFn = resolveFixedTopLocalFnMapping(k);
                 int effectiveTopIconResId = resolveFixedTopLocalFnIconRes(k, fixedTopLocalFn);
                 String effectiveTopLabel = fixedTopLocalFn != null ? fixedTopLocalFn.label : k.label;
@@ -3107,16 +3122,66 @@ public class CustomKeyboardView extends LinearLayout {
         return activeFixedTopRowsContainer != null || splitActiveFixedTopRowsContainerLeft != null;
     }
 
+    private boolean isModifierLockedStateForKey(Key key) {
+        if (key == null) return false;
+        switch (key.code) {
+            case 0xE0: return isCtrlLeftLocked;
+            case 0xE1: return isShiftLeftLocked;
+            case 0xE2: return isAltLeftLocked;
+            case 0xE3: return isWinLeftLocked;
+            default: return false;
+        }
+    }
+
+    private void setModifierLockedStateForKey(Key key, boolean locked) {
+        if (key == null) return;
+        switch (key.code) {
+            case 0xE0:
+                isCtrlLeftLocked = locked;
+                break;
+            case 0xE1:
+                isShiftLeftLocked = locked;
+                break;
+            case 0xE2:
+                isAltLeftLocked = locked;
+                break;
+            case 0xE3:
+                isWinLeftLocked = locked;
+                break;
+            default:
+                return;
+        }
+        syncModifierStates();
+        refreshVisibleTopPanelButtonStates();
+        if (splitPartner != null) {
+            splitPartner.refreshVisibleTopPanelButtonStates();
+        }
+    }
+
+    private void sendMomentaryModifierClick(Key key) {
+        if (key == null) {
+            return;
+        }
+        int combinedValue = 0;
+        combinedValue += isCtrlLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Ctrl")) : 0;
+        combinedValue += isShiftLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift")) : 0;
+        combinedValue += isAltLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Alt")) : 0;
+        combinedValue += isWinLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Win")) : 0;
+        sendKeyData(combinedValue, key.code);
+    }
+
     private OnTouchListener createTopPanelTouchListener(Key key) {
         final float[] startX = new float[1];
         final float[] startY = new float[1];
         final boolean[] isDragging = new boolean[1];
         final boolean[] longPressConsumed = new boolean[1];
         final Runnable[] pendingModeLongPress = new Runnable[1];
+        final Runnable[] pendingModifierLongPress = new Runnable[1];
         final int touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
         final int swipeThreshold = dpToPx(56);
         final int modeSlotIndex = key != null ? topModeSlotIndexFromKeyCode(key.code) : 0;
-        final boolean canSwipePanel = key == null || key.allowTopPanelPagingGesture;
+        final boolean canSwipePanel = (key == null || key.allowTopPanelPagingGesture)
+                && !isTopModifierLockCandidate(key);
 
         return (v, event) -> {
             switch (event.getActionMasked()) {
@@ -3124,6 +3189,10 @@ public class CustomKeyboardView extends LinearLayout {
                     if (pendingModeLongPress[0] != null) {
                         longPressHandler.removeCallbacks(pendingModeLongPress[0]);
                         pendingModeLongPress[0] = null;
+                    }
+                    if (pendingModifierLongPress[0] != null) {
+                        longPressHandler.removeCallbacks(pendingModifierLongPress[0]);
+                        pendingModifierLongPress[0] = null;
                     }
                     longPressConsumed[0] = false;
                     startX[0] = event.getRawX();
@@ -3137,6 +3206,13 @@ public class CustomKeyboardView extends LinearLayout {
                             pendingModeLongPress[0] = null;
                         };
                         longPressHandler.postDelayed(pendingModeLongPress[0], ALT_LONG_PRESS_TIMEOUT_MS);
+                    } else if (isTopModifierLockCandidate(key)) {
+                        pendingModifierLongPress[0] = () -> {
+                            longPressConsumed[0] = true;
+                            setModifierLockedStateForKey(key, !isModifierLockedStateForKey(key));
+                            pendingModifierLongPress[0] = null;
+                        };
+                        longPressHandler.postDelayed(pendingModifierLongPress[0], ALT_LONG_PRESS_TIMEOUT_MS);
                     }
                     if (key != null) {
                         v.setPressed(true);
@@ -3156,6 +3232,10 @@ public class CustomKeyboardView extends LinearLayout {
                             longPressHandler.removeCallbacks(pendingModeLongPress[0]);
                             pendingModeLongPress[0] = null;
                         }
+                        if (pendingModifierLongPress[0] != null) {
+                            longPressHandler.removeCallbacks(pendingModifierLongPress[0]);
+                            pendingModifierLongPress[0] = null;
+                        }
                     }
                     if (isDragging[0] && hasAnyTopPanelMode()) {
                         updateTopPanelDrag(applyTopPanelEdgeResistance(dx));
@@ -3170,6 +3250,10 @@ public class CustomKeyboardView extends LinearLayout {
                         longPressHandler.removeCallbacks(pendingModeLongPress[0]);
                         pendingModeLongPress[0] = null;
                     }
+                    if (pendingModifierLongPress[0] != null) {
+                        longPressHandler.removeCallbacks(pendingModifierLongPress[0]);
+                        pendingModifierLongPress[0] = null;
+                    }
                     float totalDx = event.getRawX() - startX[0];
                     if (isDragging[0]) {
                         finishTopPanelSwipe(totalDx, swipeThreshold);
@@ -3178,7 +3262,15 @@ public class CustomKeyboardView extends LinearLayout {
                     if (event.getActionMasked() == MotionEvent.ACTION_UP && key != null && !longPressConsumed[0]) {
                         performKeyHapticFeedback(v);
                         v.performClick();
-                        handleKeyPress(key);
+                        if (isTopModifierLockCandidate(key)) {
+                            if (isModifierLockedStateForKey(key)) {
+                                setModifierLockedStateForKey(key, false);
+                                return true;
+                            }
+                            sendMomentaryModifierClick(key);
+                        } else {
+                            handleKeyPress(key);
+                        }
                         repeatHandler.postDelayed(this::sendReleaseData, 30);
                     }
                     return true;
@@ -3192,17 +3284,32 @@ public class CustomKeyboardView extends LinearLayout {
         final float[] startX = new float[1];
         final float[] startY = new float[1];
         final boolean[] isDragging = new boolean[1];
+        final boolean[] longPressConsumed = new boolean[1];
+        final Runnable[] pendingModifierLongPress = new Runnable[1];
         final int touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
         final int swipeThreshold = dpToPx(56);
-        final boolean canSwipePanel = true;
+        final boolean canSwipePanel = !isTopModifierLockCandidate(key);
 
         return (v, event) -> {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
+                    if (pendingModifierLongPress[0] != null) {
+                        longPressHandler.removeCallbacks(pendingModifierLongPress[0]);
+                        pendingModifierLongPress[0] = null;
+                    }
+                    longPressConsumed[0] = false;
                     startX[0] = event.getRawX();
                     startY[0] = event.getRawY();
                     isDragging[0] = false;
                     cancelFixedTopRowsAnimations();
+                    if (isTopModifierLockCandidate(key)) {
+                        pendingModifierLongPress[0] = () -> {
+                            longPressConsumed[0] = true;
+                            setModifierLockedStateForKey(key, !isModifierLockedStateForKey(key));
+                            pendingModifierLongPress[0] = null;
+                        };
+                        longPressHandler.postDelayed(pendingModifierLongPress[0], ALT_LONG_PRESS_TIMEOUT_MS);
+                    }
                     if (key != null) {
                         v.setPressed(true);
                     }
@@ -3215,6 +3322,10 @@ public class CustomKeyboardView extends LinearLayout {
                         if (key != null) {
                             v.setPressed(false);
                         }
+                        if (pendingModifierLongPress[0] != null) {
+                            longPressHandler.removeCallbacks(pendingModifierLongPress[0]);
+                            pendingModifierLongPress[0] = null;
+                        }
                     }
                     if (isDragging[0] && hasAnyFixedRowsPagerMode()) {
                         updateFixedTopRowsDrag(applyFixedTopRowsEdgeResistance(dx));
@@ -3225,15 +3336,27 @@ public class CustomKeyboardView extends LinearLayout {
                     if (key != null) {
                         v.setPressed(false);
                     }
+                    if (pendingModifierLongPress[0] != null) {
+                        longPressHandler.removeCallbacks(pendingModifierLongPress[0]);
+                        pendingModifierLongPress[0] = null;
+                    }
                     float totalDx = event.getRawX() - startX[0];
                     if (isDragging[0]) {
                         finishFixedTopRowsSwipe(totalDx, swipeThreshold);
                         return true;
                     }
-                    if (event.getActionMasked() == MotionEvent.ACTION_UP && key != null) {
+                    if (event.getActionMasked() == MotionEvent.ACTION_UP && key != null && !longPressConsumed[0]) {
                         performKeyHapticFeedback(v);
                         v.performClick();
-                        handleKeyPress(key);
+                        if (isTopModifierLockCandidate(key)) {
+                            if (isModifierLockedStateForKey(key)) {
+                                setModifierLockedStateForKey(key, false);
+                                return true;
+                            }
+                            sendMomentaryModifierClick(key);
+                        } else {
+                            handleKeyPress(key);
+                        }
                         repeatHandler.postDelayed(this::sendReleaseData, 30);
                     }
                     return true;
@@ -3781,7 +3904,7 @@ public class CustomKeyboardView extends LinearLayout {
         if (view == null) {
             return;
         }
-        if (view instanceof Button) {
+        if (view instanceof Button || view instanceof ImageButton) {
             Object tag = view.getTag();
             if (tag instanceof Key) {
                 Key key = (Key) tag;
@@ -3789,8 +3912,9 @@ public class CustomKeyboardView extends LinearLayout {
                         || (key.code == 0xE1 && isShiftLeftLocked)
                         || (key.code == 0xE2 && isAltLeftLocked)
                         || (key.code == 0xE3 && isWinLeftLocked);
-                boolean fixedTopFnLocked = isFixedTopLocalFnKey(key) && fixedTopLocalFnLocked;
-                boolean keyLockedVisualState = modifierLocked || fixedTopFnLocked;
+                boolean keyLockedVisualState = isFixedTopLocalFnKey(key)
+                        ? fixedTopLocalFnLocked
+                        : modifierLocked;
                 view.setBackgroundResource(keyLockedVisualState
                         ? R.drawable.press_button_background
                         : R.drawable.function_button_background);
@@ -4480,10 +4604,14 @@ public class CustomKeyboardView extends LinearLayout {
             fixedTopLocalFnLocked = !fixedTopLocalFnLocked;
             rebuildTopShortcutPanels();
             syncTopPanelViewportContent();
+            // Modifier lock flags (Ctrl/Shift/Alt/Win) are unchanged here — only Fn-layer and keycap
+            // labels refresh; re-apply top-strip pressed visuals for icon keys.
+            refreshVisibleTopPanelButtonStates();
             if (splitPartner != null) {
                 splitPartner.fixedTopLocalFnLocked = fixedTopLocalFnLocked;
                 splitPartner.rebuildTopShortcutPanels();
                 splitPartner.syncTopPanelViewportContent();
+                splitPartner.refreshVisibleTopPanelButtonStates();
             }
             return;
         }
@@ -4498,7 +4626,9 @@ public class CustomKeyboardView extends LinearLayout {
             }
         }
 
-        if (key.shortcutModifiers >= 0) {
+        // Top-strip Ctrl/Shift/Alt/Win use {@code shortcutModifiers == 0} in {@link #buildTopPanelModifierKey};
+        // they must not take the profile-shortcut path — handled by touch listeners + switch below.
+        if (key.shortcutModifiers >= 0 && !isTopModifierLockCandidate(key)) {
             FnMapping fnOverride = extraNumpadFnLocked ? resolveExtraNumpadFnMapping(key) : null;
             if (fnOverride == null) {
                 sendShortcutWithModifiers(key.shortcutModifiers, key.code);
@@ -4508,6 +4638,8 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         boolean updateRequired = false;
+        final boolean topStripModifierTap =
+                key.isTopPanelKey && isTopModifierLockCandidate(key);
         switch (key.code) {
             case KEY_MODE_FN:
                 isFnLocked = !isFnLocked;
@@ -4515,24 +4647,32 @@ public class CustomKeyboardView extends LinearLayout {
                 updateRequired = true;
                 break;
             case 0xE1: // Shift Left
-                isShiftLeftLocked = !isShiftLeftLocked;
-                syncModifierStates();
-                updateRequired = true;
+                if (!topStripModifierTap) {
+                    isShiftLeftLocked = !isShiftLeftLocked;
+                    syncModifierStates();
+                    updateRequired = true;
+                }
                 break;
             case 0xE0: // Ctrl Left
-                isCtrlLeftLocked = !isCtrlLeftLocked;
-                syncModifierStates();
-                updateRequired = true;
+                if (!topStripModifierTap) {
+                    isCtrlLeftLocked = !isCtrlLeftLocked;
+                    syncModifierStates();
+                    updateRequired = true;
+                }
                 break;
             case 0xE2: // Alt Left
-                isAltLeftLocked = !isAltLeftLocked;
-                syncModifierStates();
-                updateRequired = true;
+                if (!topStripModifierTap) {
+                    isAltLeftLocked = !isAltLeftLocked;
+                    syncModifierStates();
+                    updateRequired = true;
+                }
                 break;
             case 0xE3: // Win Left
-                isWinLeftLocked = !isWinLeftLocked;
-                syncModifierStates();
-                updateRequired = true;
+                if (!topStripModifierTap) {
+                    isWinLeftLocked = !isWinLeftLocked;
+                    syncModifierStates();
+                    updateRequired = true;
+                }
                 break;
         }
 
