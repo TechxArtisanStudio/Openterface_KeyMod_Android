@@ -4151,7 +4151,7 @@ public class CustomKeyboardView extends LinearLayout {
         if (imeCaptureToolbar == null) {
             return;
         }
-        if (!imeSubComposeDirectHidMode && isImeSubComposePortraitContext()) {
+        if (isImeSubComposePortraitContext()) {
             LayoutParams lp = (LayoutParams) imeCaptureToolbar.getLayoutParams();
             lp.height = dpToPx(IME_COMPOSE_TOOLBAR_ROW_FIXED_HEIGHT_DP);
             lp.weight = 0f;

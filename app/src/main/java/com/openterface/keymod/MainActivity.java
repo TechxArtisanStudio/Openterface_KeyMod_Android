@@ -22,6 +22,7 @@ import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageView;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -36,6 +37,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
+import androidx.core.view.GravityCompat;
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
@@ -85,6 +88,15 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private ImageButton menuButton;
     private DrawerLayout drawerLayout;
     private String currentNavMode = LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
+    private View drawerImeRestoreTarget;
+    private boolean restoreImeAfterDrawerClose;
+    private DrawerCloseReason drawerCloseReason = DrawerCloseReason.NONE;
+
+    private enum DrawerCloseReason {
+        NONE,
+        CANCEL,
+        NAVIGATION
+    }
 
     // Sidebar nav item views
     private LinearLayout navKeyboardMouse;
@@ -394,6 +406,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         navMacros = findViewById(R.id.nav_macros);
         navVoice = findViewById(R.id.nav_voice);
         navPresentation = findViewById(R.id.nav_presentation);
+        setupDrawerImeBehavior();
 
         targetOsHeaderButton = findViewById(R.id.target_os_header_button);
         headerEndScroll = findViewById(R.id.header_end_scroll);
@@ -425,6 +438,98 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (shortcut != null) shortcutDrawable = shortcut.getCompoundDrawables()[1];
 
         setupButtonListeners();
+    }
+
+    private void setupDrawerImeBehavior() {
+        if (drawerLayout == null) {
+            return;
+        }
+        drawerLayout.addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
+            @Override
+            public void onDrawerOpened(View drawerView) {
+                hideImeForDrawerTransition();
+            }
+
+            @Override
+            public void onDrawerClosed(View drawerView) {
+                if (drawerCloseReason == DrawerCloseReason.CANCEL && restoreImeAfterDrawerClose) {
+                    tryRestoreImeAfterDrawerClose();
+                }
+                clearDrawerImeSnapshot();
+            }
+        });
+    }
+
+    private void snapshotImeBeforeOpeningDrawer() {
+        View focused = getCurrentFocus();
+        if (focused == null) {
+            clearDrawerImeSnapshot();
+            drawerCloseReason = DrawerCloseReason.CANCEL;
+            return;
+        }
+        drawerImeRestoreTarget = focused;
+        restoreImeAfterDrawerClose = isImeRestoreCandidate(focused);
+        drawerCloseReason = DrawerCloseReason.CANCEL;
+        focused.clearFocus();
+        hideImeForDrawerTransition();
+    }
+
+    private void markDrawerCloseAsNavigation() {
+        drawerCloseReason = DrawerCloseReason.NAVIGATION;
+        restoreImeAfterDrawerClose = false;
+        drawerImeRestoreTarget = null;
+    }
+
+    private void clearDrawerImeSnapshot() {
+        drawerImeRestoreTarget = null;
+        restoreImeAfterDrawerClose = false;
+        drawerCloseReason = DrawerCloseReason.NONE;
+    }
+
+    private boolean isImeRestoreCandidate(View view) {
+        return view != null
+                && view.getWindowToken() != null
+                && view.isShown()
+                && view.isEnabled()
+                && view.isFocusable();
+    }
+
+    private void hideImeForDrawerTransition() {
+        View focused = getCurrentFocus();
+        if (focused != null) {
+            focused.clearFocus();
+        }
+        InputMethodManager imm =
+                (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm == null) {
+            return;
+        }
+        android.os.IBinder token = null;
+        if (focused != null) {
+            token = focused.getWindowToken();
+        }
+        if (token == null && drawerLayout != null) {
+            token = drawerLayout.getWindowToken();
+        }
+        if (token == null && getWindow() != null && getWindow().getDecorView() != null) {
+            token = getWindow().getDecorView().getWindowToken();
+        }
+        if (token != null) {
+            imm.hideSoftInputFromWindow(token, 0);
+        }
+    }
+
+    private void tryRestoreImeAfterDrawerClose() {
+        View target = drawerImeRestoreTarget;
+        if (!isImeRestoreCandidate(target) || !ViewCompat.isAttachedToWindow(target)) {
+            return;
+        }
+        target.requestFocus();
+        InputMethodManager imm =
+                (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.showSoftInput(target, InputMethodManager.SHOW_IMPLICIT);
+        }
     }
 
     private void applyHeaderEndScrollLayoutForOrientation() {
@@ -725,10 +830,11 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (menuButton != null) {
             menuButton.setOnClickListener(v -> {
                 if (drawerLayout != null) {
-                    if (drawerLayout.isDrawerOpen(android.view.Gravity.START)) {
-                        drawerLayout.closeDrawer(android.view.Gravity.START);
+                    if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                        drawerLayout.closeDrawer(GravityCompat.START);
                     } else {
-                        drawerLayout.openDrawer(android.view.Gravity.START);
+                        snapshotImeBeforeOpeningDrawer();
+                        drawerLayout.openDrawer(GravityCompat.START);
                     }
                 }
             });
@@ -738,7 +844,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         View sidebarCloseButton = findViewById(R.id.sidebar_close_button);
         if (sidebarCloseButton != null) {
             sidebarCloseButton.setOnClickListener(v -> {
-                if (drawerLayout != null) drawerLayout.closeDrawer(android.view.Gravity.START);
+                if (drawerLayout != null) drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
 
@@ -748,7 +854,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 currentNavMode = LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
                 updateNavSelection();
                 showCompositeFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
         if (navGamepad != null) {
@@ -756,7 +863,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 currentNavMode = LaunchPanelActivity.MODE_GAMEPAD;
                 updateNavSelection();
                 showGamepadFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
         if (navShortcuts != null) {
@@ -764,7 +872,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 currentNavMode = LaunchPanelActivity.MODE_SHORTCUTS;
                 updateNavSelection();
                 showShortcutHubFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
         if (navMacros != null) {
@@ -772,7 +881,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 currentNavMode = LaunchPanelActivity.MODE_MACROS;
                 updateNavSelection();
                 showMacrosFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
         if (navVoice != null) {
@@ -780,7 +890,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 currentNavMode = LaunchPanelActivity.MODE_VOICE;
                 updateNavSelection();
                 showVoiceInputFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
         if (navPresentation != null) {
@@ -788,7 +899,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 currentNavMode = LaunchPanelActivity.MODE_PRESENTATION;
                 updateNavSelection();
                 showPresentationFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
 
@@ -796,7 +908,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         View chooseModeButton = findViewById(R.id.choose_mode_button);
         if (chooseModeButton != null) {
             chooseModeButton.setOnClickListener(v -> {
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
                 Intent intent = new Intent(MainActivity.this, LaunchPanelActivity.class);
                 intent.putExtra(LaunchPanelActivity.SHOW_PANEL, true);
                 startActivity(intent);
@@ -808,6 +921,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         View settingsButton = findViewById(R.id.settings_button);
         if (settingsButton != null) {
             settingsButton.setOnClickListener(v -> {
+                markDrawerCloseAsNavigation();
                 Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
                 startActivity(intent);
             });
