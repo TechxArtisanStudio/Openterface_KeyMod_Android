@@ -181,6 +181,9 @@ public class CustomKeyboardView extends LinearLayout {
     private final AtomicBoolean imeSubComposeCancelSend = new AtomicBoolean(false);
     private volatile boolean imeSubComposeSending;
     private final Handler imeSubComposeMainHandler = new Handler(Looper.getMainLooper());
+    private static final long SHOW_LOCAL_IME_RETRY_DELAY_MS = 160L;
+    private final Runnable showLocalImeSoftKeyboardMainRunnable = this::runShowLocalImeSoftKeyboardMain;
+    private final Runnable showLocalImeSoftKeyboardRetryRunnable = this::runShowLocalImeSoftKeyboardRetry;
     private List<List<Key>> lowerKeys;
     private UsbSerialPort port;
     private Handler repeatHandler = new Handler();
@@ -489,27 +492,16 @@ public class CustomKeyboardView extends LinearLayout {
         if (showExtraPortraitKeys == enabled) return;
         if (!enabled) {
             extraNumpadFnLocked = false;
-        } else if (systemImeCaptureMode) {
-            systemImeCaptureMode = false;
-            Context ctx = getContext();
-            if (ctx != null) {
-                ctx.getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
-                        .edit()
-                        .putBoolean(KEY_SYSTEM_IME_CAPTURE, false)
-                        .apply();
-            }
-            if (splitPartner != null) {
-                splitPartner.applyImeCaptureFromPartner(false);
-            }
-            rebuildTopShortcutPanels();
-            syncTopPanelViewportContent();
-            if (onImeCaptureModeChangedListener != null) {
-                onImeCaptureModeChangedListener.onImeCaptureModeChanged(this, false);
-            }
         }
         showExtraPortraitKeys = enabled;
         removeAllViews();
         updateKeyboard();
+        if (enabled && systemImeCaptureMode) {
+            hideSoftInputUsingKeyboardWindowToken();
+            if (getWindowToken() == null) {
+                post(this::hideSoftInputUsingKeyboardWindowToken);
+            }
+        }
     }
 
     /**
@@ -3937,30 +3929,56 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void postShowLocalImeSoftKeyboard() {
-        post(() -> {
-            if (imeCaptureEdit == null || getContext() == null) {
-                return;
-            }
-            imeCaptureEdit.requestFocus();
-            InputMethodManager imm =
-                    (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (imm != null) {
-                imm.showSoftInput(imeCaptureEdit, InputMethodManager.SHOW_IMPLICIT);
-                imeCaptureEdit.post(() -> {
-                    if (imeCaptureEdit == null || getContext() == null) {
-                        return;
-                    }
-                    InputMethodManager imm2 =
-                            (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-                    if (imm2 != null) {
-                        imm2.showSoftInput(imeCaptureEdit, InputMethodManager.SHOW_IMPLICIT);
-                    }
-                });
-            }
-        });
+        removeCallbacks(showLocalImeSoftKeyboardMainRunnable);
+        removeCallbacks(showLocalImeSoftKeyboardRetryRunnable);
+        post(showLocalImeSoftKeyboardMainRunnable);
+    }
+
+    private void runShowLocalImeSoftKeyboardMain() {
+        if (imeCaptureEdit == null || getContext() == null) {
+            return;
+        }
+        imeCaptureEdit.requestFocus();
+        InputMethodManager imm =
+                (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.showSoftInput(imeCaptureEdit, InputMethodManager.SHOW_IMPLICIT);
+        }
+        removeCallbacks(showLocalImeSoftKeyboardRetryRunnable);
+        postDelayed(showLocalImeSoftKeyboardRetryRunnable, SHOW_LOCAL_IME_RETRY_DELAY_MS);
+    }
+
+    private void runShowLocalImeSoftKeyboardRetry() {
+        if (imeCaptureEdit == null || getContext() == null) {
+            return;
+        }
+        InputMethodManager imm =
+                (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.showSoftInput(imeCaptureEdit, InputMethodManager.SHOW_IMPLICIT);
+        }
+    }
+
+    /** Dismiss system IME using this view's window token (compose field may already be detached). */
+    private void hideSoftInputUsingKeyboardWindowToken() {
+        Context ctx = getContext();
+        if (ctx == null) {
+            return;
+        }
+        android.os.IBinder token = getWindowToken();
+        if (token == null) {
+            return;
+        }
+        InputMethodManager imm =
+                (InputMethodManager) ctx.getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(token, 0);
+        }
     }
 
     private void detachLocalImeFieldQuiet() {
+        removeCallbacks(showLocalImeSoftKeyboardMainRunnable);
+        removeCallbacks(showLocalImeSoftKeyboardRetryRunnable);
         boolean wasExpanded = imeSubComposeExpanded;
         imeSubComposeCancelSend.set(true);
         if (imeCaptureEdit != null && getContext() != null) {
