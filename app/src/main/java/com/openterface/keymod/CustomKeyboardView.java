@@ -168,7 +168,10 @@ public class CustomKeyboardView extends LinearLayout {
     private LinearLayout imeCaptureEditorRow;
     private ImageButton imeSubComposeExpandButton;
     private LinearLayout imeCaptureToolbar;
+    private Button imeCaptureUndoButton;
     private Button imeCaptureClearButton;
+    @Nullable
+    private String imeCaptureUndoSnapshot;
     private Button imeCaptureTouchpadButton;
     private Button imeCaptureSendButton;
     private final ExecutorService imeSubComposeSendExecutor = Executors.newSingleThreadExecutor(r -> {
@@ -3973,7 +3976,9 @@ public class CustomKeyboardView extends LinearLayout {
         imeCaptureEditorRow = null;
         imeSubComposeExpandButton = null;
         imeCaptureToolbar = null;
+        imeCaptureUndoButton = null;
         imeCaptureClearButton = null;
+        imeCaptureUndoSnapshot = null;
         imeCaptureTouchpadButton = null;
         imeCaptureSendButton = null;
         imeSubComposeExpanded = false;
@@ -4092,6 +4097,13 @@ public class CustomKeyboardView extends LinearLayout {
         ConnectionManager cm = peekConnectionManager();
         boolean connected = cm != null && cm.isConnected();
 
+        if (imeCaptureUndoButton != null) {
+            boolean canUndo =
+                    !imeSubComposeSending && imeCaptureUndoSnapshot != null && !imeCaptureUndoSnapshot.isEmpty();
+            imeCaptureUndoButton.setEnabled(canUndo);
+            imeCaptureUndoButton.setAlpha(canUndo ? 1f : 0.45f);
+        }
+
         boolean canClear = !imeSubComposeSending && !t.isEmpty();
         imeCaptureClearButton.setEnabled(canClear);
         imeCaptureClearButton.setAlpha(canClear ? 1f : 0.45f);
@@ -4116,7 +4128,20 @@ public class CustomKeyboardView extends LinearLayout {
         if (imeCaptureEdit == null || imeSubComposeSending) {
             return;
         }
+        CharSequence cur = imeCaptureEdit.getText();
+        if (cur != null && cur.length() > 0) {
+            imeCaptureUndoSnapshot = cur.toString();
+        }
         imeCaptureEdit.setText("");
+        updateImeCaptureToolbarState();
+    }
+
+    private void onImeCaptureUndoClicked() {
+        if (imeCaptureEdit == null || imeSubComposeSending || imeCaptureUndoSnapshot == null) {
+            return;
+        }
+        imeCaptureEdit.setText(imeCaptureUndoSnapshot);
+        imeCaptureUndoSnapshot = null;
         updateImeCaptureToolbarState();
     }
 
@@ -4179,6 +4204,7 @@ public class CustomKeyboardView extends LinearLayout {
                 if (finalResult == HidTextKeystrokeSender.Result.CANCELLED) {
                     Toast.makeText(getContext(), R.string.compose_cancelled, Toast.LENGTH_SHORT).show();
                 } else {
+                    imeCaptureUndoSnapshot = null;
                     String msg = getContext().getString(R.string.compose_sent, sentLen)
                             + "\n\n"
                             + getContext().getString(R.string.ime_capture_send_flush_note);
@@ -4189,6 +4215,13 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void setImeCaptureToolbarEnabledWhileSending(boolean enabled) {
+        if (imeCaptureUndoButton != null) {
+            imeCaptureUndoButton.setEnabled(
+                    enabled
+                            && imeCaptureUndoSnapshot != null
+                            && !imeCaptureUndoSnapshot.isEmpty());
+            imeCaptureUndoButton.setAlpha(imeCaptureUndoButton.isEnabled() ? 1f : 0.45f);
+        }
         if (imeCaptureClearButton != null) {
             imeCaptureClearButton.setEnabled(enabled && imeCaptureEdit != null
                     && imeCaptureEdit.getText() != null
@@ -4263,6 +4296,13 @@ public class CustomKeyboardView extends LinearLayout {
             int hPad = dpToPx(12);
             imeCaptureToolbar.setPadding(hPad, dpToPx(4), hPad, dpToPx(4));
 
+            imeCaptureUndoButton = new Button(getContext());
+            styleImeToolbarIconButton(imeCaptureUndoButton, R.drawable.ic_compose_undo_24, R.string.compose_undo);
+            imeCaptureUndoButton.setOnClickListener(v -> onImeCaptureUndoClicked());
+            LinearLayout.LayoutParams undoLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
+            undoLp.setMargins(0, 0, dpToPx(8), 0);
+            imeCaptureUndoButton.setLayoutParams(undoLp);
+
             imeCaptureClearButton = new Button(getContext());
             styleImeToolbarIconButton(imeCaptureClearButton, R.drawable.ic_compose_clear_24, R.string.compose_clear);
             imeCaptureClearButton.setOnClickListener(v -> onImeCaptureClearClicked());
@@ -4288,6 +4328,7 @@ public class CustomKeyboardView extends LinearLayout {
             LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 3f);
             imeCaptureSendButton.setLayoutParams(sendLp);
 
+            imeCaptureToolbar.addView(imeCaptureUndoButton);
             imeCaptureToolbar.addView(imeCaptureClearButton);
             imeCaptureToolbar.addView(imeCaptureTouchpadButton);
             imeCaptureToolbar.addView(imeCaptureSendButton);
