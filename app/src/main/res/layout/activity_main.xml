@@ -103,9 +103,9 @@
                         android:id="@+id/header_mode_slot_2"
                         android:layout_width="@dimen/header_icon_size"
                         android:layout_height="@dimen/header_icon_size"
-                        android:src="@drawable/ic_edit"
+                        android:src="@drawable/ic_presentation"
                         android:background="?attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="@string/compose_mode_title"
+                        android:contentDescription="@string/presentation_mode"
                         android:padding="@dimen/button_icon_padding"
                         android:tint="@color/text_secondary" />
 
@@ -113,9 +113,9 @@
                         android:id="@+id/header_mode_slot_3"
                         android:layout_width="@dimen/header_icon_size"
                         android:layout_height="@dimen/header_icon_size"
-                        android:src="@drawable/ic_presentation"
+                        android:src="@drawable/macros"
                         android:background="?attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="@string/presentation_mode"
+                        android:contentDescription="@string/top_mode_label_macros"
                         android:padding="@dimen/button_icon_padding"
                         android:tint="@color/text_secondary" />
                 </LinearLayout>

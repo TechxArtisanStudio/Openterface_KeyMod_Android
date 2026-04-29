@@ -4162,11 +4162,13 @@ public class CustomKeyboardView extends LinearLayout {
                     this::peekConnectionManager,
                     this::getTargetOs,
                     imeTextExecutor);
-            postShowLocalImeSoftKeyboard();
         }
         applyImeSubComposeDirectHidUi();
         updateImeCaptureToolbarState();
         post(this::notifyImeSubComposeDirectHidModeChanged);
+        if (next) {
+            post(this::postShowLocalImeSoftKeyboard);
+        }
     }
 
     private void refreshImeSubComposeModeToggleIcon() {
@@ -4206,7 +4208,10 @@ public class CustomKeyboardView extends LinearLayout {
             collapseImeSubComposePersistedForChrome();
             applyImeTopStripVisibilityForSubCompose();
 
-            imeCaptureEdit.setVisibility(INVISIBLE);
+            // Stay VISIBLE so InputMethodManager can show the soft keyboard (INVISIBLE often blocks IME).
+            // The editor row is ~1dp tall in Direct HID; toolbar hint carries user-facing copy.
+            imeCaptureEdit.setHint("");
+            imeCaptureEdit.setVisibility(VISIBLE);
             if (imeSubComposeExpandButton != null) {
                 imeSubComposeExpandButton.setVisibility(GONE);
             }
@@ -4227,6 +4232,7 @@ public class CustomKeyboardView extends LinearLayout {
             setImeToolbarCellWeight(imeCaptureSendButton, keyMargin, 0f);
         } else {
             applyImeTopStripVisibilityForSubCompose();
+            imeCaptureEdit.setHint(R.string.ime_capture_hint);
             imeCaptureEdit.setVisibility(VISIBLE);
             if (imeSubComposeExpandButton != null) {
                 imeSubComposeExpandButton.setVisibility(VISIBLE);
@@ -4615,7 +4621,7 @@ public class CustomKeyboardView extends LinearLayout {
                     this::getTargetOs,
                     imeTextExecutor);
         }
-        postShowLocalImeSoftKeyboard();
+        post(this::postShowLocalImeSoftKeyboard);
     }
 
     /** Match {@link #addShortcutPanelRows} icon keys: function face, flat elevation, theme tint. */

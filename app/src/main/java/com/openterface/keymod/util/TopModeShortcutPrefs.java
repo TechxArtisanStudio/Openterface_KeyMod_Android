@@ -19,10 +19,9 @@ public final class TopModeShortcutPrefs {
     private static final String KEY_SLOT_2 = "top_mode_slot_2";
     private static final String KEY_SLOT_3 = "top_mode_slot_3";
 
-    /** Order matches {@code nav_menu.xml}: Keyboard & Mouse, Compose, Presentation, then the rest. */
+    /** Order matches {@code nav_menu.xml}: Keyboard & Mouse, Presentation, then the rest. */
     private static final String[] SELECTABLE_MODES = {
             LaunchPanelActivity.MODE_KEYBOARD_MOUSE,
-            LaunchPanelActivity.MODE_COMPOSE,
             LaunchPanelActivity.MODE_PRESENTATION,
             LaunchPanelActivity.MODE_GAMEPAD,
             LaunchPanelActivity.MODE_SHORTCUTS,
@@ -43,9 +42,9 @@ public final class TopModeShortcutPrefs {
             case 1:
                 return LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
             case 2:
-                return LaunchPanelActivity.MODE_COMPOSE;
-            case 3:
                 return LaunchPanelActivity.MODE_PRESENTATION;
+            case 3:
+                return LaunchPanelActivity.MODE_MACROS;
             default:
                 return LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
         }
@@ -102,8 +101,6 @@ public final class TopModeShortcutPrefs {
     @StringRes
     public static int labelResForMode(String mode) {
         switch (normalizeMode(mode)) {
-            case LaunchPanelActivity.MODE_COMPOSE:
-                return R.string.compose_mode_title;
             case LaunchPanelActivity.MODE_PRESENTATION:
                 return R.string.presentation_mode;
             case LaunchPanelActivity.MODE_GAMEPAD:
@@ -123,8 +120,6 @@ public final class TopModeShortcutPrefs {
     @DrawableRes
     public static int iconResForMode(String mode) {
         switch (normalizeMode(mode)) {
-            case LaunchPanelActivity.MODE_COMPOSE:
-                return R.drawable.ic_edit;
             case LaunchPanelActivity.MODE_PRESENTATION:
                 return R.drawable.ic_presentation;
             case LaunchPanelActivity.MODE_GAMEPAD:

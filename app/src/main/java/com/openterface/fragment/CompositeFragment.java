@@ -562,9 +562,9 @@ public class CompositeFragment extends Fragment {
     }
 
     /**
-     * Same approach as {@link ComposeFragment}: lift the whole column above the soft keyboard.
-     * {@code DrawerLayout} + weighted {@code fragment_container} often prevent {@code adjustResize}
-     * alone from shrinking the fragment, so IME bottom insets are applied as root padding.
+     * Lift the whole column above the soft keyboard. {@code DrawerLayout} + weighted
+     * {@code fragment_container} often prevent {@code adjustResize} alone from shrinking the
+     * fragment, so IME bottom insets are applied as root padding.
      */
     private void setupCompositeImeRootInsets(@NonNull View root) {
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, windowInsets) -> {
