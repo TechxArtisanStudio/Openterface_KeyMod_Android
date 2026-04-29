@@ -166,6 +166,15 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                                             Toast.LENGTH_SHORT,
                                             1800));
                 }
+
+                @Override
+                public void onBluetoothRssiChanged(int rssi) {
+                    runOnUiThread(
+                            () ->
+                                    updateConnectionButton(
+                                            connectionManager.getCurrentConnectionType(),
+                                            connectionManager.getCurrentConnectionState()));
+                }
             };
 
     /** Global target OS preference key */
@@ -772,7 +781,13 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
 
         int connectionTint = headerConnectionClusterTint(state);
         int neutralTint = headerNeutralActionTint();
-        connectionButton.setImageResource(R.drawable.ic_bluetooth);
+        if (state == ConnectionManager.ConnectionState.CONNECTING) {
+            connectionButton.setImageResource(R.drawable.bluetooth_searching_24px);
+        } else if (state == ConnectionManager.ConnectionState.CONNECTED) {
+            connectionButton.setImageResource(R.drawable.bluetooth_connected_24px);
+        } else {
+            connectionButton.setImageResource(R.drawable.bluetooth_24px);
+        }
         connectionButton.setColorFilter(connectionTint, PorterDuff.Mode.SRC_IN);
         if (targetOsHeaderButton != null) {
             targetOsHeaderButton.setColorFilter(neutralTint, PorterDuff.Mode.SRC_IN);
@@ -785,9 +800,14 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
 
         switch (state) {
             case CONNECTED:
-                if (signalBars != null) {
+                if (signalBars != null && type == ConnectionManager.ConnectionType.BLUETOOTH) {
+                    if (connectionManager != null) {
+                        signalBars.setImageResource(connectionManager.getBleSignalDrawableRes());
+                    }
                     signalBars.setVisibility(View.VISIBLE);
                     signalBars.setColorFilter(connectionTint, PorterDuff.Mode.SRC_IN);
+                } else if (signalBars != null) {
+                    signalBars.setVisibility(View.GONE);
                 }
                 break;
             case CONNECTING:

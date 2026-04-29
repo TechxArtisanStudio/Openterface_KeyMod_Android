@@ -87,6 +87,13 @@ public class ConnectionDialogFragment extends DialogFragment {
                                                         1800));
                     }
                 }
+
+                @Override
+                public void onBluetoothRssiChanged(int rssi) {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(ConnectionDialogFragment.this::updateUI);
+                    }
+                }
             };
 
     public interface ConnectionDialogListener {
@@ -409,29 +416,41 @@ public class ConnectionDialogFragment extends DialogFragment {
         BluetoothAdapter adapter = btMgr != null ? btMgr.getAdapter() : null;
         boolean btOff = adapter == null || !adapter.isEnabled();
 
-        boolean isBluetoothConnected = connectionManager.getCurrentConnectionType() == ConnectionManager.ConnectionType.BLUETOOTH &&
-                                      connectionManager.getCurrentConnectionState() == ConnectionManager.ConnectionState.CONNECTED;
+        boolean isBluetoothConnected =
+                connectionManager.getCurrentConnectionType() == ConnectionManager.ConnectionType.BLUETOOTH
+                        && connectionManager.getCurrentConnectionState()
+                                == ConnectionManager.ConnectionState.CONNECTED;
+        boolean isBluetoothConnecting =
+                connectionManager.getCurrentConnectionType() == ConnectionManager.ConnectionType.BLUETOOTH
+                        && connectionManager.getCurrentConnectionState()
+                                == ConnectionManager.ConnectionState.CONNECTING;
 
         int connected = ContextCompat.getColor(requireContext(), R.color.connected);
         int idle = ContextCompat.getColor(requireContext(), R.color.text_secondary);
 
         if (btOff) {
             bluetoothStatus.setText(R.string.not_connected);
-            bluetoothStatusIcon.setImageResource(R.drawable.ic_bluetooth_disabled_24);
+            bluetoothStatusIcon.setImageResource(R.drawable.bluetooth_disabled_24px);
             bluetoothStatusIcon.setColorFilter(idle, PorterDuff.Mode.SRC_IN);
+            if (bluetoothSignal != null) bluetoothSignal.setVisibility(View.GONE);
+        } else if (isBluetoothConnecting) {
+            bluetoothStatus.setText(R.string.status_connecting);
+            bluetoothStatusIcon.setImageResource(R.drawable.bluetooth_searching_24px);
+            bluetoothStatusIcon.setColorFilter(ContextCompat.getColor(requireContext(), R.color.connecting), PorterDuff.Mode.SRC_IN);
             if (bluetoothSignal != null) bluetoothSignal.setVisibility(View.GONE);
         } else if (isBluetoothConnected) {
             String deviceName = connectionManager.getLastBleDeviceName();
             bluetoothStatus.setText(deviceName != null ? deviceName : getString(R.string.connected));
-            bluetoothStatusIcon.setImageResource(R.drawable.ic_bluetooth_connected_24);
+            bluetoothStatusIcon.setImageResource(R.drawable.bluetooth_connected_24px);
             bluetoothStatusIcon.setColorFilter(connected, PorterDuff.Mode.SRC_IN);
             if (bluetoothSignal != null) {
+                bluetoothSignal.setImageResource(connectionManager.getBleSignalDrawableRes());
                 bluetoothSignal.setVisibility(View.VISIBLE);
                 bluetoothSignal.setColorFilter(connected, PorterDuff.Mode.SRC_IN);
             }
         } else {
             bluetoothStatus.setText(R.string.not_connected);
-            bluetoothStatusIcon.setImageResource(R.drawable.ic_bluetooth_24);
+            bluetoothStatusIcon.setImageResource(R.drawable.bluetooth_24px);
             bluetoothStatusIcon.setColorFilter(idle, PorterDuff.Mode.SRC_IN);
             if (bluetoothSignal != null) bluetoothSignal.setVisibility(View.GONE);
         }

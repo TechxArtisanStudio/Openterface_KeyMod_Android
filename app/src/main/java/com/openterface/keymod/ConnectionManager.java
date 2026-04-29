@@ -55,6 +55,7 @@ public class ConnectionManager {
     private ConnectionState currentConnectionState = ConnectionState.DISCONNECTED;
     private UsbSerialPort usbPort;
     private RxBleDevice bleDevice;
+    private Integer latestBleRssi;
     private BluetoothService bluetoothService;
     private MainActivity mainActivity; // Reference to activity for retrieving services
     private final MacrosManager macrosManager;
@@ -65,6 +66,7 @@ public class ConnectionManager {
     public interface ConnectionStateListener {
         void onConnectionStateChanged(ConnectionType type, ConnectionState state);
         void onConnectionError(String error);
+        default void onBluetoothRssiChanged(int rssi) {}
     }
 
     public ConnectionManager(Context context) {
@@ -106,6 +108,26 @@ public class ConnectionManager {
 
     public RxBleDevice getBleDevice() {
         return bleDevice;
+    }
+
+    public Integer getLatestBleRssi() {
+        return latestBleRssi;
+    }
+
+    public int getBleSignalDrawableRes() {
+        if (currentConnectionType != ConnectionType.BLUETOOTH || currentConnectionState != ConnectionState.CONNECTED) {
+            return R.drawable.signal_cellular_alt_off_24px;
+        }
+        if (latestBleRssi == null || latestBleRssi <= -90) {
+            return R.drawable.signal_cellular_alt_off_24px;
+        }
+        if (latestBleRssi <= -76) {
+            return R.drawable.signal_cellular_alt_1_bar_24px;
+        }
+        if (latestBleRssi <= -61) {
+            return R.drawable.signal_cellular_alt_2_bar_24px;
+        }
+        return R.drawable.signal_cellular_alt_24px;
     }
 
     public boolean isConnected() {
@@ -294,9 +316,17 @@ public class ConnectionManager {
         if (connected) {
             updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.CONNECTED);
         } else {
+            latestBleRssi = null;
             if (currentConnectionType == ConnectionType.BLUETOOTH) {
                 updateConnectionState(ConnectionType.NONE, ConnectionState.DISCONNECTED);
             }
+        }
+    }
+
+    private void updateBleRssi(int rssi) {
+        latestBleRssi = rssi;
+        for (ConnectionStateListener listener : stateListeners) {
+            listener.onBluetoothRssiChanged(rssi);
         }
     }
 
@@ -395,6 +425,7 @@ public class ConnectionManager {
 
                 @Override
                 public void onBluetoothDisconnected(RxBleDevice device) {
+                    latestBleRssi = null;
                     if (currentConnectionType == ConnectionType.BLUETOOTH) {
                         updateConnectionState(ConnectionType.NONE, ConnectionState.DISCONNECTED);
                     }
@@ -402,8 +433,14 @@ public class ConnectionManager {
 
                 @Override
                 public void onBluetoothError(RxBleDevice device, String error) {
+                    latestBleRssi = null;
                     updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.ERROR);
                     notifyError(error);
+                }
+
+                @Override
+                public void onBluetoothRssiChanged(RxBleDevice device, int rssi) {
+                    updateBleRssi(rssi);
                 }
             };
             this.bluetoothService.addConnectionStateListener(bluetoothServiceStateListener);

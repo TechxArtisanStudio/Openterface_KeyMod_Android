@@ -120,15 +120,15 @@
                         android:id="@+id/bluetooth_status_icon"
                         android:layout_width="20dp"
                         android:layout_height="20dp"
-                        android:src="@drawable/ic_bluetooth_24"
+                        android:src="@drawable/bluetooth_24px"
                         android:contentDescription="@string/connection_status" />
 
                     <ImageView
                         android:id="@+id/bluetooth_signal"
                         android:layout_width="20dp"
-                        android:layout_height="10dp"
+                        android:layout_height="20dp"
                         android:layout_marginStart="4dp"
-                        android:src="@drawable/ic_signal_bars"
+                        android:src="@drawable/signal_cellular_alt_off_24px"
                         android:tint="?attr/colorPrimary"
                         android:visibility="gone"
                         android:contentDescription="Signal strength" />

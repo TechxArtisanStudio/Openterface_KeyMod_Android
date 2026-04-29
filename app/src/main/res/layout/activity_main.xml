@@ -154,10 +154,10 @@
 
                     <ImageView
                         android:id="@+id/signal_bars"
-                        android:layout_width="24dp"
-                        android:layout_height="12dp"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
                         android:layout_marginTop="1dp"
-                        android:src="@drawable/ic_signal_bars"
+                        android:src="@drawable/signal_cellular_alt_off_24px"
                         android:tint="@color/primary"
                         android:visibility="gone"
                         android:contentDescription="Signal strength"/>
