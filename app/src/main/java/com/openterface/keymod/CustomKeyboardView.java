@@ -70,6 +70,8 @@ public class CustomKeyboardView extends LinearLayout {
     private static final String TAG = "CustomKeyboardView";
     private static final int TOP_PANEL_COLUMNS = 7;
     private static final int TOP_PANEL_ROWS = 3;
+    private static final int FIXED_TOP_ROWS_TOTAL_PAGES = 3;
+    private static final int FIXED_TOP_ROWS_DEFAULT_PAGE_INDEX = 1;
     private static final int TOP_PANEL_PAGE_SIZE = TOP_PANEL_COLUMNS * TOP_PANEL_ROWS;
     private static final int TOP_ROW_PAGE_SIZE = TOP_PANEL_COLUMNS;
     private static final int TOP_PANEL_LEFT_START_COL = 0;
@@ -77,6 +79,8 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int TOP_PANEL_RIGHT_START_COL = 4;
     private static final int TOP_PANEL_RIGHT_END_COL = TOP_PANEL_COLUMNS;
     private static final float TOP_PANEL_ROW_WEIGHT = 0.8f;
+    private static final float TOP_PANEL_SCROLLABLE_ROW_WEIGHT = TOP_PANEL_ROW_WEIGHT;
+    private static final float TOP_PANEL_FIXED_ROWS_WEIGHT = TOP_PANEL_ROW_WEIGHT * 2f;
     private static final float TOP_PANEL_TOTAL_WEIGHT = TOP_PANEL_ROWS * TOP_PANEL_ROW_WEIGHT;
     /** Single-pane IME: shortcut strip vs text vs space for soft keyboard (sum ~5.15). */
     private static final float IME_SINGLE_TOP_STRIP_WEIGHT = 1.35f;
@@ -276,10 +280,16 @@ public class CustomKeyboardView extends LinearLayout {
     private float alternatesGestureStartRawX;
     private float alternatesGestureStartRawY;
     private int topPanelPageIndex = 0;
+    private int fixedTopRowsPageIndex = FIXED_TOP_ROWS_DEFAULT_PAGE_INDEX;
     private ShortcutProfileManager shortcutProfileManager;
     private final List<TopShortcutPanel> topShortcutPanels = new ArrayList<>();
+    private final List<List<Key>> fixedTopRowsPanels = new ArrayList<>();
     private FrameLayout topPanelViewport;
-    private LinearLayout fixedTopRowsContainer;
+    private LinearLayout topPanelRootContainer;
+    private FrameLayout fixedTopRowsViewport;
+    private LinearLayout previousFixedTopRowsContainer;
+    private LinearLayout activeFixedTopRowsContainer;
+    private LinearLayout nextFixedTopRowsContainer;
     private LinearLayout previousTopPanelContainer;
     private LinearLayout activeTopPanelContainer;
     private LinearLayout nextTopPanelContainer;
@@ -289,11 +299,17 @@ public class CustomKeyboardView extends LinearLayout {
     private LinearLayout splitPreviousTopPanelContainerLeft;
     private LinearLayout splitActiveTopPanelContainerLeft;
     private LinearLayout splitNextTopPanelContainerLeft;
-    private LinearLayout splitFixedTopRowsContainerLeft;
+    private FrameLayout splitFixedTopRowsViewportLeft;
+    private LinearLayout splitPreviousFixedTopRowsContainerLeft;
+    private LinearLayout splitActiveFixedTopRowsContainerLeft;
+    private LinearLayout splitNextFixedTopRowsContainerLeft;
     private LinearLayout splitPreviousTopPanelContainerRight;
     private LinearLayout splitActiveTopPanelContainerRight;
     private LinearLayout splitNextTopPanelContainerRight;
-    private LinearLayout splitFixedTopRowsContainerRight;
+    private FrameLayout splitFixedTopRowsViewportRight;
+    private LinearLayout splitPreviousFixedTopRowsContainerRight;
+    private LinearLayout splitActiveFixedTopRowsContainerRight;
+    private LinearLayout splitNextFixedTopRowsContainerRight;
 
     private BluetoothService bluetoothService;
     private boolean isServiceBound;
@@ -885,6 +901,7 @@ public class CustomKeyboardView extends LinearLayout {
     /** Create a shared top scrolling panel view for split mode. */
     public FrameLayout createTopPanel() {
         rebuildTopShortcutPanels();
+        rebuildFixedTopRowsPanels();
         if (topShortcutPanels.isEmpty()) {
             return null;
         }
@@ -907,11 +924,16 @@ public class CustomKeyboardView extends LinearLayout {
 
         FrameLayout viewport = new FrameLayout(getContext());
         viewport.setLayoutParams(new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT));
-        fixedTopRowsContainer = new LinearLayout(getContext());
-        fixedTopRowsContainer.setLayoutParams(new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT * 2f));
-        fixedTopRowsContainer.setOrientation(VERTICAL);
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_SCROLLABLE_ROW_WEIGHT));
+        fixedTopRowsViewport = new FrameLayout(getContext());
+        fixedTopRowsViewport.setLayoutParams(new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_FIXED_ROWS_WEIGHT));
+        previousFixedTopRowsContainer = createTopShortcutPanelView();
+        activeFixedTopRowsContainer = createTopShortcutPanelView();
+        nextFixedTopRowsContainer = createTopShortcutPanelView();
+        fixedTopRowsViewport.addView(previousFixedTopRowsContainer);
+        fixedTopRowsViewport.addView(activeFixedTopRowsContainer);
+        fixedTopRowsViewport.addView(nextFixedTopRowsContainer);
 
         previousTopPanelContainer = createTopShortcutPanelView();
         activeTopPanelContainer = createTopShortcutPanelView();
@@ -920,7 +942,7 @@ public class CustomKeyboardView extends LinearLayout {
         viewport.addView(activeTopPanelContainer);
         viewport.addView(nextTopPanelContainer);
         stack.addView(viewport);
-        stack.addView(fixedTopRowsContainer);
+        stack.addView(fixedTopRowsViewport);
         root.addView(stack);
 
         syncTopPanelViewportContent();
@@ -936,6 +958,7 @@ public class CustomKeyboardView extends LinearLayout {
                 if (nextTopPanelContainer != null) {
                     nextTopPanelContainer.setTranslationX(width);
                 }
+                resetFixedTopRowsPositions(0f);
             }
         });
 
@@ -951,6 +974,7 @@ public class CustomKeyboardView extends LinearLayout {
             return;
         }
         rebuildTopShortcutPanels();
+        rebuildFixedTopRowsPanels();
         if (topShortcutPanels.isEmpty()) {
             return;
         }
@@ -962,7 +986,11 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         topPanelViewport = null;
-        fixedTopRowsContainer = null;
+        topPanelRootContainer = null;
+        fixedTopRowsViewport = null;
+        previousFixedTopRowsContainer = null;
+        activeFixedTopRowsContainer = null;
+        nextFixedTopRowsContainer = null;
         previousTopPanelContainer = null;
         activeTopPanelContainer = null;
         nextTopPanelContainer = null;
@@ -980,17 +1008,28 @@ public class CustomKeyboardView extends LinearLayout {
         splitTopLeftViewport = new FrameLayout(getContext());
         splitTopRightViewport = new FrameLayout(getContext());
         splitTopLeftViewport.setLayoutParams(new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT));
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_SCROLLABLE_ROW_WEIGHT));
         splitTopRightViewport.setLayoutParams(new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT));
-        splitFixedTopRowsContainerLeft = new LinearLayout(getContext());
-        splitFixedTopRowsContainerLeft.setLayoutParams(new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT * 2f));
-        splitFixedTopRowsContainerLeft.setOrientation(VERTICAL);
-        splitFixedTopRowsContainerRight = new LinearLayout(getContext());
-        splitFixedTopRowsContainerRight.setLayoutParams(new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT * 2f));
-        splitFixedTopRowsContainerRight.setOrientation(VERTICAL);
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_SCROLLABLE_ROW_WEIGHT));
+        splitFixedTopRowsViewportLeft = new FrameLayout(getContext());
+        splitFixedTopRowsViewportLeft.setLayoutParams(new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_FIXED_ROWS_WEIGHT));
+        splitPreviousFixedTopRowsContainerLeft = createTopShortcutPanelView();
+        splitActiveFixedTopRowsContainerLeft = createTopShortcutPanelView();
+        splitNextFixedTopRowsContainerLeft = createTopShortcutPanelView();
+        splitFixedTopRowsViewportLeft.addView(splitPreviousFixedTopRowsContainerLeft);
+        splitFixedTopRowsViewportLeft.addView(splitActiveFixedTopRowsContainerLeft);
+        splitFixedTopRowsViewportLeft.addView(splitNextFixedTopRowsContainerLeft);
+
+        splitFixedTopRowsViewportRight = new FrameLayout(getContext());
+        splitFixedTopRowsViewportRight.setLayoutParams(new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_FIXED_ROWS_WEIGHT));
+        splitPreviousFixedTopRowsContainerRight = createTopShortcutPanelView();
+        splitActiveFixedTopRowsContainerRight = createTopShortcutPanelView();
+        splitNextFixedTopRowsContainerRight = createTopShortcutPanelView();
+        splitFixedTopRowsViewportRight.addView(splitPreviousFixedTopRowsContainerRight);
+        splitFixedTopRowsViewportRight.addView(splitActiveFixedTopRowsContainerRight);
+        splitFixedTopRowsViewportRight.addView(splitNextFixedTopRowsContainerRight);
 
         splitPreviousTopPanelContainerLeft = createTopShortcutPanelView();
         splitActiveTopPanelContainerLeft = createTopShortcutPanelView();
@@ -1006,9 +1045,9 @@ public class CustomKeyboardView extends LinearLayout {
         splitTopRightViewport.addView(splitActiveTopPanelContainerRight);
         splitTopRightViewport.addView(splitNextTopPanelContainerRight);
         leftStack.addView(splitTopLeftViewport);
-        leftStack.addView(splitFixedTopRowsContainerLeft);
+        leftStack.addView(splitFixedTopRowsViewportLeft);
         rightStack.addView(splitTopRightViewport);
-        rightStack.addView(splitFixedTopRowsContainerRight);
+        rightStack.addView(splitFixedTopRowsViewportRight);
 
         leftHost.removeAllViews();
         rightHost.removeAllViews();
@@ -1023,7 +1062,10 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         syncTopPanelViewportContent();
-        leftHost.post(() -> resetTopPanelPositions(0f));
+        leftHost.post(() -> {
+            resetTopPanelPositions(0f);
+            resetFixedTopRowsPositions(0f);
+        });
     }
     
     /**
@@ -2372,6 +2414,7 @@ public class CustomKeyboardView extends LinearLayout {
      */
     private void addTopFunctionRows() {
         rebuildTopShortcutPanels();
+        rebuildFixedTopRowsPanels();
         if (topShortcutPanels.isEmpty()) {
             return;
         }
@@ -2391,14 +2434,21 @@ public class CustomKeyboardView extends LinearLayout {
         topStripContainer.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, topStripWeight));
         topStripContainer.setOrientation(VERTICAL);
         FrameLayout viewport = new FrameLayout(getContext());
-        viewport.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT));
-        fixedTopRowsContainer = new LinearLayout(getContext());
-        fixedTopRowsContainer.setLayoutParams(new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT * 2f));
-        fixedTopRowsContainer.setOrientation(VERTICAL);
+        viewport.setLayoutParams(new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_SCROLLABLE_ROW_WEIGHT));
+        fixedTopRowsViewport = new FrameLayout(getContext());
+        fixedTopRowsViewport.setLayoutParams(new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_FIXED_ROWS_WEIGHT));
+        previousFixedTopRowsContainer = createTopShortcutPanelView();
+        activeFixedTopRowsContainer = createTopShortcutPanelView();
+        nextFixedTopRowsContainer = createTopShortcutPanelView();
+        fixedTopRowsViewport.addView(previousFixedTopRowsContainer);
+        fixedTopRowsViewport.addView(activeFixedTopRowsContainer);
+        fixedTopRowsViewport.addView(nextFixedTopRowsContainer);
         topPanelViewport = viewport;
+        topPanelRootContainer = topStripContainer;
         topStripContainer.addView(viewport);
-        topStripContainer.addView(fixedTopRowsContainer);
+        topStripContainer.addView(fixedTopRowsViewport);
         initializeTopPanelViewport();
         addView(topStripContainer);
     }
@@ -2420,6 +2470,15 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void syncTopPanelViewportContent() {
+        if (fixedTopRowsPanels.isEmpty()) {
+            rebuildFixedTopRowsPanels();
+        }
+        if (fixedTopRowsPageIndex < 0) {
+            fixedTopRowsPageIndex = 0;
+        }
+        if (fixedTopRowsPageIndex >= fixedTopRowsPanels.size()) {
+            fixedTopRowsPageIndex = fixedTopRowsPanels.size() - 1;
+        }
         TopShortcutPanel previous = topPanelPageIndex > 0
                 ? topShortcutPanels.get(topPanelPageIndex - 1)
                 : null;
@@ -2447,8 +2506,29 @@ public class CustomKeyboardView extends LinearLayout {
             if (splitActiveTopPanelContainerRight != null) {
                 splitActiveTopPanelContainerRight.bringToFront();
             }
-            bindFixedTopRows(splitFixedTopRowsContainerLeft, active, TOP_PANEL_LEFT_START_COL, TOP_PANEL_LEFT_END_COL);
-            bindFixedTopRows(splitFixedTopRowsContainerRight, active, TOP_PANEL_RIGHT_START_COL, TOP_PANEL_RIGHT_END_COL);
+            List<Key> fixedPrevious = fixedTopRowsPageIndex > 0
+                    ? fixedTopRowsPanels.get(fixedTopRowsPageIndex - 1) : null;
+            List<Key> fixedActive = fixedTopRowsPanels.get(fixedTopRowsPageIndex);
+            List<Key> fixedNext = fixedTopRowsPageIndex < fixedTopRowsPanels.size() - 1
+                    ? fixedTopRowsPanels.get(fixedTopRowsPageIndex + 1) : null;
+            bindSplitFixedTopRowsPanelView(
+                    splitPreviousFixedTopRowsContainerLeft,
+                    splitPreviousFixedTopRowsContainerRight,
+                    fixedPrevious);
+            bindSplitFixedTopRowsPanelView(
+                    splitActiveFixedTopRowsContainerLeft,
+                    splitActiveFixedTopRowsContainerRight,
+                    fixedActive);
+            bindSplitFixedTopRowsPanelView(
+                    splitNextFixedTopRowsContainerLeft,
+                    splitNextFixedTopRowsContainerRight,
+                    fixedNext);
+            if (splitActiveFixedTopRowsContainerLeft != null) {
+                splitActiveFixedTopRowsContainerLeft.bringToFront();
+            }
+            if (splitActiveFixedTopRowsContainerRight != null) {
+                splitActiveFixedTopRowsContainerRight.bringToFront();
+            }
             return;
         }
 
@@ -2458,7 +2538,17 @@ public class CustomKeyboardView extends LinearLayout {
         if (activeTopPanelContainer != null) {
             activeTopPanelContainer.bringToFront();
         }
-        bindFixedTopRows(fixedTopRowsContainer, active, 0, TOP_PANEL_COLUMNS);
+        List<Key> fixedPrevious = fixedTopRowsPageIndex > 0
+                ? fixedTopRowsPanels.get(fixedTopRowsPageIndex - 1) : null;
+        List<Key> fixedActive = fixedTopRowsPanels.get(fixedTopRowsPageIndex);
+        List<Key> fixedNext = fixedTopRowsPageIndex < fixedTopRowsPanels.size() - 1
+                ? fixedTopRowsPanels.get(fixedTopRowsPageIndex + 1) : null;
+        bindFixedTopRowsPanelView(previousFixedTopRowsContainer, fixedPrevious, 0, TOP_PANEL_COLUMNS);
+        bindFixedTopRowsPanelView(activeFixedTopRowsContainer, fixedActive, 0, TOP_PANEL_COLUMNS);
+        bindFixedTopRowsPanelView(nextFixedTopRowsContainer, fixedNext, 0, TOP_PANEL_COLUMNS);
+        if (activeFixedTopRowsContainer != null) {
+            activeFixedTopRowsContainer.bringToFront();
+        }
     }
 
     private LinearLayout createTopShortcutPanelView() {
@@ -2521,9 +2611,9 @@ public class CustomKeyboardView extends LinearLayout {
         addShortcutPanelRows(topPanelContainer, panel.keys, startColInclusive, endColExclusive, 0, 1);
     }
 
-    private void bindFixedTopRows(
+    private void bindFixedTopRowsPanelView(
             LinearLayout container,
-            TopShortcutPanel panel,
+            List<Key> panelKeys,
             int startColInclusive,
             int endColExclusive
     ) {
@@ -2531,12 +2621,31 @@ public class CustomKeyboardView extends LinearLayout {
             return;
         }
         container.removeAllViews();
-        if (panel == null) {
+        if (panelKeys == null) {
             container.setVisibility(View.INVISIBLE);
             return;
         }
         container.setVisibility(View.VISIBLE);
-        addShortcutPanelRows(container, panel.keys, startColInclusive, endColExclusive, 1, TOP_PANEL_ROWS);
+        addShortcutPanelRows(container, panelKeys, startColInclusive, endColExclusive, 0, 2);
+    }
+
+    private void bindSplitFixedTopRowsPanelView(
+            LinearLayout leftContainer,
+            LinearLayout rightContainer,
+            List<Key> panelKeys
+    ) {
+        bindFixedTopRowsPanelView(
+                leftContainer,
+                panelKeys,
+                TOP_PANEL_LEFT_START_COL,
+                TOP_PANEL_LEFT_END_COL
+        );
+        bindFixedTopRowsPanelView(
+                rightContainer,
+                panelKeys,
+                TOP_PANEL_RIGHT_START_COL,
+                TOP_PANEL_RIGHT_END_COL
+        );
     }
 
     private void rebuildTopShortcutPanels() {
@@ -2560,6 +2669,16 @@ public class CustomKeyboardView extends LinearLayout {
                 title = title + " " + (pageIndex + 1) + "/" + totalPages;
             }
             topShortcutPanels.add(new TopShortcutPanel(title, pageKeys));
+        }
+    }
+
+    private void rebuildFixedTopRowsPanels() {
+        fixedTopRowsPanels.clear();
+        fixedTopRowsPanels.add(buildFixedTopRowsPage0());
+        fixedTopRowsPanels.add(buildFixedTopRowsPage1());
+        fixedTopRowsPanels.add(buildFixedTopRowsPage2());
+        if (fixedTopRowsPageIndex < 0 || fixedTopRowsPageIndex >= fixedTopRowsPanels.size()) {
+            fixedTopRowsPageIndex = FIXED_TOP_ROWS_DEFAULT_PAGE_INDEX;
         }
     }
 
@@ -2622,27 +2741,72 @@ public class CustomKeyboardView extends LinearLayout {
         return modifiers;
     }
 
-    private List<Key> buildFixedTopPanelRows() {
+    private List<Key> buildFixedTopRowsPage0() {
         List<Key> keys = new ArrayList<>(TOP_PANEL_COLUMNS * 2);
-        keys.add(markFixedRowKey(new Key("HOME",   "", 0x4A, "4A", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("END",    "", 0x4D, "4D", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("PGUP",   "", 0x4B, "4B", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("PGDN",   "", 0x4E, "4E", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("PH1", "", KEY_IME_TOGGLE, "",
-                1f,
+        // Row 2: F1..F6, local Fn toggle
+        keys.add(markFixedRowKey(new Key("F1", "", 0x3A, "3A", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F2", "", 0x3B, "3B", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F3", "", 0x3C, "3C", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F4", "", 0x3D, "3D", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F5", "", 0x3E, "3E", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F6", "", 0x3F, "3F", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f, R.drawable.ic_swap_horiz_24, 0f, false, false, -1, true)));
+        // Row 3: F7..F12, display toggle
+        keys.add(markFixedRowKey(new Key("F7", "", 0x40, "40", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F8", "", 0x41, "41", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F9", "", 0x42, "42", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F10", "", 0x43, "43", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F11", "", 0x44, "44", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F12", "", 0x45, "45", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("DISPLAY", "", KEY_TOP_SHORTCUT_DISPLAY_TOGGLE, "", 1f,
+                topShortcutShowActionLabels ? R.drawable.text_on_24 : R.drawable.icon_on_24,
+                0f, false, false, -1, true)));
+        return keys;
+    }
+
+    private List<Key> buildFixedTopRowsPage1() {
+        List<Key> keys = new ArrayList<>(TOP_PANEL_COLUMNS * 2);
+        // Row 2: ESC, Shift(icon), DEL(icon), TAB(icon), Up, keyboard toggle, local Fn toggle
+        keys.add(markFixedRowKey(new Key("ESC", "", 0x29, "29", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("SHIFT", "", 0xE1, "E1", 1f, R.drawable.shift_24px, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("DEL", "", 0x4C, "4C", 1f, R.drawable.backspace_24, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("TAB", "", 0x2B, "2B", 1f, R.drawable.keyboard_tab_24, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("UP", "", 0x52, "52", 1f, R.drawable.keyboard_arrow_up_24, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("PH1", "", KEY_IME_TOGGLE, "", 1f,
                 systemImeCaptureMode ? R.drawable.ic_keyboard_ime_24 : R.drawable.ic_keyboard_keymod_24,
                 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("UP",     "", 0x52, "52", 1f, R.drawable.keyboard_arrow_up_24, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f,
-                R.drawable.change_circle_24px, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("ESC",    "", 0x29, "29", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE0)));
-        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE2)));
-        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE3)));
-        keys.add(markFixedRowKey(new Key("LEFT",   "", 0x50, "50", 1f, R.drawable.keyboard_arrow_left_24, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("DOWN",   "", 0x51, "51", 1f, R.drawable.keyboard_arrow_down_24, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("RIGHT",  "", 0x4F, "4F", 1f, R.drawable.keyboard_arrow_right_24, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f, R.drawable.ic_swap_horiz_24, 0f, false, false, -1, true)));
+        // Row 3: CTRL, ALT, WIN(icon), Left(icon), Down(icon), Right(icon), Enter(icon)
+        keys.add(markFixedRowKey(new Key("CTRL", "", 0xE0, "E0", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("ALT", "", 0xE2, "E2", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("WIN", "", 0xE3, "E3", 1f, R.drawable.windows, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("LEFT", "", 0x50, "50", 1f, R.drawable.keyboard_arrow_left_24, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("DOWN", "", 0x51, "51", 1f, R.drawable.keyboard_arrow_down_24, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("RIGHT", "", 0x4F, "4F", 1f, R.drawable.keyboard_arrow_right_24, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("ENTER", "", 0x28, "28", 1f, R.drawable.keyboard_return_24px, 0f, false, false, -1, true)));
         return keys;
+    }
+
+    private List<Key> buildFixedTopRowsPage2() {
+        List<Key> keys = new ArrayList<>(TOP_PANEL_COLUMNS * 2);
+        // Row 2: six placeholders + local Fn toggle
+        for (int i = 0; i < 6; i++) {
+            keys.add(buildNoOpFixedPlaceholder());
+        }
+        keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f, R.drawable.ic_swap_horiz_24, 0f, false, false, -1, true)));
+        // Row 3: seven placeholders
+        for (int i = 0; i < TOP_PANEL_COLUMNS; i++) {
+            keys.add(buildNoOpFixedPlaceholder());
+        }
+        return keys;
+    }
+
+    private Key buildNoOpFixedPlaceholder() {
+        return markFixedRowKey(new Key("", "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+    }
+
+    private List<Key> buildFixedTopPanelRows() {
+        return buildFixedTopRowsPage1();
     }
 
     private int resolveFixedTopLocalFnIconRes(Key key, FnMapping mapping) {
@@ -2650,16 +2814,9 @@ public class CustomKeyboardView extends LinearLayout {
             return key != null ? key.iconResId : 0;
         }
         if (mapping.keyCode == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE) {
-            return topShortcutShowActionLabels ? R.drawable.toggle_on_24px : R.drawable.toggle_off_24px;
+            return topShortcutShowActionLabels ? R.drawable.text_on_24 : R.drawable.icon_on_24;
         }
         return mapping.iconResId != 0 ? mapping.iconResId : (key != null ? key.iconResId : 0);
-    }
-
-    private boolean isFixedTopLocalFnDisplayMapping(Key key, FnMapping mapping) {
-        return key != null
-                && isTopImeToggleKey(key)
-                && mapping != null
-                && mapping.keyCode == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE;
     }
 
     private Key markFixedRowKey(Key key) {
@@ -2768,13 +2925,17 @@ public class CustomKeyboardView extends LinearLayout {
         int visibleColumns = Math.max(1, clampedEnd - clampedStart);
         int clampedStartRow = Math.max(0, startRowInclusive);
         int clampedEndRow = Math.min(TOP_PANEL_ROWS, endRowExclusive);
+        boolean fixedRowsSlice = panelKeys != null
+                && panelKeys.size() == TOP_PANEL_COLUMNS * 2
+                && (clampedEndRow - clampedStartRow) == 2;
         for (int rowIndex = clampedStartRow; rowIndex < clampedEndRow; rowIndex++) {
             LinearLayout rowLayout = new LinearLayout(getContext());
             rowLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT));
             rowLayout.setOrientation(HORIZONTAL);
-            if (rowIndex == 0) {
-                rowLayout.setOnTouchListener(createTopPanelTouchListener(null));
-            }
+            OnTouchListener rowTouchListener = fixedRowsSlice
+                    ? createFixedTopRowsTouchListener(null)
+                    : createTopPanelTouchListener(null);
+            rowLayout.setOnTouchListener(rowTouchListener);
 
             for (int localCol = 0; localCol < visibleColumns; localCol++) {
                 int col = clampedStart + localCol;
@@ -2786,9 +2947,7 @@ public class CustomKeyboardView extends LinearLayout {
                 if (index >= panelKeys.size()) {
                     View spacer = new View(getContext());
                     spacer.setLayoutParams(p);
-                    if (rowIndex == 0) {
-                        spacer.setOnTouchListener(createTopPanelTouchListener(null));
-                    }
+                    spacer.setOnTouchListener(rowTouchListener);
                     rowLayout.addView(spacer);
                     continue;
                 }
@@ -2797,8 +2956,7 @@ public class CustomKeyboardView extends LinearLayout {
                 boolean modifierLocked = (k.code == 0xE0 && isCtrlLeftLocked)
                     || (k.code == 0xE1 && isShiftLeftLocked)
                     || (k.code == 0xE2 && isAltLeftLocked)
-                    || (k.code == 0xE3 && isWinLeftLocked)
-                    || (k.code == KEY_FIXED_TOP_LOCAL_FN && fixedTopLocalFnLocked);
+                    || (k.code == 0xE3 && isWinLeftLocked);
                 FnMapping fixedTopLocalFn = resolveFixedTopLocalFnMapping(k);
                 int effectiveTopIconResId = resolveFixedTopLocalFnIconRes(k, fixedTopLocalFn);
                 String effectiveTopLabel = fixedTopLocalFn != null ? fixedTopLocalFn.label : k.label;
@@ -2827,11 +2985,6 @@ public class CustomKeyboardView extends LinearLayout {
                             String mode = TopModeShortcutPrefs.getModeForSlot(ctx, slot);
                             ib.setContentDescription(ctx.getString(TopModeShortcutPrefs.labelResForMode(mode)));
                         }
-                    } else if (isFixedTopLocalFnDisplayMapping(k, fixedTopLocalFn)) {
-                        Context ctx = getContext();
-                        if (ctx != null) {
-                            ib.setContentDescription(ctx.getString(R.string.top_shortcut_toggle_display_mode));
-                        }
                     } else if (isTopImeToggleKey(k)) {
                         Context ctx = getContext();
                         if (ctx != null) {
@@ -2846,7 +2999,9 @@ public class CustomKeyboardView extends LinearLayout {
                         }
                     }
                     ib.setTag(k);
-                    ib.setOnTouchListener(createTopPanelTouchListener(k));
+                    ib.setOnTouchListener(fixedRowsSlice
+                            ? createFixedTopRowsTouchListener(k)
+                            : createTopPanelTouchListener(k));
                     rowLayout.addView(ib);
                 } else if (renderAsCustomIconText) {
                     Button iconTextButton = new Button(getContext());
@@ -2863,7 +3018,9 @@ public class CustomKeyboardView extends LinearLayout {
                     iconTextButton.setTextColor(resolveThemeTextColor());
                     iconTextButton.setAllCaps(false);
                     iconTextButton.setTag(k);
-                    iconTextButton.setOnTouchListener(createTopPanelTouchListener(k));
+                    iconTextButton.setOnTouchListener(fixedRowsSlice
+                            ? createFixedTopRowsTouchListener(k)
+                            : createTopPanelTouchListener(k));
                     rowLayout.addView(iconTextButton);
                 } else {
                     Button b = new Button(getContext());
@@ -2901,7 +3058,9 @@ public class CustomKeyboardView extends LinearLayout {
                         b.setTypeface(b.getTypeface(), android.graphics.Typeface.BOLD);
                     }
                     b.setTag(k);
-                    b.setOnTouchListener(createTopPanelTouchListener(k));
+                    b.setOnTouchListener(fixedRowsSlice
+                            ? createFixedTopRowsTouchListener(k)
+                            : createTopPanelTouchListener(k));
                     rowLayout.addView(b);
                 }
             }
@@ -2918,18 +3077,32 @@ public class CustomKeyboardView extends LinearLayout {
         splitTopLeftViewport = null;
         splitTopRightViewport = null;
         splitTopCenterSpacer = null;
-        splitFixedTopRowsContainerLeft = null;
-        splitFixedTopRowsContainerRight = null;
+        splitFixedTopRowsViewportLeft = null;
+        splitFixedTopRowsViewportRight = null;
+        splitPreviousFixedTopRowsContainerLeft = null;
+        splitActiveFixedTopRowsContainerLeft = null;
+        splitNextFixedTopRowsContainerLeft = null;
+        splitPreviousFixedTopRowsContainerRight = null;
+        splitActiveFixedTopRowsContainerRight = null;
+        splitNextFixedTopRowsContainerRight = null;
         splitPreviousTopPanelContainerLeft = null;
         splitActiveTopPanelContainerLeft = null;
         splitNextTopPanelContainerLeft = null;
         splitPreviousTopPanelContainerRight = null;
         splitActiveTopPanelContainerRight = null;
         splitNextTopPanelContainerRight = null;
+        fixedTopRowsViewport = null;
+        previousFixedTopRowsContainer = null;
+        activeFixedTopRowsContainer = null;
+        nextFixedTopRowsContainer = null;
     }
 
     private boolean hasAnyTopPanelMode() {
         return activeTopPanelContainer != null || isSplitTopPanelMode();
+    }
+
+    private boolean hasAnyFixedRowsPagerMode() {
+        return activeFixedTopRowsContainer != null || splitActiveFixedTopRowsContainerLeft != null;
     }
 
     private OnTouchListener createTopPanelTouchListener(Key key) {
@@ -3001,6 +3174,61 @@ public class CustomKeyboardView extends LinearLayout {
                         return true;
                     }
                     if (event.getActionMasked() == MotionEvent.ACTION_UP && key != null && !longPressConsumed[0]) {
+                        performKeyHapticFeedback(v);
+                        v.performClick();
+                        handleKeyPress(key);
+                        repeatHandler.postDelayed(this::sendReleaseData, 30);
+                    }
+                    return true;
+                default:
+                    return false;
+            }
+        };
+    }
+
+    private OnTouchListener createFixedTopRowsTouchListener(Key key) {
+        final float[] startX = new float[1];
+        final float[] startY = new float[1];
+        final boolean[] isDragging = new boolean[1];
+        final int touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
+        final int swipeThreshold = dpToPx(56);
+        final boolean canSwipePanel = true;
+
+        return (v, event) -> {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    startX[0] = event.getRawX();
+                    startY[0] = event.getRawY();
+                    isDragging[0] = false;
+                    cancelFixedTopRowsAnimations();
+                    if (key != null) {
+                        v.setPressed(true);
+                    }
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    float dx = event.getRawX() - startX[0];
+                    float dy = event.getRawY() - startY[0];
+                    if (canSwipePanel && !isDragging[0] && Math.abs(dx) > touchSlop && Math.abs(dx) > Math.abs(dy)) {
+                        isDragging[0] = true;
+                        if (key != null) {
+                            v.setPressed(false);
+                        }
+                    }
+                    if (isDragging[0] && hasAnyFixedRowsPagerMode()) {
+                        updateFixedTopRowsDrag(applyFixedTopRowsEdgeResistance(dx));
+                    }
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                case MotionEvent.ACTION_UP:
+                    if (key != null) {
+                        v.setPressed(false);
+                    }
+                    float totalDx = event.getRawX() - startX[0];
+                    if (isDragging[0]) {
+                        finishFixedTopRowsSwipe(totalDx, swipeThreshold);
+                        return true;
+                    }
+                    if (event.getActionMasked() == MotionEvent.ACTION_UP && key != null) {
                         performKeyHapticFeedback(v);
                         v.performClick();
                         handleKeyPress(key);
@@ -3186,6 +3414,21 @@ public class CustomKeyboardView extends LinearLayout {
         }
     }
 
+    private void cancelFixedTopRowsAnimations() {
+        if (isSplitTopPanelMode()) {
+            if (splitPreviousFixedTopRowsContainerLeft != null) splitPreviousFixedTopRowsContainerLeft.animate().cancel();
+            if (splitActiveFixedTopRowsContainerLeft != null) splitActiveFixedTopRowsContainerLeft.animate().cancel();
+            if (splitNextFixedTopRowsContainerLeft != null) splitNextFixedTopRowsContainerLeft.animate().cancel();
+            if (splitPreviousFixedTopRowsContainerRight != null) splitPreviousFixedTopRowsContainerRight.animate().cancel();
+            if (splitActiveFixedTopRowsContainerRight != null) splitActiveFixedTopRowsContainerRight.animate().cancel();
+            if (splitNextFixedTopRowsContainerRight != null) splitNextFixedTopRowsContainerRight.animate().cancel();
+            return;
+        }
+        if (previousFixedTopRowsContainer != null) previousFixedTopRowsContainer.animate().cancel();
+        if (activeFixedTopRowsContainer != null) activeFixedTopRowsContainer.animate().cancel();
+        if (nextFixedTopRowsContainer != null) nextFixedTopRowsContainer.animate().cancel();
+    }
+
     private void updateTopPanelDrag(float translationX) {
         if (!hasAnyTopPanelMode()) {
             return;
@@ -3214,6 +3457,37 @@ public class CustomKeyboardView extends LinearLayout {
         }
         if (nextTopPanelContainer != null) {
             nextTopPanelContainer.setTranslationX(translationX + width);
+        }
+    }
+
+    private void updateFixedTopRowsDrag(float translationX) {
+        if (!hasAnyFixedRowsPagerMode()) {
+            return;
+        }
+        float width = getFixedTopRowsWidth();
+        if (isSplitTopPanelMode()) {
+            splitActiveFixedTopRowsContainerLeft.setTranslationX(translationX);
+            splitActiveFixedTopRowsContainerRight.setTranslationX(translationX);
+            if (splitPreviousFixedTopRowsContainerLeft != null) {
+                splitPreviousFixedTopRowsContainerLeft.setTranslationX(translationX - width);
+            }
+            if (splitPreviousFixedTopRowsContainerRight != null) {
+                splitPreviousFixedTopRowsContainerRight.setTranslationX(translationX - width);
+            }
+            if (splitNextFixedTopRowsContainerLeft != null) {
+                splitNextFixedTopRowsContainerLeft.setTranslationX(translationX + width);
+            }
+            if (splitNextFixedTopRowsContainerRight != null) {
+                splitNextFixedTopRowsContainerRight.setTranslationX(translationX + width);
+            }
+            return;
+        }
+        activeFixedTopRowsContainer.setTranslationX(translationX);
+        if (previousFixedTopRowsContainer != null) {
+            previousFixedTopRowsContainer.setTranslationX(translationX - width);
+        }
+        if (nextFixedTopRowsContainer != null) {
+            nextFixedTopRowsContainer.setTranslationX(translationX + width);
         }
     }
 
@@ -3248,6 +3522,37 @@ public class CustomKeyboardView extends LinearLayout {
         }
     }
 
+    private void resetFixedTopRowsPositions(float activeTranslationX) {
+        if (!hasAnyFixedRowsPagerMode()) {
+            return;
+        }
+        float width = getFixedTopRowsWidth();
+        if (isSplitTopPanelMode()) {
+            splitActiveFixedTopRowsContainerLeft.setTranslationX(activeTranslationX);
+            splitActiveFixedTopRowsContainerRight.setTranslationX(activeTranslationX);
+            if (splitPreviousFixedTopRowsContainerLeft != null) {
+                splitPreviousFixedTopRowsContainerLeft.setTranslationX(activeTranslationX - width);
+            }
+            if (splitPreviousFixedTopRowsContainerRight != null) {
+                splitPreviousFixedTopRowsContainerRight.setTranslationX(activeTranslationX - width);
+            }
+            if (splitNextFixedTopRowsContainerLeft != null) {
+                splitNextFixedTopRowsContainerLeft.setTranslationX(activeTranslationX + width);
+            }
+            if (splitNextFixedTopRowsContainerRight != null) {
+                splitNextFixedTopRowsContainerRight.setTranslationX(activeTranslationX + width);
+            }
+            return;
+        }
+        activeFixedTopRowsContainer.setTranslationX(activeTranslationX);
+        if (previousFixedTopRowsContainer != null) {
+            previousFixedTopRowsContainer.setTranslationX(activeTranslationX - width);
+        }
+        if (nextFixedTopRowsContainer != null) {
+            nextFixedTopRowsContainer.setTranslationX(activeTranslationX + width);
+        }
+    }
+
     private void animateTopPanelToRest() {
         if (!hasAnyTopPanelMode()) {
             return;
@@ -3279,6 +3584,173 @@ public class CustomKeyboardView extends LinearLayout {
         }
     }
 
+    private void animateFixedTopRowsToRest() {
+        if (!hasAnyFixedRowsPagerMode()) {
+            return;
+        }
+        float width = getFixedTopRowsWidth();
+        if (isSplitTopPanelMode()) {
+            if (splitPreviousFixedTopRowsContainerLeft != null) {
+                splitPreviousFixedTopRowsContainerLeft.animate().translationX(-width).setDuration(140).start();
+            }
+            if (splitPreviousFixedTopRowsContainerRight != null) {
+                splitPreviousFixedTopRowsContainerRight.animate().translationX(-width).setDuration(140).start();
+            }
+            splitActiveFixedTopRowsContainerLeft.animate().translationX(0f).setDuration(140).start();
+            splitActiveFixedTopRowsContainerRight.animate().translationX(0f).setDuration(140).start();
+            if (splitNextFixedTopRowsContainerLeft != null) {
+                splitNextFixedTopRowsContainerLeft.animate().translationX(width).setDuration(140).start();
+            }
+            if (splitNextFixedTopRowsContainerRight != null) {
+                splitNextFixedTopRowsContainerRight.animate().translationX(width).setDuration(140).start();
+            }
+            return;
+        }
+        if (previousFixedTopRowsContainer != null) {
+            previousFixedTopRowsContainer.animate().translationX(-width).setDuration(140).start();
+        }
+        activeFixedTopRowsContainer.animate().translationX(0f).setDuration(140).start();
+        if (nextFixedTopRowsContainer != null) {
+            nextFixedTopRowsContainer.animate().translationX(width).setDuration(140).start();
+        }
+    }
+
+    private float applyFixedTopRowsEdgeResistance(float translationX) {
+        boolean draggingPastFirst = fixedTopRowsPageIndex == 0 && translationX > 0;
+        boolean draggingPastLast = fixedTopRowsPageIndex == fixedTopRowsPanels.size() - 1 && translationX < 0;
+        if (draggingPastFirst || draggingPastLast) {
+            return translationX * 0.35f;
+        }
+        return translationX;
+    }
+
+    private void finishFixedTopRowsSwipe(float translationX, int swipeThreshold) {
+        if (!hasAnyFixedRowsPagerMode()) {
+            return;
+        }
+        boolean moveToNext = translationX < -swipeThreshold && fixedTopRowsPageIndex < fixedTopRowsPanels.size() - 1;
+        boolean moveToPrevious = translationX > swipeThreshold && fixedTopRowsPageIndex > 0;
+        if (!moveToNext && !moveToPrevious) {
+            animateFixedTopRowsToRest();
+            return;
+        }
+        int targetPage = moveToNext ? fixedTopRowsPageIndex + 1 : fixedTopRowsPageIndex - 1;
+        float width = getFixedTopRowsWidth();
+        if (isSplitTopPanelMode()) {
+            if (moveToNext && splitNextFixedTopRowsContainerLeft != null && splitNextFixedTopRowsContainerRight != null) {
+                LinearLayout recycledLeft = splitPreviousFixedTopRowsContainerLeft;
+                LinearLayout recycledRight = splitPreviousFixedTopRowsContainerRight;
+                splitActiveFixedTopRowsContainerLeft.animate().translationX(-width).setDuration(140).start();
+                splitNextFixedTopRowsContainerLeft.animate().translationX(0f).setDuration(140).withEndAction(() -> {
+                    fixedTopRowsPageIndex = targetPage;
+                    splitPreviousFixedTopRowsContainerLeft = splitActiveFixedTopRowsContainerLeft;
+                    splitActiveFixedTopRowsContainerLeft = splitNextFixedTopRowsContainerLeft;
+                    splitNextFixedTopRowsContainerLeft = recycledLeft;
+                    splitPreviousFixedTopRowsContainerRight = splitActiveFixedTopRowsContainerRight;
+                    splitActiveFixedTopRowsContainerRight = splitNextFixedTopRowsContainerRight;
+                    splitNextFixedTopRowsContainerRight = recycledRight;
+                    bindSplitFixedTopRowsPanelView(
+                            splitNextFixedTopRowsContainerLeft,
+                            splitNextFixedTopRowsContainerRight,
+                            fixedTopRowsPageIndex < fixedTopRowsPanels.size() - 1
+                                    ? fixedTopRowsPanels.get(fixedTopRowsPageIndex + 1)
+                                    : null);
+                    resetFixedTopRowsPositions(0f);
+                    splitActiveFixedTopRowsContainerLeft.bringToFront();
+                    splitActiveFixedTopRowsContainerRight.bringToFront();
+                }).start();
+                splitActiveFixedTopRowsContainerRight.animate().translationX(-width).setDuration(140).start();
+                splitNextFixedTopRowsContainerRight.animate().translationX(0f).setDuration(140).start();
+                if (splitPreviousFixedTopRowsContainerLeft != null) {
+                    splitPreviousFixedTopRowsContainerLeft.animate().translationX(-2f * width).setDuration(140).start();
+                }
+                if (splitPreviousFixedTopRowsContainerRight != null) {
+                    splitPreviousFixedTopRowsContainerRight.animate().translationX(-2f * width).setDuration(140).start();
+                }
+                return;
+            }
+            if (moveToPrevious && splitPreviousFixedTopRowsContainerLeft != null && splitPreviousFixedTopRowsContainerRight != null) {
+                LinearLayout recycledLeft = splitNextFixedTopRowsContainerLeft;
+                LinearLayout recycledRight = splitNextFixedTopRowsContainerRight;
+                splitActiveFixedTopRowsContainerLeft.animate().translationX(width).setDuration(140).start();
+                splitPreviousFixedTopRowsContainerLeft.animate().translationX(0f).setDuration(140).withEndAction(() -> {
+                    fixedTopRowsPageIndex = targetPage;
+                    splitNextFixedTopRowsContainerLeft = splitActiveFixedTopRowsContainerLeft;
+                    splitActiveFixedTopRowsContainerLeft = splitPreviousFixedTopRowsContainerLeft;
+                    splitPreviousFixedTopRowsContainerLeft = recycledLeft;
+                    splitNextFixedTopRowsContainerRight = splitActiveFixedTopRowsContainerRight;
+                    splitActiveFixedTopRowsContainerRight = splitPreviousFixedTopRowsContainerRight;
+                    splitPreviousFixedTopRowsContainerRight = recycledRight;
+                    bindSplitFixedTopRowsPanelView(
+                            splitPreviousFixedTopRowsContainerLeft,
+                            splitPreviousFixedTopRowsContainerRight,
+                            fixedTopRowsPageIndex > 0
+                                    ? fixedTopRowsPanels.get(fixedTopRowsPageIndex - 1)
+                                    : null);
+                    resetFixedTopRowsPositions(0f);
+                    splitActiveFixedTopRowsContainerLeft.bringToFront();
+                    splitActiveFixedTopRowsContainerRight.bringToFront();
+                }).start();
+                splitActiveFixedTopRowsContainerRight.animate().translationX(width).setDuration(140).start();
+                splitPreviousFixedTopRowsContainerRight.animate().translationX(0f).setDuration(140).start();
+                if (splitNextFixedTopRowsContainerLeft != null) {
+                    splitNextFixedTopRowsContainerLeft.animate().translationX(2f * width).setDuration(140).start();
+                }
+                if (splitNextFixedTopRowsContainerRight != null) {
+                    splitNextFixedTopRowsContainerRight.animate().translationX(2f * width).setDuration(140).start();
+                }
+                return;
+            }
+            animateFixedTopRowsToRest();
+            return;
+        }
+        if (moveToNext && nextFixedTopRowsContainer != null) {
+            LinearLayout recycledContainer = previousFixedTopRowsContainer;
+            activeFixedTopRowsContainer.animate().translationX(-width).setDuration(140).start();
+            nextFixedTopRowsContainer.animate().translationX(0f).setDuration(140).withEndAction(() -> {
+                fixedTopRowsPageIndex = targetPage;
+                previousFixedTopRowsContainer = activeFixedTopRowsContainer;
+                activeFixedTopRowsContainer = nextFixedTopRowsContainer;
+                nextFixedTopRowsContainer = recycledContainer;
+                bindFixedTopRowsPanelView(nextFixedTopRowsContainer,
+                        fixedTopRowsPageIndex < fixedTopRowsPanels.size() - 1
+                                ? fixedTopRowsPanels.get(fixedTopRowsPageIndex + 1)
+                                : null,
+                        0,
+                        TOP_PANEL_COLUMNS);
+                resetFixedTopRowsPositions(0f);
+                activeFixedTopRowsContainer.bringToFront();
+            }).start();
+            if (previousFixedTopRowsContainer != null) {
+                previousFixedTopRowsContainer.animate().translationX(-2f * width).setDuration(140).start();
+            }
+            return;
+        }
+        if (moveToPrevious && previousFixedTopRowsContainer != null) {
+            LinearLayout recycledContainer = nextFixedTopRowsContainer;
+            activeFixedTopRowsContainer.animate().translationX(width).setDuration(140).start();
+            previousFixedTopRowsContainer.animate().translationX(0f).setDuration(140).withEndAction(() -> {
+                fixedTopRowsPageIndex = targetPage;
+                nextFixedTopRowsContainer = activeFixedTopRowsContainer;
+                activeFixedTopRowsContainer = previousFixedTopRowsContainer;
+                previousFixedTopRowsContainer = recycledContainer;
+                bindFixedTopRowsPanelView(previousFixedTopRowsContainer,
+                        fixedTopRowsPageIndex > 0
+                                ? fixedTopRowsPanels.get(fixedTopRowsPageIndex - 1)
+                                : null,
+                        0,
+                        TOP_PANEL_COLUMNS);
+                resetFixedTopRowsPositions(0f);
+                activeFixedTopRowsContainer.bringToFront();
+            }).start();
+            if (nextFixedTopRowsContainer != null) {
+                nextFixedTopRowsContainer.animate().translationX(2f * width).setDuration(140).start();
+            }
+            return;
+        }
+        animateFixedTopRowsToRest();
+    }
+
     private void refreshVisibleTopPanelButtonStates() {
         if (isSplitTopPanelMode()) {
             refreshTopPanelButtonStates(splitPreviousTopPanelContainerLeft);
@@ -3287,11 +3759,20 @@ public class CustomKeyboardView extends LinearLayout {
             refreshTopPanelButtonStates(splitPreviousTopPanelContainerRight);
             refreshTopPanelButtonStates(splitActiveTopPanelContainerRight);
             refreshTopPanelButtonStates(splitNextTopPanelContainerRight);
+            refreshTopPanelButtonStates(splitPreviousFixedTopRowsContainerLeft);
+            refreshTopPanelButtonStates(splitActiveFixedTopRowsContainerLeft);
+            refreshTopPanelButtonStates(splitNextFixedTopRowsContainerLeft);
+            refreshTopPanelButtonStates(splitPreviousFixedTopRowsContainerRight);
+            refreshTopPanelButtonStates(splitActiveFixedTopRowsContainerRight);
+            refreshTopPanelButtonStates(splitNextFixedTopRowsContainerRight);
             return;
         }
         refreshTopPanelButtonStates(previousTopPanelContainer);
         refreshTopPanelButtonStates(activeTopPanelContainer);
         refreshTopPanelButtonStates(nextTopPanelContainer);
+        refreshTopPanelButtonStates(previousFixedTopRowsContainer);
+        refreshTopPanelButtonStates(activeFixedTopRowsContainer);
+        refreshTopPanelButtonStates(nextFixedTopRowsContainer);
     }
 
     private void refreshTopPanelButtonStates(View view) {
@@ -3305,8 +3786,7 @@ public class CustomKeyboardView extends LinearLayout {
                 boolean modifierLocked = (key.code == 0xE0 && isCtrlLeftLocked)
                         || (key.code == 0xE1 && isShiftLeftLocked)
                         || (key.code == 0xE2 && isAltLeftLocked)
-                        || (key.code == 0xE3 && isWinLeftLocked)
-                        || (key.code == KEY_FIXED_TOP_LOCAL_FN && fixedTopLocalFnLocked);
+                        || (key.code == 0xE3 && isWinLeftLocked);
                 view.setBackgroundResource(modifierLocked
                         ? R.drawable.press_button_background
                         : R.drawable.function_button_background);
@@ -3336,6 +3816,24 @@ public class CustomKeyboardView extends LinearLayout {
         }
         if (activeTopPanelContainer != null && activeTopPanelContainer.getWidth() > 0) {
             return activeTopPanelContainer.getWidth();
+        }
+        return getWidth();
+    }
+
+    private float getFixedTopRowsWidth() {
+        if (isSplitTopPanelMode()) {
+            if (splitFixedTopRowsViewportLeft != null && splitFixedTopRowsViewportLeft.getWidth() > 0) {
+                return splitFixedTopRowsViewportLeft.getWidth();
+            }
+            if (splitActiveFixedTopRowsContainerLeft != null && splitActiveFixedTopRowsContainerLeft.getWidth() > 0) {
+                return splitActiveFixedTopRowsContainerLeft.getWidth();
+            }
+        }
+        if (fixedTopRowsViewport != null && fixedTopRowsViewport.getWidth() > 0) {
+            return fixedTopRowsViewport.getWidth();
+        }
+        if (activeFixedTopRowsContainer != null && activeFixedTopRowsContainer.getWidth() > 0) {
+            return activeFixedTopRowsContainer.getWidth();
         }
         return getWidth();
     }
@@ -3752,7 +4250,7 @@ public class CustomKeyboardView extends LinearLayout {
             case 0x4D: return new FnMapping("F2", 0x3B, 0);
             case 0x4B: return new FnMapping("F3", 0x3C, 0);
             case 0x4E: return new FnMapping("F4", 0x3D, 0);
-            case KEY_IME_TOGGLE: return new FnMapping("DISPLAY", KEY_TOP_SHORTCUT_DISPLAY_TOGGLE, 0);
+            case KEY_IME_TOGGLE: return null;
             case 0x52: return new FnMapping("INS", 0x49, 0);
             case 0x29: return new FnMapping("F5", 0x3E, 0);
             case 0xE0: return new FnMapping("TAB", 0x2B, 0);
@@ -3949,10 +4447,6 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         FnMapping fixedTopLocalFn = resolveFixedTopLocalFnMapping(key);
-        if (isFixedTopLocalFnDisplayMapping(key, fixedTopLocalFn)) {
-            setTopShortcutShowActionLabels(!topShortcutShowActionLabels);
-            return;
-        }
 
         if (isTopImeToggleKey(key)) {
             toggleSystemImeCaptureFromUser();
@@ -3980,9 +4474,11 @@ public class CustomKeyboardView extends LinearLayout {
 
         if (key.code == KEY_FIXED_TOP_LOCAL_FN) {
             fixedTopLocalFnLocked = !fixedTopLocalFnLocked;
+            rebuildTopShortcutPanels();
             syncTopPanelViewportContent();
             if (splitPartner != null) {
                 splitPartner.fixedTopLocalFnLocked = fixedTopLocalFnLocked;
+                splitPartner.rebuildTopShortcutPanels();
                 splitPartner.syncTopPanelViewportContent();
             }
             return;
@@ -4344,20 +4840,24 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void applyImeTopStripVisibilityForSubCompose() {
-        if (topPanelViewport == null) {
+        if (topPanelRootContainer == null && topPanelViewport == null) {
             return;
         }
-        LayoutParams lp = (LayoutParams) topPanelViewport.getLayoutParams();
+        View target = topPanelRootContainer != null ? topPanelRootContainer : topPanelViewport;
+        if (!(target.getLayoutParams() instanceof LayoutParams)) {
+            return;
+        }
+        LayoutParams lp = (LayoutParams) target.getLayoutParams();
         if (imeSubComposeExpanded) {
-            topPanelViewport.setVisibility(GONE);
+            target.setVisibility(GONE);
             lp.height = 0;
             lp.weight = 0f;
         } else {
-            topPanelViewport.setVisibility(VISIBLE);
+            target.setVisibility(VISIBLE);
             lp.height = 0;
             lp.weight = IME_SINGLE_TOP_STRIP_WEIGHT;
         }
-        topPanelViewport.setLayoutParams(lp);
+        target.setLayoutParams(lp);
     }
 
     private void persistImeSubComposeExpanded(boolean expanded) {

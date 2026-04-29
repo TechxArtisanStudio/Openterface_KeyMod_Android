@@ -121,11 +121,10 @@ public class ShortcutProfileManager {
         p.shortcuts.add(new Shortcut("default_copy",       "Copy",       "Ctrl+C", MOD_CTRL, KEY_C, "content_copy_24", 2));
         p.shortcuts.add(new Shortcut("default_cut",        "Cut",        "Ctrl+X", MOD_CTRL, KEY_X, "content_cut_24", 3));
         p.shortcuts.add(new Shortcut("default_paste",      "Paste",      "Ctrl+V", MOD_CTRL, KEY_V, "content_paste_24", 4));
-        p.shortcuts.add(new Shortcut("default_tab",        "Tab",        "Tab",    MOD_NONE, KEY_TAB, "keyboard_tab_24", 5));
-        p.shortcuts.add(new Shortcut("default_save",       "Save",       "Ctrl+S", MOD_CTRL, KEY_S, "save_24", 6));
-        p.shortcuts.add(new Shortcut("default_undo",       "Undo",       "Ctrl+Z", MOD_CTRL, KEY_Z, "undo_24", 7));
+        p.shortcuts.add(new Shortcut("default_save",       "Save",       "Ctrl+S", MOD_CTRL, KEY_S, "save_24", 5));
+        p.shortcuts.add(new Shortcut("default_undo",       "Undo",       "Ctrl+Z", MOD_CTRL, KEY_Z, "undo_24", 6));
         p.shortcuts.add(new Shortcut("default_redo",       "Redo",       "Ctrl+Y", MOD_CTRL, KEY_Y, "redo_24", 8));
-        p.shortcuts.add(new Shortcut("default_find",       "Find",       "Ctrl+F", MOD_CTRL, KEY_F, "search_24", 9));
+        p.shortcuts.add(new Shortcut("default_find",       "Find",       "Ctrl+F", MOD_CTRL, KEY_F, "search_24", 7));
         return p;
     }
 
@@ -156,11 +155,10 @@ public class ShortcutProfileManager {
         changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_copy", "Copy", "Ctrl+C", MOD_CTRL, KEY_C, "content_copy_24", 2);
         changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_cut", "Cut", "Ctrl+X", MOD_CTRL, KEY_X, "content_cut_24", 3);
         changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_paste", "Paste", "Ctrl+V", MOD_CTRL, KEY_V, "content_paste_24", 4);
-        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_tab", "Tab", "Tab", MOD_NONE, KEY_TAB, "keyboard_tab_24", 5);
-        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_save", "Save", "Ctrl+S", MOD_CTRL, KEY_S, "save_24", 6);
-        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_undo", "Undo", "Ctrl+Z", MOD_CTRL, KEY_Z, "undo_24", 7);
+        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_save", "Save", "Ctrl+S", MOD_CTRL, KEY_S, "save_24", 5);
+        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_undo", "Undo", "Ctrl+Z", MOD_CTRL, KEY_Z, "undo_24", 6);
         changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_redo", "Redo", "Ctrl+Y", MOD_CTRL, KEY_Y, "redo_24", 8);
-        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_find", "Find", "Ctrl+F", MOD_CTRL, KEY_F, "search_24", 9);
+        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_find", "Find", "Ctrl+F", MOD_CTRL, KEY_F, "search_24", 7);
 
         if (source.size() != ordered.size()) {
             changed = true;
