@@ -258,7 +258,7 @@ by TechxArtisan</string>
     <string name="top_mode_label_shortcuts">Shortcuts</string>
     <string name="top_mode_label_macros">Macros</string>
     <string name="top_shortcut_toggle_display_mode">Toggle top shortcut display mode</string>
-    <string name="ime_capture_hint">Type here — text is sent to the connected host</string>
+    <string name="ime_capture_hint">Type and edit long text here — tap Send to send it to the connected device</string>
     <string name="top_shortcut_ime_toggle_keymod">KeyMod keyboard (tap for system IME)</string>
     <string name="top_shortcut_ime_toggle_system">System IME (tap for KeyMod keyboard)</string>
     <string name="ime_not_connected">Connect USB or Bluetooth to send keystrokes.</string>
@@ -267,7 +267,7 @@ by TechxArtisan</string>
     <string name="ime_capture_send_flush_note">Send types the buffered text on the host. In Compose mode, keystrokes are not sent until you tap Send.</string>
     <string name="ime_sub_compose_mode_toggle_direct">Switch to direct HID: each key sends as you type</string>
     <string name="ime_sub_compose_mode_toggle_compose">Switch to compose: type a buffer, then tap Send</string>
-    <string name="ime_sub_compose_direct_hid_hint">Keys send to the host as you type</string>
+    <string name="ime_sub_compose_direct_hid_hint">Keys send out directly as you type</string>
 
     <!-- Presentation Mode Strings -->
     <string name="presentation_mode">Presentation</string>

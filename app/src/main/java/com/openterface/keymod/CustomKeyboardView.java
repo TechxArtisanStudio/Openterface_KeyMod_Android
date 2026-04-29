@@ -91,7 +91,39 @@ public class CustomKeyboardView extends LinearLayout {
      */
     private static final float IME_COMPOSE_TOOLBAR_ROW_WEIGHT =
             IME_SINGLE_TOP_STRIP_WEIGHT / (float) TOP_PANEL_ROWS;
+    /** Deterministic compose-toolbar row height in portrait sub-compose (expanded + minimized). */
+    private static final int IME_COMPOSE_TOOLBAR_ROW_FIXED_HEIGHT_DP = 44;
     private static final float IME_SUB_COMPOSE_EDITOR_WEIGHT_EXPANDED = 12f;
+    /**
+     * Portrait BOTH + IME capture (sub-compose collapsed): touchpad vs keyboard weights in
+     * {@code CompositeFragment#applyOrientationLayout}. When the text area expands, the fragment
+     * hides the touchpad and toggle so the keyboard column receives this fraction of the column
+     * height as collapsed; expanded it gets the full slice. Keep in sync with
+     * {@code PORTRAIT_IME_SUB_COMPOSE_COLLAPSED_TOUCHPAD_WEIGHT} / {@code KEYBOARD_WEIGHT}.
+     */
+    private static final float IME_SUB_COMPOSE_COLLAPSED_TP = 0.9f;
+    private static final float IME_SUB_COMPOSE_COLLAPSED_KB = 1.7f;
+    private static final float IME_SUB_COMPOSE_COLLAPSED_KEYBOARD_COLUMN_SHARE =
+            IME_SUB_COMPOSE_COLLAPSED_KB / (IME_SUB_COMPOSE_COLLAPSED_TP + IME_SUB_COMPOSE_COLLAPSED_KB);
+    /**
+     * Collapsed portrait stack has a fixed-height toggle ({@code R.dimen.toggle_handle_height}) between
+     * touchpad and keyboard; expanded chrome hides it and that band is folded into the keyboard
+     * column. The weight-based share above only accounts for weighted touchpad vs keyboard, so trim
+     * slightly so the compose toolbar row matches the collapsed visual height.
+     */
+    private static final float IME_COMPOSE_TOOLBAR_EXPANDED_FINE_HEIGHT_TRIM = 0.93f;
+    /**
+     * Expanded sub-compose: top strip is hidden (weight 0), so only editor + toolbar share vertical
+     * weight inside the keyboard. Scale the toolbar fraction to match the collapsed three-way split
+     * (top strip + slim editor + toolbar), then multiply by {@link #IME_SUB_COMPOSE_COLLAPSED_KEYBOARD_COLUMN_SHARE}
+     * because {@code CompositeFragment} gives the keyboard the full portrait slice when expanded,
+     * so without this factor the toolbar row grows taller than before expand.
+     */
+    private static final float IME_COMPOSE_TOOLBAR_ROW_WEIGHT_EXPANDED =
+            IME_COMPOSE_TOOLBAR_ROW_WEIGHT * IME_SUB_COMPOSE_EDITOR_WEIGHT_EXPANDED
+                    / (IME_SINGLE_TOP_STRIP_WEIGHT + IME_SINGLE_TEXT_WEIGHT)
+                    * IME_SUB_COMPOSE_COLLAPSED_KEYBOARD_COLUMN_SHARE
+                    * IME_COMPOSE_TOOLBAR_EXPANDED_FINE_HEIGHT_TRIM;
     /** Extra numpad Fn-arrow overlay (dp); larger than top strip 24dp icons for the taller grid cells. */
     private static final int EXTRA_NUMPAD_FN_ARROW_ICON_DP = 36;
     /** Fn-layer Save / Undo / Tab icons — match top shortcut row visual weight (24dp assets, modest cell size). */
@@ -4105,12 +4137,35 @@ public class CustomKeyboardView extends LinearLayout {
         }
         if (imeSubComposeDirectHidMode) {
             imeCaptureEditorRow.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(1), 0f));
+            refreshImeSubComposeToolbarRowWeight();
             return;
         }
         LayoutParams lp = (LayoutParams) imeCaptureEditorRow.getLayoutParams();
         lp.height = 0;
         lp.weight = imeSubComposeExpanded ? IME_SUB_COMPOSE_EDITOR_WEIGHT_EXPANDED : IME_SINGLE_TEXT_WEIGHT;
         imeCaptureEditorRow.setLayoutParams(lp);
+        refreshImeSubComposeToolbarRowWeight();
+    }
+
+    private void refreshImeSubComposeToolbarRowWeight() {
+        if (imeCaptureToolbar == null) {
+            return;
+        }
+        if (!imeSubComposeDirectHidMode && isImeSubComposePortraitContext()) {
+            LayoutParams lp = (LayoutParams) imeCaptureToolbar.getLayoutParams();
+            lp.height = dpToPx(IME_COMPOSE_TOOLBAR_ROW_FIXED_HEIGHT_DP);
+            lp.weight = 0f;
+            imeCaptureToolbar.setLayoutParams(lp);
+            return;
+        }
+        float w = IME_COMPOSE_TOOLBAR_ROW_WEIGHT;
+        if (!imeSubComposeDirectHidMode && imeSubComposeExpanded) {
+            w = IME_COMPOSE_TOOLBAR_ROW_WEIGHT_EXPANDED;
+        }
+        LayoutParams lp = (LayoutParams) imeCaptureToolbar.getLayoutParams();
+        lp.height = 0;
+        lp.weight = w;
+        imeCaptureToolbar.setLayoutParams(lp);
     }
 
     private void refreshImeSubComposeExpandIcon() {
