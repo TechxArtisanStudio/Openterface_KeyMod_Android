@@ -9,6 +9,8 @@ import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +69,9 @@ public class ShortcutProfileManager {
         if (profiles.isEmpty()) {
             createDefaultProfiles();
         }
+        if (migrateDefaultProfileIfNeeded()) {
+            saveProfiles();
+        }
     }
 
     /**
@@ -112,15 +117,116 @@ public class ShortcutProfileManager {
         p.description = "Common shortcuts for any app";
         p.icon = "ic_default";
         p.createdAt = System.currentTimeMillis();
-        p.shortcuts.add(new Shortcut("d1", "Copy",       "Ctrl+C",     MOD_CTRL, KEY_C));
-        p.shortcuts.add(new Shortcut("d2", "Paste",      "Ctrl+V",     MOD_CTRL, KEY_V));
-        p.shortcuts.add(new Shortcut("d3", "Cut",        "Ctrl+X",     MOD_CTRL, KEY_X));
-        p.shortcuts.add(new Shortcut("d4", "Undo",       "Ctrl+Z",     MOD_CTRL, KEY_Z));
-        p.shortcuts.add(new Shortcut("d5", "Redo",       "Ctrl+Y",     MOD_CTRL, KEY_Y));
-        p.shortcuts.add(new Shortcut("d6", "Save",       "Ctrl+S",     MOD_CTRL, KEY_S));
-        p.shortcuts.add(new Shortcut("d7", "Select All", "Ctrl+A",     MOD_CTRL, KEY_A));
-        p.shortcuts.add(new Shortcut("d8", "Find",       "Ctrl+F",     MOD_CTRL, KEY_F));
+        p.shortcuts.add(new Shortcut("default_select_all", "Select All", "Ctrl+A", MOD_CTRL, KEY_A, "select_all_24", 1));
+        p.shortcuts.add(new Shortcut("default_copy",       "Copy",       "Ctrl+C", MOD_CTRL, KEY_C, "content_copy_24", 2));
+        p.shortcuts.add(new Shortcut("default_cut",        "Cut",        "Ctrl+X", MOD_CTRL, KEY_X, "content_cut_24", 3));
+        p.shortcuts.add(new Shortcut("default_paste",      "Paste",      "Ctrl+V", MOD_CTRL, KEY_V, "content_paste_24", 4));
+        p.shortcuts.add(new Shortcut("default_tab",        "Tab",        "Tab",    MOD_NONE, KEY_TAB, "keyboard_tab_24", 5));
+        p.shortcuts.add(new Shortcut("default_save",       "Save",       "Ctrl+S", MOD_CTRL, KEY_S, "save_24", 6));
+        p.shortcuts.add(new Shortcut("default_undo",       "Undo",       "Ctrl+Z", MOD_CTRL, KEY_Z, "undo_24", 7));
+        p.shortcuts.add(new Shortcut("default_redo",       "Redo",       "Ctrl+Y", MOD_CTRL, KEY_Y, "redo_24", 8));
+        p.shortcuts.add(new Shortcut("default_find",       "Find",       "Ctrl+F", MOD_CTRL, KEY_F, "search_24", 9));
         return p;
+    }
+
+    private boolean migrateDefaultProfileIfNeeded() {
+        ShortcutProfile profile = getProfileById("default");
+        if (profile == null) {
+            return false;
+        }
+
+        boolean changed = false;
+        List<Shortcut> source = profile.shortcuts != null ? profile.shortcuts : new ArrayList<>();
+        Map<String, Shortcut> bySignature = new HashMap<>();
+        for (Shortcut shortcut : source) {
+            if (shortcut == null) continue;
+            if (shortcut.icon == null || shortcut.icon.trim().isEmpty()) {
+                shortcut.icon = inferDefaultIcon(shortcut);
+                changed = true;
+            }
+            if (shortcut.displayOrder <= 0) {
+                shortcut.displayOrder = Integer.MAX_VALUE;
+                changed = true;
+            }
+            bySignature.put(signature(shortcut.modifiers, shortcut.keyCode), shortcut);
+        }
+
+        List<Shortcut> ordered = new ArrayList<>();
+        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_select_all", "Select All", "Ctrl+A", MOD_CTRL, KEY_A, "select_all_24", 1);
+        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_copy", "Copy", "Ctrl+C", MOD_CTRL, KEY_C, "content_copy_24", 2);
+        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_cut", "Cut", "Ctrl+X", MOD_CTRL, KEY_X, "content_cut_24", 3);
+        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_paste", "Paste", "Ctrl+V", MOD_CTRL, KEY_V, "content_paste_24", 4);
+        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_tab", "Tab", "Tab", MOD_NONE, KEY_TAB, "keyboard_tab_24", 5);
+        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_save", "Save", "Ctrl+S", MOD_CTRL, KEY_S, "save_24", 6);
+        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_undo", "Undo", "Ctrl+Z", MOD_CTRL, KEY_Z, "undo_24", 7);
+        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_redo", "Redo", "Ctrl+Y", MOD_CTRL, KEY_Y, "redo_24", 8);
+        changed |= addOrCreateDefaultShortcut(ordered, bySignature, "default_find", "Find", "Ctrl+F", MOD_CTRL, KEY_F, "search_24", 9);
+
+        if (source.size() != ordered.size()) {
+            changed = true;
+        }
+        profile.shortcuts = ordered;
+        return changed;
+    }
+
+    private boolean addOrCreateDefaultShortcut(
+            List<Shortcut> target,
+            Map<String, Shortcut> bySignature,
+            String id,
+            String name,
+            String label,
+            int modifiers,
+            int keyCode,
+            String icon,
+            int displayOrder
+    ) {
+        Shortcut shortcut = bySignature.get(signature(modifiers, keyCode));
+        boolean changed = false;
+        if (shortcut == null) {
+            shortcut = new Shortcut(id, name, label, modifiers, keyCode, icon, displayOrder);
+            changed = true;
+        } else {
+            if (shortcut.id == null || shortcut.id.trim().isEmpty()) {
+                shortcut.id = id;
+                changed = true;
+            }
+            if (!name.equals(shortcut.name)) {
+                shortcut.name = name;
+                changed = true;
+            }
+            if (!label.equals(shortcut.label)) {
+                shortcut.label = label;
+                changed = true;
+            }
+            if (shortcut.icon == null || shortcut.icon.trim().isEmpty() || !icon.equals(shortcut.icon)) {
+                shortcut.icon = icon;
+                changed = true;
+            }
+            if (shortcut.displayOrder != displayOrder) {
+                shortcut.displayOrder = displayOrder;
+                changed = true;
+            }
+        }
+        target.add(shortcut);
+        return changed;
+    }
+
+    private String signature(int modifiers, int keyCode) {
+        return modifiers + ":" + keyCode;
+    }
+
+    private String inferDefaultIcon(Shortcut shortcut) {
+        if (shortcut == null || shortcut.keyCode <= 0) return "";
+        if (shortcut.keyCode == KEY_A && shortcut.modifiers == MOD_CTRL) return "select_all_24";
+        if (shortcut.keyCode == KEY_C && shortcut.modifiers == MOD_CTRL) return "content_copy_24";
+        if (shortcut.keyCode == KEY_X && shortcut.modifiers == MOD_CTRL) return "content_cut_24";
+        if (shortcut.keyCode == KEY_V && shortcut.modifiers == MOD_CTRL) return "content_paste_24";
+        if (shortcut.keyCode == KEY_TAB && shortcut.modifiers == MOD_NONE) return "keyboard_tab_24";
+        if (shortcut.keyCode == KEY_S && shortcut.modifiers == MOD_CTRL) return "save_24";
+        if (shortcut.keyCode == KEY_Z && shortcut.modifiers == MOD_CTRL) return "undo_24";
+        if (shortcut.keyCode == KEY_Y && shortcut.modifiers == MOD_CTRL) return "redo_24";
+        if (shortcut.keyCode == KEY_F && shortcut.modifiers == MOD_CTRL) return "search_24";
+        return "";
     }
 
     private ShortcutProfile createBlenderProfile() {
@@ -750,6 +856,30 @@ public class ShortcutProfileManager {
         prefs.edit().putString(MY_SHORTCUTS_KEY_PREFIX + profileId, json).apply();
     }
 
+    public List<Shortcut> getOrderedShortcutsForTopStrip(String profileId) {
+        ShortcutProfile profile = getProfileById(profileId);
+        if (profile == null) {
+            return new ArrayList<>();
+        }
+        List<Shortcut> source = getMyShortcuts(profileId);
+        if (source == null || source.isEmpty()) {
+            source = profile.getAllShortcutsFlat();
+        }
+        if (source == null) {
+            return new ArrayList<>();
+        }
+        List<Shortcut> sorted = new ArrayList<>(source);
+        final Map<String, Integer> existingOrder = new HashMap<>();
+        for (int i = 0; i < sorted.size(); i++) {
+            Shortcut shortcut = sorted.get(i);
+            existingOrder.put(shortcut.id != null ? shortcut.id : ("index_" + i), i);
+        }
+        Collections.sort(sorted, Comparator
+                .comparingInt((Shortcut s) -> s.displayOrder > 0 ? s.displayOrder : Integer.MAX_VALUE)
+                .thenComparingInt(s -> existingOrder.getOrDefault(s.id != null ? s.id : "", Integer.MAX_VALUE)));
+        return sorted;
+    }
+
     /**
      * Profile change listener interface
      */
@@ -768,6 +898,8 @@ public class ShortcutProfileManager {
         public String label;
         public int modifiers;
         public int keyCode;
+        public String icon;
+        public int displayOrder;
 
         public Shortcut() {}
 
@@ -777,6 +909,14 @@ public class ShortcutProfileManager {
             this.label = label;
             this.modifiers = modifiers;
             this.keyCode = keyCode;
+            this.icon = "";
+            this.displayOrder = 0;
+        }
+
+        public Shortcut(String id, String name, String label, int modifiers, int keyCode, String icon, int displayOrder) {
+            this(id, name, label, modifiers, keyCode);
+            this.icon = icon;
+            this.displayOrder = displayOrder;
         }
     }
 

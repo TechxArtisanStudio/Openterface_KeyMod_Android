@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -34,6 +35,8 @@ import com.openterface.keymod.ShortcutProfileManager.ProfileChangeListener;
 import com.openterface.keymod.util.KeyParser;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -375,8 +378,23 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         
         shortcutsGridView.setVisibility(View.VISIBLE);
         emptyMyShortcuts.setVisibility(View.GONE);
+        sortShortcutsForDisplay(toShow);
         shortcutsAdapter.setShortcuts(toShow);
         shortcutsAdapter.notifyDataSetChanged();
+    }
+
+    private void sortShortcutsForDisplay(List<ShortcutProfileManager.Shortcut> shortcuts) {
+        if (shortcuts == null || shortcuts.size() < 2) {
+            return;
+        }
+        final java.util.HashMap<String, Integer> existing = new java.util.HashMap<>();
+        for (int i = 0; i < shortcuts.size(); i++) {
+            ShortcutProfileManager.Shortcut shortcut = shortcuts.get(i);
+            existing.put(shortcut.id != null ? shortcut.id : ("idx_" + i), i);
+        }
+        Collections.sort(shortcuts, Comparator
+                .comparingInt((ShortcutProfileManager.Shortcut s) -> s.displayOrder > 0 ? s.displayOrder : Integer.MAX_VALUE)
+                .thenComparingInt(s -> existing.getOrDefault(s.id != null ? s.id : "", Integer.MAX_VALUE)));
     }
 
     private void addToMyFavorites(ShortcutProfileManager.Shortcut shortcut) {
@@ -460,12 +478,18 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
 
         EditText nameInput = dialogView.findViewById(R.id.shortcut_name_input);
         EditText dataInput = dialogView.findViewById(R.id.shortcut_data_input);
+        EditText iconInput = dialogView.findViewById(R.id.shortcut_icon_input);
+        EditText orderInput = dialogView.findViewById(R.id.shortcut_order_input);
         LinearLayout chipsRow = dialogView.findViewById(R.id.key_chips_row);
         TextView previewText = dialogView.findViewById(R.id.shortcut_preview);
 
         nameInput.setText(shortcut.name);
         String dataToken = KeyParser.toToken(shortcut.keyCode, shortcut.modifiers);
         dataInput.setText(dataToken);
+        iconInput.setText(shortcut.icon != null ? shortcut.icon : "");
+        if (shortcut.displayOrder > 0) {
+            orderInput.setText(String.valueOf(shortcut.displayOrder));
+        }
 
         String[][] tokens = {
             {"⎇ Alt", "<ALT>"}, {"^ Ctrl", "<CTRL>"}, {"⇧ Shift", "<SHIFT>"}, {"⌘ Cmd", "<CMD>"},
@@ -543,6 +567,8 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                     shortcut.label = label;
                     shortcut.modifiers = parsed.modifiers;
                     shortcut.keyCode = parsed.keyCode;
+                    shortcut.icon = iconInput.getText().toString().trim();
+                    shortcut.displayOrder = parseDisplayOrder(orderInput.getText().toString().trim(), shortcut.displayOrder);
 
                     profileManager.updateProfile(selectedProfile);
                     loadProfiles();
@@ -690,6 +716,8 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
 
         EditText nameInput = dialogView.findViewById(R.id.shortcut_name_input);
         EditText dataInput = dialogView.findViewById(R.id.shortcut_data_input);
+        EditText iconInput = dialogView.findViewById(R.id.shortcut_icon_input);
+        EditText orderInput = dialogView.findViewById(R.id.shortcut_order_input);
         LinearLayout chipsRow = dialogView.findViewById(R.id.key_chips_row);
         TextView previewText = dialogView.findViewById(R.id.shortcut_preview);
 
@@ -772,6 +800,10 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                     String label = KeyParser.toLabel(parsed.keyCode, parsed.modifiers);
                     ShortcutProfileManager.Shortcut shortcut = new ShortcutProfileManager.Shortcut(
                             "user-" + System.currentTimeMillis(), name, label, parsed.modifiers, parsed.keyCode);
+                    shortcut.icon = iconInput.getText().toString().trim();
+                    shortcut.displayOrder = parseDisplayOrder(
+                            orderInput.getText().toString().trim(),
+                            nextDisplayOrder(profile));
 
                     profile.shortcuts.add(shortcut);
                     profileManager.updateProfile(profile);
@@ -800,6 +832,29 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    private int nextDisplayOrder(ShortcutProfile profile) {
+        int max = 0;
+        List<ShortcutProfileManager.Shortcut> all = profile.getAllShortcutsFlat();
+        for (ShortcutProfileManager.Shortcut shortcut : all) {
+            if (shortcut != null && shortcut.displayOrder > max) {
+                max = shortcut.displayOrder;
+            }
+        }
+        return max + 1;
+    }
+
+    private int parseDisplayOrder(String raw, int fallback) {
+        if (TextUtils.isEmpty(raw)) {
+            return fallback > 0 ? fallback : 0;
+        }
+        try {
+            int value = Integer.parseInt(raw);
+            return Math.max(value, 0);
+        } catch (NumberFormatException ignored) {
+            return fallback > 0 ? fallback : 0;
+        }
     }
 
     private void viewShortcuts(ShortcutProfile profile) {
@@ -1121,9 +1176,20 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
             }
 
             ShortcutProfileManager.Shortcut shortcut = shortcuts.get(position);
+            TextView iconText = convertView.findViewById(R.id.shortcut_icon);
             TextView nameText = convertView.findViewById(R.id.shortcut_name);
             TextView labelText = convertView.findViewById(R.id.shortcut_label);
 
+            String icon = shortcut.icon != null ? shortcut.icon.trim() : "";
+            if (!icon.isEmpty() && !icon.matches(".*[A-Za-z0-9_].*")) {
+                iconText.setText(icon);
+                iconText.setVisibility(View.VISIBLE);
+            } else if (!icon.isEmpty() && icon.length() <= 2) {
+                iconText.setText(icon);
+                iconText.setVisibility(View.VISIBLE);
+            } else {
+                iconText.setVisibility(View.GONE);
+            }
             nameText.setText(shortcut.name);
             labelText.setText(KeyParser.displayLabel(shortcut.label, getTargetOs()));
 

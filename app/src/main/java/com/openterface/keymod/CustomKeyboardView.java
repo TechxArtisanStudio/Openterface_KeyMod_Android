@@ -71,6 +71,7 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int TOP_PANEL_COLUMNS = 7;
     private static final int TOP_PANEL_ROWS = 3;
     private static final int TOP_PANEL_PAGE_SIZE = TOP_PANEL_COLUMNS * TOP_PANEL_ROWS;
+    private static final int TOP_ROW_PAGE_SIZE = TOP_PANEL_COLUMNS;
     private static final int TOP_PANEL_LEFT_START_COL = 0;
     private static final int TOP_PANEL_LEFT_END_COL = 4;
     private static final int TOP_PANEL_RIGHT_START_COL = 4;
@@ -142,6 +143,7 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int KEY_TOP_MODE_SLOT_3 = 0xF009;
     /** PH1: toggle system IME capture vs KeyMod HID keyboard. */
     private static final int KEY_IME_TOGGLE = 0xF00A;
+    private static final int KEY_TOP_SHORTCUT_DISPLAY_TOGGLE = 0xF00B;
     private static final int KEY_NOOP_PLACEHOLDER = -1;
     private static final String APP_PREFS_NAME = "AppPrefs";
     private static final String KEY_SYSTEM_IME_CAPTURE = "system_ime_capture_mode";
@@ -274,6 +276,7 @@ public class CustomKeyboardView extends LinearLayout {
     private ShortcutProfileManager shortcutProfileManager;
     private final List<TopShortcutPanel> topShortcutPanels = new ArrayList<>();
     private FrameLayout topPanelViewport;
+    private LinearLayout fixedTopRowsContainer;
     private LinearLayout previousTopPanelContainer;
     private LinearLayout activeTopPanelContainer;
     private LinearLayout nextTopPanelContainer;
@@ -283,9 +286,11 @@ public class CustomKeyboardView extends LinearLayout {
     private LinearLayout splitPreviousTopPanelContainerLeft;
     private LinearLayout splitActiveTopPanelContainerLeft;
     private LinearLayout splitNextTopPanelContainerLeft;
+    private LinearLayout splitFixedTopRowsContainerLeft;
     private LinearLayout splitPreviousTopPanelContainerRight;
     private LinearLayout splitActiveTopPanelContainerRight;
     private LinearLayout splitNextTopPanelContainerRight;
+    private LinearLayout splitFixedTopRowsContainerRight;
 
     private BluetoothService bluetoothService;
     private boolean isServiceBound;
@@ -321,6 +326,8 @@ public class CustomKeyboardView extends LinearLayout {
         boolean requiresShift;
         int shortcutModifiers;
         boolean isTopPanelKey;
+        String customIconGlyph;
+        boolean allowTopPanelPagingGesture;
 
         Key(String label, String symbolLabel, String alternates, String cornerHint, int code, String codeStr, float widthPercent, int iconResId,
             float horizontalGap, boolean isRepeatable, boolean requiresShift, int shortcutModifiers, boolean isTopPanelKey) {
@@ -337,6 +344,8 @@ public class CustomKeyboardView extends LinearLayout {
             this.requiresShift = requiresShift;
             this.shortcutModifiers = shortcutModifiers;
             this.isTopPanelKey = isTopPanelKey;
+            this.customIconGlyph = "";
+            this.allowTopPanelPagingGesture = true;
         }
 
         Key(String label, String symbolLabel, int code, String codeStr, float widthPercent, int iconResId,
@@ -678,8 +687,7 @@ public class CustomKeyboardView extends LinearLayout {
     private static boolean isTopShortcutToggleKey(Key key) {
         return key != null
                 && key.isTopPanelKey
-                && "PH3".equals(key.label)
-                && key.code == KEY_NOOP_PLACEHOLDER;
+                && key.code == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE;
     }
 
     private static boolean isTopImeToggleKey(Key key) {
@@ -690,7 +698,7 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private static boolean isTopShortcutActionLabelEligible(Key key) {
-        if (key == null || !key.isTopPanelKey || key.code == KEY_NOOP_PLACEHOLDER) {
+        if (key == null || !key.isTopPanelKey || key.code == KEY_NOOP_PLACEHOLDER || key.code == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE) {
             return false;
         }
         return key.shortcutModifiers >= 0 || key.code == 0x2B;
@@ -878,11 +886,21 @@ public class CustomKeyboardView extends LinearLayout {
             topPanelPageIndex = topShortcutPanels.size() - 1;
         }
 
-        FrameLayout viewport = new FrameLayout(getContext());
-        // Height comes from parent split_top_panel (weighted vs main row — same 2.4:4 ratio as
-        // TOP_PANEL_TOTAL_WEIGHT : letter rows in full landscape keyboard).
-        viewport.setLayoutParams(new FrameLayout.LayoutParams(
+        FrameLayout root = new FrameLayout(getContext());
+        root.setLayoutParams(new FrameLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        LinearLayout stack = new LinearLayout(getContext());
+        stack.setLayoutParams(new FrameLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        stack.setOrientation(VERTICAL);
+
+        FrameLayout viewport = new FrameLayout(getContext());
+        viewport.setLayoutParams(new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT));
+        fixedTopRowsContainer = new LinearLayout(getContext());
+        fixedTopRowsContainer.setLayoutParams(new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT * 2f));
+        fixedTopRowsContainer.setOrientation(VERTICAL);
 
         previousTopPanelContainer = createTopShortcutPanelView();
         activeTopPanelContainer = createTopShortcutPanelView();
@@ -890,11 +908,14 @@ public class CustomKeyboardView extends LinearLayout {
         viewport.addView(previousTopPanelContainer);
         viewport.addView(activeTopPanelContainer);
         viewport.addView(nextTopPanelContainer);
+        stack.addView(viewport);
+        stack.addView(fixedTopRowsContainer);
+        root.addView(stack);
 
         syncTopPanelViewportContent();
 
         // Post to wait for layout, then set initial positions
-        viewport.post(() -> {
+        root.post(() -> {
             float width = viewport.getWidth();
             if (width > 0) {
                 activeTopPanelContainer.setTranslationX(0);
@@ -907,7 +928,7 @@ public class CustomKeyboardView extends LinearLayout {
             }
         });
 
-        return viewport;
+        return root;
     }
 
     public void createSplitLandscapeTopPanel(
@@ -930,17 +951,35 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         topPanelViewport = null;
+        fixedTopRowsContainer = null;
         previousTopPanelContainer = null;
         activeTopPanelContainer = null;
         nextTopPanelContainer = null;
 
         splitTopCenterSpacer = centerSpacer;
+        LinearLayout leftStack = new LinearLayout(getContext());
+        leftStack.setLayoutParams(new FrameLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        leftStack.setOrientation(VERTICAL);
+        LinearLayout rightStack = new LinearLayout(getContext());
+        rightStack.setLayoutParams(new FrameLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        rightStack.setOrientation(VERTICAL);
+
         splitTopLeftViewport = new FrameLayout(getContext());
         splitTopRightViewport = new FrameLayout(getContext());
-        splitTopLeftViewport.setLayoutParams(new FrameLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-        splitTopRightViewport.setLayoutParams(new FrameLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        splitTopLeftViewport.setLayoutParams(new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT));
+        splitTopRightViewport.setLayoutParams(new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT));
+        splitFixedTopRowsContainerLeft = new LinearLayout(getContext());
+        splitFixedTopRowsContainerLeft.setLayoutParams(new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT * 2f));
+        splitFixedTopRowsContainerLeft.setOrientation(VERTICAL);
+        splitFixedTopRowsContainerRight = new LinearLayout(getContext());
+        splitFixedTopRowsContainerRight.setLayoutParams(new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT * 2f));
+        splitFixedTopRowsContainerRight.setOrientation(VERTICAL);
 
         splitPreviousTopPanelContainerLeft = createTopShortcutPanelView();
         splitActiveTopPanelContainerLeft = createTopShortcutPanelView();
@@ -955,11 +994,15 @@ public class CustomKeyboardView extends LinearLayout {
         splitTopRightViewport.addView(splitPreviousTopPanelContainerRight);
         splitTopRightViewport.addView(splitActiveTopPanelContainerRight);
         splitTopRightViewport.addView(splitNextTopPanelContainerRight);
+        leftStack.addView(splitTopLeftViewport);
+        leftStack.addView(splitFixedTopRowsContainerLeft);
+        rightStack.addView(splitTopRightViewport);
+        rightStack.addView(splitFixedTopRowsContainerRight);
 
         leftHost.removeAllViews();
         rightHost.removeAllViews();
-        leftHost.addView(splitTopLeftViewport);
-        rightHost.addView(splitTopRightViewport);
+        leftHost.addView(leftStack);
+        rightHost.addView(rightStack);
 
         OnTouchListener sharedTouch = createTopPanelTouchListener(null);
         splitTopLeftViewport.setOnTouchListener(sharedTouch);
@@ -2329,15 +2372,24 @@ public class CustomKeyboardView extends LinearLayout {
             topPanelPageIndex = topShortcutPanels.size() - 1;
         }
 
-        FrameLayout viewport = new FrameLayout(getContext());
         float topStripWeight = TOP_PANEL_TOTAL_WEIGHT;
         if (systemImeCaptureMode && !shortcutsStripOnly && splitPart == SPLIT_NONE) {
             topStripWeight = IME_SINGLE_TOP_STRIP_WEIGHT;
         }
-        viewport.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, topStripWeight));
+        LinearLayout topStripContainer = new LinearLayout(getContext());
+        topStripContainer.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, topStripWeight));
+        topStripContainer.setOrientation(VERTICAL);
+        FrameLayout viewport = new FrameLayout(getContext());
+        viewport.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT));
+        fixedTopRowsContainer = new LinearLayout(getContext());
+        fixedTopRowsContainer.setLayoutParams(new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT * 2f));
+        fixedTopRowsContainer.setOrientation(VERTICAL);
         topPanelViewport = viewport;
+        topStripContainer.addView(viewport);
+        topStripContainer.addView(fixedTopRowsContainer);
         initializeTopPanelViewport();
-        addView(viewport);
+        addView(topStripContainer);
     }
 
     private void initializeTopPanelViewport() {
@@ -2384,6 +2436,8 @@ public class CustomKeyboardView extends LinearLayout {
             if (splitActiveTopPanelContainerRight != null) {
                 splitActiveTopPanelContainerRight.bringToFront();
             }
+            bindFixedTopRows(splitFixedTopRowsContainerLeft, active, TOP_PANEL_LEFT_START_COL, TOP_PANEL_LEFT_END_COL);
+            bindFixedTopRows(splitFixedTopRowsContainerRight, active, TOP_PANEL_RIGHT_START_COL, TOP_PANEL_RIGHT_END_COL);
             return;
         }
 
@@ -2393,6 +2447,7 @@ public class CustomKeyboardView extends LinearLayout {
         if (activeTopPanelContainer != null) {
             activeTopPanelContainer.bringToFront();
         }
+        bindFixedTopRows(fixedTopRowsContainer, active, 0, TOP_PANEL_COLUMNS);
     }
 
     private LinearLayout createTopShortcutPanelView() {
@@ -2402,7 +2457,6 @@ public class CustomKeyboardView extends LinearLayout {
                 LayoutParams.MATCH_PARENT
         ));
         topPanelContainer.setOrientation(VERTICAL);
-        topPanelContainer.setOnTouchListener(createTopPanelTouchListener(null));
         return topPanelContainer;
     }
 
@@ -2416,7 +2470,7 @@ public class CustomKeyboardView extends LinearLayout {
             return;
         }
         topPanelContainer.setVisibility(View.VISIBLE);
-        addShortcutPanelRows(topPanelContainer, panel.keys, 0, TOP_PANEL_COLUMNS);
+        addShortcutPanelRows(topPanelContainer, panel.keys, 0, TOP_PANEL_COLUMNS, 0, 1);
     }
 
     private void bindSplitTopShortcutPanelView(
@@ -2453,95 +2507,148 @@ public class CustomKeyboardView extends LinearLayout {
             return;
         }
         topPanelContainer.setVisibility(View.VISIBLE);
-        addShortcutPanelRows(topPanelContainer, panel.keys, startColInclusive, endColExclusive);
+        addShortcutPanelRows(topPanelContainer, panel.keys, startColInclusive, endColExclusive, 0, 1);
+    }
+
+    private void bindFixedTopRows(
+            LinearLayout container,
+            TopShortcutPanel panel,
+            int startColInclusive,
+            int endColExclusive
+    ) {
+        if (container == null) {
+            return;
+        }
+        container.removeAllViews();
+        if (panel == null) {
+            container.setVisibility(View.INVISIBLE);
+            return;
+        }
+        container.setVisibility(View.VISIBLE);
+        addShortcutPanelRows(container, panel.keys, startColInclusive, endColExclusive, 1, TOP_PANEL_ROWS);
     }
 
     private void rebuildTopShortcutPanels() {
         topShortcutPanels.clear();
-        topShortcutPanels.add(new TopShortcutPanel("Standard 1/2", buildStandardTopPanelPage1Keys()));
-        topShortcutPanels.add(new TopShortcutPanel("Standard 2/2", buildStandardTopPanelPage2Keys()));
-    }
-
-    private void addProfilePanels(ShortcutProfileManager.ShortcutProfile profile, String panelName) {
-        if (profile == null) {
-            return;
+        ShortcutProfileManager.ShortcutProfile activeProfile = shortcutProfileManager.getActiveProfile();
+        List<ShortcutProfileManager.Shortcut> ordered = activeProfile != null
+                ? shortcutProfileManager.getOrderedShortcutsForTopStrip(activeProfile.id)
+                : new ArrayList<>();
+        if (ordered == null || ordered.isEmpty()) {
+            ordered = new ArrayList<>();
         }
 
-        List<ShortcutProfileManager.Shortcut> source = shortcutProfileManager.getMyShortcuts(profile.id);
-        if (source == null || source.isEmpty()) {
-            source = profile.getAllShortcutsFlat();
-        }
-        if (source == null || source.isEmpty()) {
-            return;
-        }
-
-        for (int i = 0; i < source.size(); i += TOP_PANEL_PAGE_SIZE) {
-            int end = Math.min(i + TOP_PANEL_PAGE_SIZE, source.size());
-            List<Key> panelKeys = new ArrayList<>();
-            for (int j = i; j < end; j++) {
-                ShortcutProfileManager.Shortcut shortcut = source.get(j);
-                if (shortcut == null) {
-                    continue;
-                }
-                String label = compactShortcutName(shortcut);
-                String symbol = compactShortcutSymbol(shortcut);
-                panelKeys.add(new Key(
-                        label,
-                        symbol,
-                        shortcut.keyCode,
-                        String.format("%02X", shortcut.keyCode),
-                        1f,
-                        0,
-                        0f,
-                        false,
-                        false,
-                        shortcut.modifiers,
-                        true
-                ));
+        int totalPages = Math.max(1, (int) Math.ceil((double) ordered.size() / TOP_ROW_PAGE_SIZE));
+        for (int pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+            int start = pageIndex * TOP_ROW_PAGE_SIZE;
+            int end = Math.min(start + TOP_ROW_PAGE_SIZE, ordered.size());
+            List<ShortcutProfileManager.Shortcut> slice = ordered.subList(start, end);
+            List<Key> pageKeys = buildTopPanelPageKeys(slice);
+            String title = activeProfile != null ? activeProfile.name : "Default";
+            if (totalPages > 1) {
+                title = title + " " + (pageIndex + 1) + "/" + totalPages;
             }
-
-            if (!panelKeys.isEmpty()) {
-                int page = (i / TOP_PANEL_PAGE_SIZE) + 1;
-                int totalPages = (int) Math.ceil((double) source.size() / TOP_PANEL_PAGE_SIZE);
-                String title = totalPages > 1
-                        ? panelName + " " + page + "/" + totalPages
-                        : panelName;
-                topShortcutPanels.add(new TopShortcutPanel(title, panelKeys));
-            }
+            topShortcutPanels.add(new TopShortcutPanel(title, pageKeys));
         }
     }
 
-    private List<Key> buildStandardTopPanelPage1Keys() {
+    private List<Key> buildTopPanelPageKeys(List<ShortcutProfileManager.Shortcut> row1Shortcuts) {
         List<Key> keys = new ArrayList<>(TOP_PANEL_PAGE_SIZE);
-        int primaryModifier = "macos".equals(getTargetOs()) ? MOD_WIN : MOD_CTRL;
-        keys.add(new Key("ALL",    "", 0x04, "04", 1f, R.drawable.select_all_24, 0f, false, false, primaryModifier, true));
-        keys.add(new Key("COPY",   "", 0x06, "06", 1f, R.drawable.content_copy_24, 0f, false, false, primaryModifier, true));
-        keys.add(new Key("CUT",    "", 0x1B, "1B", 1f, R.drawable.content_cut_24, 0f, false, false, primaryModifier, true));
-        keys.add(new Key("PASTE",  "", 0x19, "19", 1f, R.drawable.content_paste_24, 0f, false, false, primaryModifier, true));
-        keys.add(new Key("TAB",    "", 0x2B, "2B", 1f, R.drawable.keyboard_tab_24, 0f, false, false, -1, true));
-        keys.add(new Key("SAVE",   "", 0x16, "16", 1f, R.drawable.save_24, 0f, false, false, primaryModifier, true));
-        keys.add(new Key("UNDO",   "", 0x1D, "1D", 1f, R.drawable.undo_24, 0f, false, false, primaryModifier, true));
+        keys.addAll(buildProfileTopRow(row1Shortcuts));
+        keys.addAll(buildFixedTopPanelRows());
+        return keys;
+    }
 
-        keys.add(new Key("HOME",   "", 0x4A, "4A", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("END",    "", 0x4D, "4D", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PGUP",   "", 0x4B, "4B", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PGDN",   "", 0x4E, "4E", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH1", "", KEY_IME_TOGGLE, "",
+    private List<Key> buildProfileTopRow(List<ShortcutProfileManager.Shortcut> shortcuts) {
+        List<Key> row = new ArrayList<>(TOP_ROW_PAGE_SIZE);
+        for (int i = 0; i < TOP_ROW_PAGE_SIZE; i++) {
+            if (shortcuts != null && i < shortcuts.size()) {
+                ShortcutProfileManager.Shortcut shortcut = shortcuts.get(i);
+                row.add(buildTopPanelShortcutKey(shortcut));
+            } else {
+                row.add(new Key("", "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+            }
+        }
+        return row;
+    }
+
+    private Key buildTopPanelShortcutKey(ShortcutProfileManager.Shortcut shortcut) {
+        if (shortcut == null) {
+            return new Key("", "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true);
+        }
+        String label = compactShortcutName(shortcut);
+        String symbol = compactShortcutSymbol(shortcut);
+        int iconResId = resolveShortcutIconRes(shortcut.icon);
+        Key key = new Key(
+                label,
+                symbol,
+                shortcut.keyCode,
+                String.format("%02X", shortcut.keyCode),
+                1f,
+                iconResId,
+                0f,
+                false,
+                false,
+                shortcut.modifiers,
+                true
+        );
+        if (iconResId == 0 && isEmojiIcon(shortcut.icon)) {
+            key.customIconGlyph = shortcut.icon.trim();
+        }
+        return key;
+    }
+
+    private List<Key> buildFixedTopPanelRows() {
+        List<Key> keys = new ArrayList<>(TOP_PANEL_COLUMNS * 2);
+        keys.add(markFixedRowKey(new Key("HOME",   "", 0x4A, "4A", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("END",    "", 0x4D, "4D", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("PGUP",   "", 0x4B, "4B", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("PGDN",   "", 0x4E, "4E", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("PH1", "", KEY_IME_TOGGLE, "",
                 1f,
                 systemImeCaptureMode ? R.drawable.ic_keyboard_ime_24 : R.drawable.ic_keyboard_keymod_24,
-                0f, false, false, -1, true));
-        keys.add(new Key("UP",     "", 0x52, "52", 1f, R.drawable.keyboard_arrow_up_24, 0f, false, false, -1, true));
-        keys.add(new Key("PH3",   "", KEY_NOOP_PLACEHOLDER, "", 1f,
+                0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("UP",     "", 0x52, "52", 1f, R.drawable.keyboard_arrow_up_24, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("DISPLAY",   "", KEY_TOP_SHORTCUT_DISPLAY_TOGGLE, "", 1f,
                 topShortcutShowActionLabels ? R.drawable.toggle_on_24px : R.drawable.toggle_off_24px,
-                0f, false, false, -1, true));
-        keys.add(new Key("ESC",    "", 0x29, "29", 1f, 0, 0f, false, false, -1, true));
-        keys.add(buildTopPanelModifierKey(0xE0));
-        keys.add(buildTopPanelModifierKey(0xE2));
-        keys.add(buildTopPanelModifierKey(0xE3));
-        keys.add(new Key("LEFT",   "", 0x50, "50", 1f, R.drawable.keyboard_arrow_left_24, 0f, false, false, -1, true));
-        keys.add(new Key("DOWN",   "", 0x51, "51", 1f, R.drawable.keyboard_arrow_down_24, 0f, false, false, -1, true));
-        keys.add(new Key("RIGHT",  "", 0x4F, "4F", 1f, R.drawable.keyboard_arrow_right_24, 0f, false, false, -1, true));
+                0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("ESC",    "", 0x29, "29", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE0)));
+        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE2)));
+        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE3)));
+        keys.add(markFixedRowKey(new Key("LEFT",   "", 0x50, "50", 1f, R.drawable.keyboard_arrow_left_24, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("DOWN",   "", 0x51, "51", 1f, R.drawable.keyboard_arrow_down_24, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("RIGHT",  "", 0x4F, "4F", 1f, R.drawable.keyboard_arrow_right_24, 0f, false, false, -1, true)));
         return keys;
+    }
+
+    private Key markFixedRowKey(Key key) {
+        if (key != null) {
+            key.allowTopPanelPagingGesture = false;
+        }
+        return key;
+    }
+
+    private int resolveShortcutIconRes(String iconName) {
+        if (iconName == null) {
+            return 0;
+        }
+        String raw = iconName.trim();
+        if (raw.isEmpty() || isEmojiIcon(raw)) {
+            return 0;
+        }
+        Context ctx = getContext();
+        if (ctx == null) {
+            return 0;
+        }
+        return ctx.getResources().getIdentifier(raw, "drawable", ctx.getPackageName());
+    }
+
+    private boolean isEmojiIcon(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return false;
+        }
+        return !raw.matches("^[A-Za-z0-9_]+$");
     }
 
     private Key buildTopPanelModifierKey(int code) {
@@ -2582,32 +2689,6 @@ public class CustomKeyboardView extends LinearLayout {
         return new Key(label, "", code, String.format("%02X", code), 1f, iconResId, 0f, false, false, 0, true);
     }
 
-    private List<Key> buildStandardTopPanelPage2Keys() {
-        List<Key> keys = new ArrayList<>(TOP_PANEL_PAGE_SIZE);
-        keys.add(modeSlotKey(1));
-        keys.add(modeSlotKey(2));
-        keys.add(modeSlotKey(3));
-        keys.add(new Key("PH4",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH5",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH6",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH7",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH8",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH9",   "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH10",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH11",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH12",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH13",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH14",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH15",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH16",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH17",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH18",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH19",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH20",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        keys.add(new Key("PH21",  "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
-        return keys;
-    }
-
     private String compactShortcutName(ShortcutProfileManager.Shortcut shortcut) {
         String label = shortcut.name != null ? shortcut.name : shortcut.label;
         if (label == null || label.trim().isEmpty()) {
@@ -2637,18 +2718,23 @@ public class CustomKeyboardView extends LinearLayout {
             LinearLayout parent,
             List<Key> panelKeys,
             int startColInclusive,
-            int endColExclusive
+            int endColExclusive,
+            int startRowInclusive,
+            int endRowExclusive
     ) {
         int m = dpToPx(KEY_OUTER_MARGIN_DP);
         int clampedStart = Math.max(0, startColInclusive);
         int clampedEnd = Math.min(TOP_PANEL_COLUMNS, endColExclusive);
         int visibleColumns = Math.max(1, clampedEnd - clampedStart);
-
-        for (int rowIndex = 0; rowIndex < TOP_PANEL_ROWS; rowIndex++) {
+        int clampedStartRow = Math.max(0, startRowInclusive);
+        int clampedEndRow = Math.min(TOP_PANEL_ROWS, endRowExclusive);
+        for (int rowIndex = clampedStartRow; rowIndex < clampedEndRow; rowIndex++) {
             LinearLayout rowLayout = new LinearLayout(getContext());
             rowLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 0, TOP_PANEL_ROW_WEIGHT));
             rowLayout.setOrientation(HORIZONTAL);
-            rowLayout.setOnTouchListener(createTopPanelTouchListener(null));
+            if (rowIndex == 0) {
+                rowLayout.setOnTouchListener(createTopPanelTouchListener(null));
+            }
 
             for (int localCol = 0; localCol < visibleColumns; localCol++) {
                 int col = clampedStart + localCol;
@@ -2660,7 +2746,9 @@ public class CustomKeyboardView extends LinearLayout {
                 if (index >= panelKeys.size()) {
                     View spacer = new View(getContext());
                     spacer.setLayoutParams(p);
-                    spacer.setOnTouchListener(createTopPanelTouchListener(null));
+                    if (rowIndex == 0) {
+                        spacer.setOnTouchListener(createTopPanelTouchListener(null));
+                    }
                     rowLayout.addView(spacer);
                     continue;
                 }
@@ -2672,6 +2760,9 @@ public class CustomKeyboardView extends LinearLayout {
                     || (k.code == 0xE3 && isWinLeftLocked);
                 boolean renderAsActionLabel = topShortcutShowActionLabels
                         && isTopShortcutActionLabelEligible(k);
+                boolean renderAsCustomIconText = !renderAsActionLabel
+                        && k.customIconGlyph != null
+                        && !k.customIconGlyph.trim().isEmpty();
                 if (k.iconResId != 0 && !renderAsActionLabel) {
                     ImageButton ib = new ImageButton(getContext());
                     applyFlatKeyStyle(ib);
@@ -2707,6 +2798,23 @@ public class CustomKeyboardView extends LinearLayout {
                     ib.setTag(k);
                     ib.setOnTouchListener(createTopPanelTouchListener(k));
                     rowLayout.addView(ib);
+                } else if (renderAsCustomIconText) {
+                    Button iconTextButton = new Button(getContext());
+                    applyFlatKeyStyle(iconTextButton);
+                    iconTextButton.setLayoutParams(p);
+                    iconTextButton.setBackgroundResource(modifierLocked
+                            ? R.drawable.press_button_background
+                            : R.drawable.function_button_background);
+                    iconTextButton.setSelected(modifierLocked);
+                    iconTextButton.setGravity(Gravity.CENTER);
+                    iconTextButton.setTextSize(18);
+                    iconTextButton.setTypeface(Typeface.DEFAULT_BOLD);
+                    iconTextButton.setText(k.customIconGlyph);
+                    iconTextButton.setTextColor(resolveThemeTextColor());
+                    iconTextButton.setAllCaps(false);
+                    iconTextButton.setTag(k);
+                    iconTextButton.setOnTouchListener(createTopPanelTouchListener(k));
+                    rowLayout.addView(iconTextButton);
                 } else {
                     Button b = new Button(getContext());
                     applyFlatKeyStyle(b);
@@ -2758,6 +2866,8 @@ public class CustomKeyboardView extends LinearLayout {
         splitTopLeftViewport = null;
         splitTopRightViewport = null;
         splitTopCenterSpacer = null;
+        splitFixedTopRowsContainerLeft = null;
+        splitFixedTopRowsContainerRight = null;
         splitPreviousTopPanelContainerLeft = null;
         splitActiveTopPanelContainerLeft = null;
         splitNextTopPanelContainerLeft = null;
@@ -2779,6 +2889,7 @@ public class CustomKeyboardView extends LinearLayout {
         final int touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
         final int swipeThreshold = dpToPx(56);
         final int modeSlotIndex = key != null ? topModeSlotIndexFromKeyCode(key.code) : 0;
+        final boolean canSwipePanel = key == null || key.allowTopPanelPagingGesture;
 
         return (v, event) -> {
             switch (event.getActionMasked()) {
@@ -2809,7 +2920,7 @@ public class CustomKeyboardView extends LinearLayout {
                     float dy = event.getRawY() - startY[0];
                     // Do not cancel mode long-press on small movement (finger jitter); only cancel
                     // when the user is clearly horizontal-swipe paging the strip.
-                    if (!isDragging[0] && Math.abs(dx) > touchSlop && Math.abs(dx) > Math.abs(dy)) {
+                    if (canSwipePanel && !isDragging[0] && Math.abs(dx) > touchSlop && Math.abs(dx) > Math.abs(dy)) {
                         isDragging[0] = true;
                         if (key != null) {
                             v.setPressed(false);
