@@ -2579,6 +2579,7 @@ public class CustomKeyboardView extends LinearLayout {
         String label = compactShortcutName(shortcut);
         String symbol = compactShortcutSymbol(shortcut);
         int iconResId = resolveShortcutIconRes(shortcut.icon);
+        int normalizedModifiers = normalizeShortcutModifiersForTargetOs(shortcut.modifiers);
         Key key = new Key(
                 label,
                 symbol,
@@ -2589,13 +2590,25 @@ public class CustomKeyboardView extends LinearLayout {
                 0f,
                 false,
                 false,
-                shortcut.modifiers,
+                normalizedModifiers,
                 true
         );
         if (iconResId == 0 && isEmojiIcon(shortcut.icon)) {
             key.customIconGlyph = shortcut.icon.trim();
         }
         return key;
+    }
+
+    private int normalizeShortcutModifiersForTargetOs(int modifiers) {
+        String targetOs = getTargetOs();
+        if ("macos".equals(targetOs)) {
+            boolean hasCtrl = (modifiers & MOD_CTRL) != 0;
+            boolean hasCmd = (modifiers & MOD_WIN) != 0;
+            if (hasCtrl && !hasCmd) {
+                return (modifiers & ~MOD_CTRL) | MOD_WIN;
+            }
+        }
+        return modifiers;
     }
 
     private List<Key> buildFixedTopPanelRows() {
@@ -2618,7 +2631,8 @@ public class CustomKeyboardView extends LinearLayout {
         keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE3)));
         keys.add(markFixedRowKey(new Key("LEFT",   "", 0x50, "50", 1f, R.drawable.keyboard_arrow_left_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("DOWN",   "", 0x51, "51", 1f, R.drawable.keyboard_arrow_down_24, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("RIGHT",  "", 0x4F, "4F", 1f, R.drawable.keyboard_arrow_right_24, 0f, false, false, -1, true)));
+        // Temporarily clear row-2 col-7 slot; keep display-toggle feature code for later relocation.
+        keys.add(markFixedRowKey(new Key("", "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true)));
         return keys;
     }
 

@@ -637,7 +637,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
             return;
         }
 
-        connectionManager.sendKeyEvent(shortcut.modifiers, shortcut.keyCode);
+        connectionManager.sendKeyEvent(normalizeModifiersForTargetOs(shortcut.modifiers), shortcut.keyCode);
         // Small delay then release key
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
             if (connectionManager != null) {
@@ -652,6 +652,20 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
 
         Log.d(TAG, "Sent shortcut: " + shortcut.name + " (" + shortcut.label + ")"
                 + " modifiers=" + shortcut.modifiers + " key=" + shortcut.keyCode);
+    }
+
+    private int normalizeModifiersForTargetOs(int modifiers) {
+        String targetOs = getTargetOs();
+        final int modCtrl = 0x01;
+        final int modCmd = 0x08;
+        if ("macos".equals(targetOs)) {
+            boolean hasCtrl = (modifiers & modCtrl) != 0;
+            boolean hasCmd = (modifiers & modCmd) != 0;
+            if (hasCtrl && !hasCmd) {
+                return (modifiers & ~modCtrl) | modCmd;
+            }
+        }
+        return modifiers;
     }
 
     private void showCreateProfileDialog() {
