@@ -2993,7 +2993,7 @@ public class CustomKeyboardView extends LinearLayout {
                 row.add(buildTopPanelShortcutKey(shortcut, row1GlobalStartIndex + i));
             } else {
                 Key k = new Key("", "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true);
-                k.topStripFavoriteSlotIndex = -1;
+                k.topStripFavoriteSlotIndex = row1GlobalStartIndex + i;
                 row.add(k);
             }
         }
@@ -3006,7 +3006,7 @@ public class CustomKeyboardView extends LinearLayout {
     ) {
         if (shortcut == null) {
             Key k = new Key("", "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true);
-            k.topStripFavoriteSlotIndex = -1;
+            k.topStripFavoriteSlotIndex = topStripFavoriteSlotIndex;
             return k;
         }
         String label = compactShortcutName(shortcut);
