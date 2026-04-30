@@ -265,7 +265,7 @@ by TechxArtisan</string>
     <!-- Top strip long-press: subtitle for favourite picker (title above). -->
     <string name="top_strip_favorite_picker_subtitle">Place a shortcut from your favourites list in this slot.</string>
     <string name="top_strip_favorite_picker_empty">Add shortcuts to ⭐ Favorites in Shortcut Hub first.</string>
-    <string name="my_shortcuts_reorder_sheet_title">Reorder ⭐ Favorites</string>
+    <string name="my_shortcuts_reorder_sheet_title">Favorites</string>
     <string name="my_shortcuts_reorder_done">Done</string>
     <string name="my_shortcuts_reorder_info_cd">Show help for reordering Favorites</string>
     <string name="my_shortcuts_reorder_help_read_mode_title">%1$s · %2$d in Favorites</string>
@@ -286,6 +286,35 @@ by TechxArtisan</string>
     <string name="shortcut_hub_added_to_favorites_toast">Added to Favorites: %1$s</string>
     <string name="shortcut_hub_remove_from_favorites_message">Remove \'%1$s\' from Favorites?</string>
     <string name="my_shortcuts_sheet_empty_profile">No shortcuts in this profile to add.</string>
+
+    <!-- Quick create shortcut from favorites strip (last page) -->
+    <string name="top_strip_create_shortcut_label">Create</string>
+    <string name="top_strip_create_shortcut_cd">Create new shortcut</string>
+    <string name="create_shortcut_sheet_title">New shortcut</string>
+    <string name="create_shortcut_info_cd">How to use New shortcut</string>
+    <!-- Full-screen help (same pattern as reorder Favorites help). -->
+    <string name="create_shortcut_help_read_mode_title">New shortcut · %1$s</string>
+    <string name="create_shortcut_help_read_mode_block1"><![CDATA[<b>Where it saves</b> — The shortcut is added to <b>General</b> in Shortcut Hub and to your <b>Favorites</b> strip. To change the name, icon, or order, open Shortcut Hub.]]></string>
+    <string name="create_shortcut_help_read_mode_block2"><![CDATA[<b>Keys</b> — Toggle modifiers, then tap <b>one</b> letter or key chip. Chips wrap to more lines on small screens. <b>Advanced</b> lets you type token syntax (e.g. <tt>&lt;CTRL&gt;c&lt;/CTRL&gt;</tt>) instead; choosing a chip clears Advanced.]]></string>
+    <string name="create_shortcut_help_read_mode_block3"><![CDATA[<b>Modifiers &amp; Target OS</b> — Button labels match your current <b>Target OS</b> (header in the main app). The first toggle is <b>⌘ / Win / Super</b> (HID Gui), then <b>Ctrl</b>, <b>Shift</b>, and <b>Opt / Alt</b>. Stored shortcuts use the same bits as the keyboard; when you change Target OS, labels and HID mapping update together.]]></string>
+    <string name="create_shortcut_preview_empty">Pick a key below, or use Advanced.</string>
+    <string name="create_shortcut_preview_invalid">No valid key yet</string>
+    <string name="create_shortcut_modifiers_label">Modifiers</string>
+    <!-- Defaults; labels are set in code from Target OS. -->
+    <string name="create_shortcut_mod_cmd">⌘</string>
+    <string name="create_shortcut_mod_ctrl">Ctrl</string>
+    <string name="create_shortcut_mod_shift">Shift</string>
+    <string name="create_shortcut_mod_alt">Alt</string>
+    <string name="create_shortcut_key_label">Key</string>
+    <string name="create_shortcut_advanced_label">Advanced (optional)</string>
+    <string name="create_shortcut_advanced_hint">e.g. &lt;CTRL&gt;C&lt;/CTRL&gt;</string>
+    <string name="create_shortcut_save">Save</string>
+    <string name="create_shortcut_no_profile">No Shortcut Hub profile is active.</string>
+    <string name="create_shortcut_need_key">Choose a key or enter advanced shortcut data.</string>
+    <string name="create_shortcut_invalid">No valid key found in shortcut data.</string>
+    <string name="create_shortcut_duplicate">This shortcut already exists in this profile.</string>
+    <string name="create_shortcut_save_failed">Could not save shortcut.</string>
+    <string name="create_shortcut_saved">Saved: %1$s</string>
     <string name="my_shortcuts_sheet_empty_my_hint">Use the tabs above to browse shortcuts, tap the bookmark icon to add to Favorites, then return here to drag and reorder.</string>
     <string name="top_mode_label_keyboard_mouse">Keyboard &amp; Mouse</string>
     <string name="top_mode_label_gamepad">Gamepad</string>

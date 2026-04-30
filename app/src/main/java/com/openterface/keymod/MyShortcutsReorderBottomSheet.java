@@ -167,6 +167,17 @@ public final class MyShortcutsReorderBottomSheet {
             emptyMyHint.setVisibility(
                     idx == 0 && myAdapter.getItemCount() == 0 ? View.VISIBLE : View.GONE);
         };
+        myAdapter.setRemoveFavoriteClickListener((shortcut, position) -> {
+            if (shortcut == null || shortcut.id == null || shortcut.id.isEmpty()) {
+                return;
+            }
+            if (removeShortcutFromWorkingListById(data, shortcut.id)) {
+                myAdapter.notifyDataSetChanged();
+                pickAdapter.notifyDataSetChanged();
+                updateEmptyHint.run();
+                Toast.makeText(activity, R.string.my_shortcuts_removed_from_my, Toast.LENGTH_SHORT).show();
+            }
+        });
 
         Runnable selectMyTab = () -> {
             touchHelper.attachToRecyclerView(null);
@@ -174,6 +185,10 @@ public final class MyShortcutsReorderBottomSheet {
             myAdapter.setDragHelper(touchHelper);
             touchHelper.attachToRecyclerView(recycler);
             myAdapter.notifyDataSetChanged();
+            RecyclerView.LayoutManager lm = recycler.getLayoutManager();
+            if (lm instanceof LinearLayoutManager) {
+                ((LinearLayoutManager) lm).scrollToPositionWithOffset(0, 0);
+            }
             updateEmptyHint.run();
         };
 
@@ -244,13 +259,9 @@ public final class MyShortcutsReorderBottomSheet {
         selectMyTab.run();
 
         recycler.post(() -> {
-            int n = data.size();
-            if (n > 0 && scrollToIndex >= 0) {
-                int pos = Math.min(scrollToIndex, n - 1);
-                LinearLayoutManager lm = (LinearLayoutManager) recycler.getLayoutManager();
-                if (lm != null) {
-                    lm.scrollToPositionWithOffset(pos, 0);
-                }
+            RecyclerView.LayoutManager lm = recycler.getLayoutManager();
+            if (lm instanceof LinearLayoutManager) {
+                ((LinearLayoutManager) lm).scrollToPositionWithOffset(0, 0);
             }
         });
 

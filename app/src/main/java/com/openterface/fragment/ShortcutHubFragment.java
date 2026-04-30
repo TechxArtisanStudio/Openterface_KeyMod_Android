@@ -644,7 +644,8 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                 }
                 KeyParser.ParsedKey parsed = KeyParser.parse(d);
                 if (parsed.keyCode >= 0) {
-                    previewText.setText("Preview: " + KeyParser.toLabel(parsed.keyCode, parsed.modifiers));
+                    previewText.setText("Preview: " + KeyParser.toLabelForTargetOs(
+                            parsed.keyCode, parsed.modifiers, getTargetOs()));
                 } else {
                     previewText.setText("Preview: no valid key detected");
                 }
@@ -669,7 +670,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                         return;
                     }
 
-                    String label = KeyParser.toLabel(parsed.keyCode, parsed.modifiers);
+                    String label = KeyParser.toLabelForTargetOs(parsed.keyCode, parsed.modifiers, getTargetOs());
                     shortcut.name = name;
                     shortcut.label = label;
                     shortcut.modifiers = parsed.modifiers;
@@ -895,7 +896,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                 }
                 KeyParser.ParsedKey parsed = KeyParser.parse(data);
                 if (parsed.keyCode >= 0) {
-                    String label = KeyParser.toLabel(parsed.keyCode, parsed.modifiers);
+                    String label = KeyParser.toLabelForTargetOs(parsed.keyCode, parsed.modifiers, getTargetOs());
                     previewText.setText("Preview: " + label);
                 } else {
                     previewText.setText("Preview: no valid key detected");
@@ -924,7 +925,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                         return;
                     }
 
-                    String label = KeyParser.toLabel(parsed.keyCode, parsed.modifiers);
+                    String label = KeyParser.toLabelForTargetOs(parsed.keyCode, parsed.modifiers, getTargetOs());
                     ShortcutProfileManager.Shortcut shortcut = new ShortcutProfileManager.Shortcut(
                             "user-" + System.currentTimeMillis(), name, label, parsed.modifiers, parsed.keyCode);
                     shortcut.icon = iconInput.getText().toString().trim();

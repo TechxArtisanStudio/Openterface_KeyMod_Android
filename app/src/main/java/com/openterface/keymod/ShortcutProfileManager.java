@@ -6,6 +6,7 @@ import android.util.Log;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.openterface.keymod.util.KeyParser;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -1121,6 +1122,149 @@ public class ShortcutProfileManager {
     }
 
     /**
+     * Normalizes modifier bits for storage/display consistency (e.g. lone Ctrl → Cmd on macOS target).
+     */
+    public static int normalizeModifiersForTargetOs(int modifiers, String targetOs) {
+        final int modCtrl = 0x01;
+        final int modCmd = 0x08;
+        if ("macos".equals(targetOs)) {
+            boolean hasCtrl = (modifiers & modCtrl) != 0;
+            boolean hasCmd = (modifiers & modCmd) != 0;
+            if (hasCtrl && !hasCmd) {
+                return (modifiers & ~modCtrl) | modCmd;
+            }
+        }
+        return modifiers;
+    }
+
+    private static int nextDisplayOrderAcrossProfile(ShortcutProfile profile) {
+        int max = 0;
+        for (Shortcut s : profile.getAllShortcutsFlat()) {
+            if (s != null && s.displayOrder > max) {
+                max = s.displayOrder;
+            }
+        }
+        return max + 1;
+    }
+
+    private static ShortcutCategory findOrCreateGeneralCategory(ShortcutProfile profile) {
+        if (profile.categories == null) {
+            profile.categories = new ArrayList<>();
+        }
+        for (ShortcutCategory c : profile.categories) {
+            if (c != null && "general".equals(c.id)) {
+                if (c.shortcuts == null) {
+                    c.shortcuts = new ArrayList<>();
+                }
+                return c;
+            }
+        }
+        ShortcutCategory general = new ShortcutCategory("general", "General");
+        if (general.shortcuts == null) {
+            general.shortcuts = new ArrayList<>();
+        }
+        profile.categories.add(0, general);
+        return general;
+    }
+
+    /**
+     * True if the profile already has a shortcut with the same HID key and semantically same modifiers
+     * for the target OS (e.g. Ctrl vs Cmd on macOS).
+     */
+    public boolean profileContainsChordNormalized(
+            ShortcutProfile profile,
+            int keyCode,
+            int modifiers,
+            String targetOs
+    ) {
+        if (profile == null) {
+            return false;
+        }
+        int want = normalizeModifiersForTargetOs(modifiers, targetOs);
+        for (Shortcut s : profile.getAllShortcutsFlat()) {
+            if (s == null) {
+                continue;
+            }
+            int have = normalizeModifiersForTargetOs(s.modifiers, targetOs);
+            if (s.keyCode == keyCode && have == want) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** True if the profile contains the same chord (normalized per target OS). */
+    public boolean profileHasChord(String profileId, int keyCode, int modifiers, String targetOs) {
+        ShortcutProfile p = getProfileById(profileId);
+        if (p == null) {
+            return false;
+        }
+        return profileContainsChordNormalized(p, keyCode, modifiers, targetOs);
+    }
+
+    /**
+     * Adds a new shortcut to General (or flat list), appends it to My Shortcuts for the profile, and saves.
+     *
+     * @return the new shortcut, or null if the profile is missing or the chord already exists
+     */
+    public Shortcut addQuickShortcutToGeneralAndFavorites(
+            String profileId,
+            int keyCode,
+            int modifiers,
+            String targetOs
+    ) {
+        ShortcutProfile profile = getProfileById(profileId);
+        if (profile == null || keyCode < 0) {
+            return null;
+        }
+        if (profileContainsChordNormalized(profile, keyCode, modifiers, targetOs)) {
+            return null;
+        }
+        // Store raw HID modifier bits from the parser; apply target-OS mapping only when sending
+        // (see CustomKeyboardView.normalizeShortcutModifiersForTargetOs) so shortcuts stay correct
+        // when the user changes target OS.
+        String label = KeyParser.toLabelForTargetOs(keyCode, modifiers, targetOs);
+        Shortcut shortcut = new Shortcut(
+                "user-" + System.currentTimeMillis(),
+                "",
+                label,
+                modifiers,
+                keyCode);
+        shortcut.icon = "";
+        shortcut.displayOrder = nextDisplayOrderAcrossProfile(profile);
+
+        if (profile.categories != null && !profile.categories.isEmpty()) {
+            ShortcutCategory gen = findOrCreateGeneralCategory(profile);
+            if (gen.shortcuts == null) {
+                gen.shortcuts = new ArrayList<>();
+            }
+            gen.shortcuts.add(shortcut);
+        } else {
+            if (profile.shortcuts == null) {
+                profile.shortcuts = new ArrayList<>();
+            }
+            profile.shortcuts.add(shortcut);
+        }
+
+        List<Shortcut> my = new ArrayList<>(getMyShortcuts(profileId));
+        boolean already = false;
+        for (Shortcut s : my) {
+            if (s != null && shortcut.id.equals(s.id)) {
+                already = true;
+                break;
+            }
+        }
+        if (!already) {
+            my.add(shortcut);
+            renumberDisplayOrder(my);
+            updateMyShortcuts(profileId, my);
+        }
+
+        updateProfile(profile);
+        return shortcut;
+    }
+
+    /**
      * Profile change listener interface
      */
     public interface ProfileChangeListener {
@@ -1194,9 +1338,16 @@ public class ShortcutProfileManager {
 
         /** Returns all shortcuts flattened across categories (and flat list). */
         public List<Shortcut> getAllShortcutsFlat() {
-            List<Shortcut> all = new ArrayList<>(shortcuts);
-            for (ShortcutCategory cat : categories) {
-                all.addAll(cat.shortcuts);
+            List<Shortcut> all = new ArrayList<>();
+            if (shortcuts != null) {
+                all.addAll(shortcuts);
+            }
+            if (categories != null) {
+                for (ShortcutCategory cat : categories) {
+                    if (cat != null && cat.shortcuts != null) {
+                        all.addAll(cat.shortcuts);
+                    }
+                }
             }
             return all;
         }

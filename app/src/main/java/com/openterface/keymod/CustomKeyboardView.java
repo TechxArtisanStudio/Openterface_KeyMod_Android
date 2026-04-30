@@ -178,6 +178,8 @@ public class CustomKeyboardView extends LinearLayout {
     /** Fixed page-2 row-3: Shortcut Hub profile slots 1–7 (tap = activate, long-press = assign). */
     private static final int KEY_TOP_PROFILE_SLOT_1 = 0xF00D;
     private static final int KEY_TOP_PROFILE_SLOT_7 = 0xF013;
+    /** Row-1 strip: opens quick-create shortcut sheet (after last favorite on last page). */
+    private static final int KEY_TOP_STRIP_CREATE_SHORTCUT = 0xF014;
     private static final int KEY_NOOP_PLACEHOLDER = -1;
     private static final String APP_PREFS_NAME = "AppPrefs";
     private static final String KEY_SYSTEM_IME_CAPTURE = "system_ime_capture_mode";
@@ -1073,6 +1075,31 @@ public class CustomKeyboardView extends LinearLayout {
                         splitPartner.refreshTopShortcutFavoriteStrip();
                     }
                 });
+    }
+
+    private void showCreateShortcutFromStrip() {
+        AppCompatActivity act = unwrapAppCompatActivity(getContext());
+        if (act == null) {
+            return;
+        }
+        reloadShortcutProfileManagerFromPrefs();
+        if (splitPartner != null) {
+            splitPartner.reloadShortcutProfileManagerFromPrefs();
+        }
+        ShortcutProfileManager.ShortcutProfile ap = shortcutProfileManager.getActiveProfile();
+        if (ap == null) {
+            Toast.makeText(getContext(), R.string.create_shortcut_no_profile, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String targetOs = getTargetOs();
+        CreateShortcutBottomSheet.show(act, shortcutProfileManager, ap.id, targetOs, () -> {
+            reloadShortcutProfileManagerFromPrefs();
+            refreshTopShortcutFavoriteStrip();
+            if (splitPartner != null) {
+                splitPartner.reloadShortcutProfileManagerFromPrefs();
+                splitPartner.refreshTopShortcutFavoriteStrip();
+            }
+        });
     }
 
     /** Sync modifier lock states to the paired keyboard. */
@@ -1989,7 +2016,7 @@ public class CustomKeyboardView extends LinearLayout {
         if (key.code >= 0xE0 && key.code <= 0xE7) {
             return false;
         }
-        if (key.code >= 0xF001 && key.code <= KEY_TOP_PROFILE_SLOT_7) {
+        if (key.code >= 0xF001 && key.code <= KEY_TOP_STRIP_CREATE_SHORTCUT) {
             return false;
         }
         if ("Space".equalsIgnoreCase(key.label) || "Enter".equalsIgnoreCase(key.label)) {
@@ -2864,12 +2891,12 @@ public class CustomKeyboardView extends LinearLayout {
             ordered = new ArrayList<>();
         }
 
-        int totalPages = Math.max(1, (int) Math.ceil((double) ordered.size() / TOP_ROW_PAGE_SIZE));
+        int favoriteCount = ordered.size();
+        int totalSlots = favoriteCount + 1;
+        int totalPages = Math.max(1, (int) Math.ceil((double) totalSlots / TOP_ROW_PAGE_SIZE));
         for (int pageIndex = 0; pageIndex < totalPages; pageIndex++) {
-            int start = pageIndex * TOP_ROW_PAGE_SIZE;
-            int end = Math.min(start + TOP_ROW_PAGE_SIZE, ordered.size());
-            List<ShortcutProfileManager.Shortcut> slice = ordered.subList(start, end);
-            List<Key> pageKeys = buildTopPanelPageKeys(slice, start);
+            int pageStart = pageIndex * TOP_ROW_PAGE_SIZE;
+            List<Key> pageKeys = buildTopPanelPageKeys(ordered, pageStart);
             String title = activeProfile != null ? activeProfile.name : "Default";
             if (totalPages > 1) {
                 title = title + " " + (pageIndex + 1) + "/" + totalPages;
@@ -2899,31 +2926,45 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private List<Key> buildTopPanelPageKeys(
-            List<ShortcutProfileManager.Shortcut> row1Shortcuts,
-            int row1GlobalStartIndex
+            List<ShortcutProfileManager.Shortcut> orderedFavorites,
+            int pageStartGlobalIndex
     ) {
         List<Key> keys = new ArrayList<>(TOP_PANEL_PAGE_SIZE);
-        keys.addAll(buildProfileTopRow(row1Shortcuts, row1GlobalStartIndex));
+        keys.addAll(buildProfileTopRow(orderedFavorites, pageStartGlobalIndex));
         keys.addAll(buildFixedTopPanelRows());
         return keys;
     }
 
+    /**
+     * Row 1: up to {@link #TOP_ROW_PAGE_SIZE} cells from ordered favorites plus one trailing
+     * {@link #KEY_TOP_STRIP_CREATE_SHORTCUT} slot after the last favorite (typically on the last page).
+     */
     private List<Key> buildProfileTopRow(
-            List<ShortcutProfileManager.Shortcut> shortcuts,
-            int row1GlobalStartIndex
+            List<ShortcutProfileManager.Shortcut> orderedFavorites,
+            int pageStartGlobalIndex
     ) {
+        int n = orderedFavorites != null ? orderedFavorites.size() : 0;
+        int createIndex = n;
         List<Key> row = new ArrayList<>(TOP_ROW_PAGE_SIZE);
         for (int i = 0; i < TOP_ROW_PAGE_SIZE; i++) {
-            if (shortcuts != null && i < shortcuts.size()) {
-                ShortcutProfileManager.Shortcut shortcut = shortcuts.get(i);
-                row.add(buildTopPanelShortcutKey(shortcut, row1GlobalStartIndex + i));
+            int globalIndex = pageStartGlobalIndex + i;
+            if (globalIndex < n) {
+                row.add(buildTopPanelShortcutKey(orderedFavorites.get(globalIndex), globalIndex));
+            } else if (globalIndex == createIndex) {
+                row.add(buildTopStripCreateShortcutKey());
             } else {
                 Key k = new Key("", "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true);
-                k.topStripFavoriteSlotIndex = row1GlobalStartIndex + i;
+                k.topStripFavoriteSlotIndex = -1;
                 row.add(k);
             }
         }
         return row;
+    }
+
+    private Key buildTopStripCreateShortcutKey() {
+        Key key = new Key("", "", KEY_TOP_STRIP_CREATE_SHORTCUT, "", 1f, R.drawable.add_24, 0f, false, false, -1, true);
+        key.topStripFavoriteSlotIndex = -1;
+        return key;
     }
 
     private Key buildTopPanelShortcutKey(
@@ -3145,11 +3186,10 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private String compactShortcutName(ShortcutProfileManager.Shortcut shortcut) {
-        String label = shortcut.name != null ? shortcut.name : shortcut.label;
-        if (label == null || label.trim().isEmpty()) {
-            label = "Key";
+        if (shortcut.name == null || shortcut.name.trim().isEmpty()) {
+            return "";
         }
-        label = label.trim();
+        String label = shortcut.name.trim();
         return label.length() > 8 ? label.substring(0, 8) : label;
     }
 
@@ -3369,6 +3409,11 @@ public class CustomKeyboardView extends LinearLayout {
                         if (ctx != null) {
                             ib.setContentDescription(ctx.getString(R.string.top_shortcut_toggle_display_mode));
                         }
+                    } else if (k.code == KEY_TOP_STRIP_CREATE_SHORTCUT) {
+                        Context ctx = getContext();
+                        if (ctx != null) {
+                            ib.setContentDescription(ctx.getString(R.string.top_strip_create_shortcut_cd));
+                        }
                     }
                     ib.setTag(k);
                     ib.setOnTouchListener(fixedRowsSlice
@@ -3425,9 +3470,15 @@ public class CustomKeyboardView extends LinearLayout {
                     } else if (fixedTopLocalFn != null) {
                         topButtonText = effectiveTopLabel;
                     } else if (k.symbolLabel != null && !k.symbolLabel.isEmpty()) {
-                        topButtonText = k.symbolLabel + "\n" + k.label;
+                        if (k.label != null && !k.label.trim().isEmpty()) {
+                            topButtonText = k.symbolLabel + "\n" + k.label;
+                        } else {
+                            topButtonText = k.symbolLabel;
+                        }
                     } else {
-                        topButtonText = k.label != null ? k.label : "";
+                        topButtonText = k.label != null && !k.label.trim().isEmpty()
+                                ? k.label
+                                : (k.symbolLabel != null ? k.symbolLabel : "");
                     }
                     b.setText(topButtonText);
                     if (renderAsActionLabel) {
@@ -5073,6 +5124,11 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         if (key.code == KEY_NOOP_PLACEHOLDER) {
+            return;
+        }
+
+        if (key.code == KEY_TOP_STRIP_CREATE_SHORTCUT) {
+            showCreateShortcutFromStrip();
             return;
         }
 

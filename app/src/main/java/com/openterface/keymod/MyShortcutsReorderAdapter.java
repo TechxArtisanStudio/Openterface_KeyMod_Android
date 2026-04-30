@@ -8,6 +8,7 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -32,6 +33,11 @@ public class MyShortcutsReorderAdapter extends RecyclerView.Adapter<MyShortcutsR
     private final List<ShortcutProfileManager.Shortcut> items;
     private ItemTouchHelper dragHelper;
     private RowInteraction rowInteraction;
+    private OnRemoveFavoriteClickListener removeFavoriteClickListener;
+
+    public interface OnRemoveFavoriteClickListener {
+        void onRemoveFavoriteClick(@NonNull ShortcutProfileManager.Shortcut shortcut, int position);
+    }
 
     public MyShortcutsReorderAdapter(Context context, String targetOs,
             List<ShortcutProfileManager.Shortcut> items) {
@@ -46,6 +52,10 @@ public class MyShortcutsReorderAdapter extends RecyclerView.Adapter<MyShortcutsR
 
     public void setRowInteraction(RowInteraction rowInteraction) {
         this.rowInteraction = rowInteraction;
+    }
+
+    public void setRemoveFavoriteClickListener(@Nullable OnRemoveFavoriteClickListener listener) {
+        this.removeFavoriteClickListener = listener;
     }
 
     public List<ShortcutProfileManager.Shortcut> getItems() {
@@ -104,6 +114,14 @@ public class MyShortcutsReorderAdapter extends RecyclerView.Adapter<MyShortcutsR
             }
             return false;
         });
+        if (removeFavoriteClickListener != null) {
+            holder.removeFavorite.setVisibility(View.VISIBLE);
+            holder.removeFavorite.setOnClickListener(v ->
+                    removeFavoriteClickListener.onRemoveFavoriteClick(shortcut, holder.getBindingAdapterPosition()));
+        } else {
+            holder.removeFavorite.setVisibility(View.GONE);
+            holder.removeFavorite.setOnClickListener(null);
+        }
     }
 
     @Override
@@ -114,11 +132,13 @@ public class MyShortcutsReorderAdapter extends RecyclerView.Adapter<MyShortcutsR
     static final class VH extends RecyclerView.ViewHolder {
         final ImageView dragHandle;
         final View content;
+        final View removeFavorite;
 
         VH(@NonNull View itemView) {
             super(itemView);
             dragHandle = itemView.findViewById(R.id.reorder_drag_handle);
             content = itemView.findViewById(R.id.reorder_row_content);
+            removeFavorite = itemView.findViewById(R.id.reorder_remove_favorite);
         }
     }
 }
