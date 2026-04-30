@@ -1008,8 +1008,46 @@ public class ShortcutProfileManager {
      * Persists the user's "My Shortcuts" list for the given profile.
      */
     public void updateMyShortcuts(String profileId, List<Shortcut> shortcuts) {
+        writeMyShortcutsToPrefs(profileId, shortcuts, false);
+    }
+
+    private void writeMyShortcutsToPrefs(String profileId, List<Shortcut> shortcuts, boolean synchronous) {
+        if (profileId == null || shortcuts == null) {
+            return;
+        }
         String json = gson.toJson(shortcuts);
-        prefs.edit().putString(MY_SHORTCUTS_KEY_PREFIX + profileId, json).apply();
+        android.content.SharedPreferences.Editor ed =
+                prefs.edit().putString(MY_SHORTCUTS_KEY_PREFIX + profileId, json);
+        if (synchronous) {
+            ed.commit();
+        } else {
+            ed.apply();
+        }
+    }
+
+    /**
+     * Persists My Shortcuts in the given order (e.g. after drag-reorder). Updates {@link Shortcut#displayOrder}.
+     *
+     * @param notifyListener when false, skips {@link ProfileChangeListener#onProfileUpdated} (e.g. per-row
+     *                       drag in Shortcut Hub to avoid refreshing the list mid-gesture).
+     */
+    public void reorderMyShortcuts(String profileId, List<Shortcut> ordered, boolean notifyListener) {
+        if (profileId == null || ordered == null) {
+            return;
+        }
+        List<Shortcut> copy = new ArrayList<>(ordered);
+        renumberDisplayOrder(copy);
+        writeMyShortcutsToPrefs(profileId, copy, true);
+        if (notifyListener) {
+            ShortcutProfile p = getProfileById(profileId);
+            if (listener != null && p != null) {
+                listener.onProfileUpdated(p);
+            }
+        }
+    }
+
+    public void reorderMyShortcuts(String profileId, List<Shortcut> ordered) {
+        reorderMyShortcuts(profileId, ordered, true);
     }
 
     public List<Shortcut> getOrderedShortcutsForTopStrip(String profileId) {

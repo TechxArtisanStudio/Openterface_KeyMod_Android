@@ -265,6 +265,10 @@ by TechxArtisan</string>
     <!-- Top strip long-press: subtitle for favourite picker (title above). -->
     <string name="top_strip_favorite_picker_subtitle">Place a shortcut from your favourites list in this slot.</string>
     <string name="top_strip_favorite_picker_empty">Add shortcuts to ⭐ My in Shortcut Hub first.</string>
+    <string name="my_shortcuts_reorder_sheet_title">Reorder ⭐ My shortcuts</string>
+    <string name="my_shortcuts_reorder_done">Done</string>
+    <string name="my_shortcuts_reorder_sheet_subtitle_with_profile">Profile: %1$s · %2$d shortcuts\nDrag using the handle to change order. The first seven appear on the top strip (swipe for more pages).</string>
+    <string name="my_shortcuts_reorder_drag_handle_cd">Drag to reorder</string>
     <string name="top_mode_label_keyboard_mouse">Keyboard &amp; Mouse</string>
     <string name="top_mode_label_gamepad">Gamepad</string>
     <string name="top_mode_label_shortcuts">Shortcuts</string>

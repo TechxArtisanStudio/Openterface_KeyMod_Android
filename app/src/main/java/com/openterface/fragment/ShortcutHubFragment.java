@@ -25,9 +25,13 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.ItemTouchHelper;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.openterface.keymod.ConnectionManager;
 import com.openterface.keymod.MainActivity;
+import com.openterface.keymod.MyShortcutsReorderAdapter;
 import com.openterface.keymod.R;
 import com.openterface.keymod.ShortcutProfileManager;
 import com.openterface.keymod.ShortcutProfileManager.ShortcutProfile;
@@ -69,6 +73,9 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
     private Button tabMy;
     private LinearLayout tabsContainer;
     private GridView shortcutsGridView;
+    private RecyclerView myShortcutsRecyclerView;
+    private MyShortcutsReorderAdapter myShortcutsReorderAdapter;
+    private ItemTouchHelper myShortcutsReorderTouchHelper;
     private TextView emptyMyShortcuts;
 
     private static final String TAB_MY  = "my";
@@ -106,6 +113,9 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
     private final MainActivity.OnTargetOsChangeListener osChangeListener = os -> {
         if (shortcutsAdapter != null) {
             shortcutsAdapter.notifyDataSetChanged();
+        }
+        if (myShortcutsReorderAdapter != null) {
+            myShortcutsReorderAdapter.notifyDataSetChanged();
         }
     };
 
@@ -148,6 +158,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         tabMy = view.findViewById(R.id.tab_my);
         tabsContainer = view.findViewById(R.id.tabs_container);
         shortcutsGridView = view.findViewById(R.id.shortcuts_gridview);
+        myShortcutsRecyclerView = view.findViewById(R.id.my_shortcuts_recycler);
         emptyMyShortcuts = view.findViewById(R.id.empty_my_shortcuts);
 
         profilesList = new ArrayList<>();
@@ -351,35 +362,130 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         boolean hasCategories = selectedProfile.categories != null && !selectedProfile.categories.isEmpty();
 
         List<ShortcutProfileManager.Shortcut> toShow = new ArrayList<>();
-        
+
         // Priority 1: Show category shortcuts if a category is selected
         if (currentCategoryId != null && hasCategories) {
+            detachMyShortcutsReorderTouchHelper();
+            myShortcutsRecyclerView.setVisibility(View.GONE);
             for (ShortcutProfileManager.ShortcutCategory cat : selectedProfile.categories) {
                 if (cat.id.equals(currentCategoryId)) {
                     toShow = new ArrayList<>(cat.shortcuts);
                     break;
                 }
             }
-        } 
-        // Priority 2: Show My Shortcuts favorites (top strip uses this list only)
+        }
+        // Priority 2: Show My Shortcuts favorites (drag-reorder list; top strip uses same order)
         else if (TAB_MY.equals(currentTab)) {
+            myShortcutsList.clear();
+            myShortcutsList.addAll(profileManager.getMyShortcuts(selectedProfile.id));
+            sortShortcutsForDisplay(myShortcutsList);
             toShow = myShortcutsList;
             if (toShow.isEmpty()) {
+                detachMyShortcutsReorderTouchHelper();
+                myShortcutsRecyclerView.setVisibility(View.GONE);
                 shortcutsGridView.setVisibility(View.GONE);
                 emptyMyShortcuts.setVisibility(View.VISIBLE);
                 return;
             }
-        } 
+            shortcutsGridView.setVisibility(View.GONE);
+            emptyMyShortcuts.setVisibility(View.GONE);
+            myShortcutsRecyclerView.setVisibility(View.VISIBLE);
+            bindMyShortcutsReorderRecycler();
+            return;
+        }
         // Priority 3: Show all flat shortcuts (for profiles without categories)
         else if (!hasCategories) {
+            detachMyShortcutsReorderTouchHelper();
+            myShortcutsRecyclerView.setVisibility(View.GONE);
             toShow = selectedProfile.shortcuts != null ? selectedProfile.shortcuts : new ArrayList<>();
+        } else {
+            detachMyShortcutsReorderTouchHelper();
+            myShortcutsRecyclerView.setVisibility(View.GONE);
         }
-        
+
         shortcutsGridView.setVisibility(View.VISIBLE);
         emptyMyShortcuts.setVisibility(View.GONE);
         sortShortcutsForDisplay(toShow);
         shortcutsAdapter.setShortcuts(toShow);
         shortcutsAdapter.notifyDataSetChanged();
+    }
+
+    private void detachMyShortcutsReorderTouchHelper() {
+        if (myShortcutsReorderTouchHelper != null) {
+            myShortcutsReorderTouchHelper.attachToRecyclerView(null);
+            myShortcutsReorderTouchHelper = null;
+        }
+    }
+
+    private void bindMyShortcutsReorderRecycler() {
+        if (selectedProfile == null || myShortcutsRecyclerView == null) {
+            return;
+        }
+        String targetOs = requireContext().getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+                .getString("target_os", "macos");
+        List<ShortcutProfileManager.Shortcut> ordered = new ArrayList<>(
+                profileManager.getOrderedShortcutsForTopStrip(selectedProfile.id));
+
+        if (myShortcutsReorderAdapter == null) {
+            myShortcutsReorderAdapter = new MyShortcutsReorderAdapter(requireContext(), targetOs, ordered);
+            myShortcutsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+            myShortcutsRecyclerView.setAdapter(myShortcutsReorderAdapter);
+            myShortcutsReorderAdapter.setRowInteraction(new MyShortcutsReorderAdapter.RowInteraction() {
+                @Override
+                public void onRowClick(ShortcutProfileManager.Shortcut shortcut) {
+                    executeShortcut(shortcut);
+                }
+
+                @Override
+                public void onRowLongClick(ShortcutProfileManager.Shortcut shortcut) {
+                    showShortcutActionsMenu(shortcut);
+                }
+            });
+        } else {
+            myShortcutsReorderAdapter.replaceItems(ordered);
+        }
+
+        detachMyShortcutsReorderTouchHelper();
+
+        ItemTouchHelper.Callback callback = new ItemTouchHelper.SimpleCallback(
+                ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView,
+                    @NonNull RecyclerView.ViewHolder viewHolder,
+                    @NonNull RecyclerView.ViewHolder target) {
+                MyShortcutsReorderAdapter adapter = (MyShortcutsReorderAdapter) recyclerView.getAdapter();
+                if (adapter == null || selectedProfile == null) {
+                    return false;
+                }
+                int from = viewHolder.getBindingAdapterPosition();
+                int to = target.getBindingAdapterPosition();
+                if (from == RecyclerView.NO_POSITION || to == RecyclerView.NO_POSITION) {
+                    return false;
+                }
+                adapter.moveItem(from, to);
+                profileManager.reorderMyShortcuts(
+                        selectedProfile.id, new ArrayList<>(adapter.getItems()), false);
+                myShortcutsList.clear();
+                myShortcutsList.addAll(profileManager.getMyShortcuts(selectedProfile.id));
+                if (vibrator != null && vibrator.hasVibrator()) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(18, VibrationEffect.DEFAULT_AMPLITUDE));
+                }
+                return true;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+            }
+
+            @Override
+            public boolean isLongPressDragEnabled() {
+                return false;
+            }
+        };
+        myShortcutsReorderTouchHelper = new ItemTouchHelper(callback);
+        myShortcutsReorderTouchHelper.attachToRecyclerView(myShortcutsRecyclerView);
+        myShortcutsReorderAdapter.setDragHelper(myShortcutsReorderTouchHelper);
+        myShortcutsReorderAdapter.notifyDataSetChanged();
     }
 
     private void sortShortcutsForDisplay(List<ShortcutProfileManager.Shortcut> shortcuts) {
