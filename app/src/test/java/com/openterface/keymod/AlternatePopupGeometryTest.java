@@ -90,4 +90,23 @@ public class AlternatePopupGeometryTest {
         int r = AlternatePopupGeometry.pickSlot(80f, -80f, 10f, 200f, 20f, o);
         assertEquals(AlternatePopupGeometry.RESULT_CANCEL, r);
     }
+
+    @Test
+    public void diagonalMarkedOccupied_doesNotCancel() {
+        boolean[] o = new boolean[AlternatePopupGeometry.SLOT_COUNT];
+        // Runtime gesture fallback can mark empty diagonals occupied when vertical cardinal exists.
+        o[AlternatePopupGeometry.SLOT_UP] = true;
+        o[AlternatePopupGeometry.SLOT_UP_RIGHT] = true;
+        int r = AlternatePopupGeometry.pickSlot(80f, -80f, 10f, 200f, 20f, o);
+        assertEquals(AlternatePopupGeometry.SLOT_UP_RIGHT, r);
+    }
+
+    @Test
+    public void diagonalNotOccupied_stillCancels() {
+        boolean[] o = new boolean[AlternatePopupGeometry.SLOT_COUNT];
+        o[AlternatePopupGeometry.SLOT_UP] = true;
+        o[AlternatePopupGeometry.SLOT_UP_RIGHT] = false;
+        int r = AlternatePopupGeometry.pickSlot(80f, -80f, 10f, 200f, 20f, o);
+        assertEquals(AlternatePopupGeometry.RESULT_CANCEL, r);
+    }
 }

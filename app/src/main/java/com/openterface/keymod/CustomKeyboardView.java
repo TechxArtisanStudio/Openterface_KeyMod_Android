@@ -293,10 +293,12 @@ public class CustomKeyboardView extends LinearLayout {
     /** Inside this radius from touch-down, release commits the default alternate (center). */
     private static final int ALT_GESTURE_R_MIN_DP = 12;
     /** Beyond this radius from touch-down, release cancels (no character). */
-    private static final int ALT_GESTURE_R_CANCEL_DP = 220;
+    private static final int ALT_GESTURE_R_CANCEL_DP = 228;
     /** Half-width of neutral band on X/Y for 3×3 classification (cardinal vs diagonal vs default cross). */
-    private static final int ALT_GESTURE_AXIS_DEADZONE_DP = 14;
+    private static final int ALT_GESTURE_AXIS_DEADZONE_DP = 18;
     private static final int ALT_POPUP_VERTICAL_OFFSET_DP = 96;
+    /** Additional upward shift when bottom-row alternates are present (finger otherwise covers row-3). */
+    private static final int ALT_POPUP_BOTTOM_ROW_EXTRA_OFFSET_DP = 18;
     private static final int ALT_POPUP_CONTAINER_PADDING_DP_PORTRAIT = 6;
     private static final int ALT_POPUP_CONTAINER_PADDING_DP_LANDSCAPE = 8;
     private static final int ALT_POPUP_OPTION_MARGIN_DP_PORTRAIT = 2;
@@ -474,22 +476,54 @@ public class CustomKeyboardView extends LinearLayout {
             return c;
         }
 
-        boolean[] slotOccupiedFlags() {
+        boolean[] slotOccupiedForGestureFlags() {
             boolean[] b = new boolean[AlternatePopupGeometry.SLOT_COUNT];
             for (int i = 0; i < AlternatePopupGeometry.SLOT_COUNT; i++) {
                 b[i] = slotOptions[i] != null;
             }
+            // Empty diagonals inherit vertical cardinal for gesture tolerance only.
+            if (!b[AlternatePopupGeometry.SLOT_UP_LEFT] && b[AlternatePopupGeometry.SLOT_UP]) {
+                b[AlternatePopupGeometry.SLOT_UP_LEFT] = true;
+            }
+            if (!b[AlternatePopupGeometry.SLOT_UP_RIGHT] && b[AlternatePopupGeometry.SLOT_UP]) {
+                b[AlternatePopupGeometry.SLOT_UP_RIGHT] = true;
+            }
+            if (!b[AlternatePopupGeometry.SLOT_DOWN_LEFT] && b[AlternatePopupGeometry.SLOT_DOWN]) {
+                b[AlternatePopupGeometry.SLOT_DOWN_LEFT] = true;
+            }
+            if (!b[AlternatePopupGeometry.SLOT_DOWN_RIGHT] && b[AlternatePopupGeometry.SLOT_DOWN]) {
+                b[AlternatePopupGeometry.SLOT_DOWN_RIGHT] = true;
+            }
             return b;
+        }
+
+        int resolveGesturePick(int pick) {
+            if (pick < 0 || pick >= AlternatePopupGeometry.SLOT_COUNT) {
+                return pick;
+            }
+            if (slotOptions[pick] != null) {
+                return pick;
+            }
+            if ((pick == AlternatePopupGeometry.SLOT_UP_LEFT || pick == AlternatePopupGeometry.SLOT_UP_RIGHT)
+                    && slotOptions[AlternatePopupGeometry.SLOT_UP] != null) {
+                return AlternatePopupGeometry.SLOT_UP;
+            }
+            if ((pick == AlternatePopupGeometry.SLOT_DOWN_LEFT || pick == AlternatePopupGeometry.SLOT_DOWN_RIGHT)
+                    && slotOptions[AlternatePopupGeometry.SLOT_DOWN] != null) {
+                return AlternatePopupGeometry.SLOT_DOWN;
+            }
+            return pick;
         }
 
         AlternateOption resolveCommittedOption(int pick) {
             if (pick == AlternatePopupGeometry.RESULT_DEFAULT) {
                 return defaultOption;
             }
-            if (pick < 0 || pick >= AlternatePopupGeometry.SLOT_COUNT) {
+            int resolvedPick = resolveGesturePick(pick);
+            if (resolvedPick < 0 || resolvedPick >= AlternatePopupGeometry.SLOT_COUNT) {
                 return null;
             }
-            return slotOptions[pick];
+            return slotOptions[resolvedPick];
         }
 
         int defaultHighlightSlot() {
@@ -2384,6 +2418,10 @@ public class CustomKeyboardView extends LinearLayout {
             minCol = 1;
             maxCol = 1;
         }
+        boolean hasBottomRowAlternates =
+                model.slotOptions[AlternatePopupGeometry.SLOT_DOWN_LEFT] != null
+                        || model.slotOptions[AlternatePopupGeometry.SLOT_DOWN] != null
+                        || model.slotOptions[AlternatePopupGeometry.SLOT_DOWN_RIGHT] != null;
         grid.setRowCount(maxRow - minRow + 1);
         grid.setColumnCount(maxCol - minCol + 1);
         int marginPx = dpToPx(optionMarginDp);
@@ -2435,7 +2473,9 @@ public class CustomKeyboardView extends LinearLayout {
             int[] loc = new int[2];
             anchor.getLocationOnScreen(loc);
             int popupX = (int) (loc[0] + (anchor.getWidth() / 2f) - (grid.getMeasuredWidth() / 2f));
-            int popupY = loc[1] - dpToPx(ALT_POPUP_VERTICAL_OFFSET_DP);
+            int verticalOffsetDp = ALT_POPUP_VERTICAL_OFFSET_DP
+                    + (hasBottomRowAlternates ? ALT_POPUP_BOTTOM_ROW_EXTRA_OFFSET_DP : 0);
+            int popupY = loc[1] - dpToPx(verticalOffsetDp);
             alternatePopupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY, popupX, popupY);
         });
     }
@@ -2446,12 +2486,13 @@ public class CustomKeyboardView extends LinearLayout {
         }
         float dx = rawX - alternatesGestureStartRawX;
         float dy = rawY - alternatesGestureStartRawY;
-        boolean[] occ = currentAlternatePopupModel.slotOccupiedFlags();
+        boolean[] occ = currentAlternatePopupModel.slotOccupiedForGestureFlags();
         int pick = AlternatePopupGeometry.pickSlot(dx, dy,
                 dpToPx(ALT_GESTURE_R_MIN_DP),
                 dpToPx(ALT_GESTURE_R_CANCEL_DP),
                 dpToPx(ALT_GESTURE_AXIS_DEADZONE_DP),
                 occ);
+        pick = currentAlternatePopupModel.resolveGesturePick(pick);
         if (pick != currentAlternatePick) {
             onAlternatePickChanged(alternateAnchorView, pick);
             currentAlternatePick = pick;
