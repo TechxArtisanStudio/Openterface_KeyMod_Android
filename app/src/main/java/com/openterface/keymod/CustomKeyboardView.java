@@ -392,8 +392,8 @@ public class CustomKeyboardView extends LinearLayout {
         /** If >= 0, scrolling row-1 cell maps to this index in ordered My Shortcuts (long-press to reassign). */
         int topStripFavoriteSlotIndex = -1;
         /**
-         * {@code true}: under local Fn the strip DISPLAY cell shows "=" / sends '=' (Page 0 F-row).
-         * {@code false}: keep icon/text toggle visuals instead of "=" (Shortcut Hub historically; Page 2 has no DISPLAY now).
+         * {@code true}: Page 0 DISPLAY shows "=" / sends '=' when the digit overlay is active (local Fn latch off).
+         * {@code false}: alternative DISPLAY behavior (historical; Page 2 has no DISPLAY now).
          */
         boolean displayToggleLocalFnShowsEquals = true;
 
@@ -3134,7 +3134,7 @@ public class CustomKeyboardView extends LinearLayout {
 
     private List<Key> buildFixedTopRowsPage0() {
         List<Key> keys = new ArrayList<>(TOP_PANEL_COLUMNS * 2);
-        // Row 2: F6..F12 (local Fn on → 6 7 8 9 0 + -)
+        // Row 2: F6..F12 (local Fn latch off → overlay 6 7 8 9 0 + -)
         keys.add(markFixedRowKey(new Key("F6", "", 0x3F, "3F", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F7", "", 0x40, "40", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F8", "", 0x41, "41", 1f, 0, 0f, false, false, -1, true)));
@@ -3142,7 +3142,7 @@ public class CustomKeyboardView extends LinearLayout {
         keys.add(markFixedRowKey(new Key("F10", "", 0x43, "43", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F11", "", 0x44, "44", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F12", "", 0x45, "45", 1f, 0, 0f, false, false, -1, true)));
-        // Row 3: F1..F5, DISPLAY, local Fn (local Fn on → 1 2 3 4 5 =; Fn key unchanged)
+        // Row 3: F1..F5, DISPLAY, local Fn (local Fn latch off → 1 2 3 4 5 =; Fn unchanged)
         keys.add(markFixedRowKey(new Key("F1", "", 0x3A, "3A", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F2", "", 0x3B, "3B", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F3", "", 0x3C, "3C", 1f, 0, 0f, false, false, -1, true)));
@@ -3253,7 +3253,7 @@ public class CustomKeyboardView extends LinearLayout {
         if (mapping == null) {
             return key != null ? key.iconResId : 0;
         }
-        // F-row DISPLAY under local Fn: "=" text only vs icon glyphs (Page 0 only).
+        // Page 0 DISPLAY "=" overlay: text only (digit row); icon mode when Fn latch shows DISPLAY keycap.
         if (key != null && key.code == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE) {
             if (key.displayToggleLocalFnShowsEquals) {
                 return 0;
@@ -5062,15 +5062,31 @@ public class CustomKeyboardView extends LinearLayout {
         return key != null && key.isTopPanelKey && !key.allowTopPanelPagingGesture;
     }
 
+    /** Page 0 F-strip / DISPLAY only (distinct from modifier page or Shortcut Hub punctuation). */
+    private boolean isFixedTopRowsPage0StripKey(Key key) {
+        if (key == null) {
+            return false;
+        }
+        int c = key.code;
+        return (c >= 0x3A && c <= 0x45) || c == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE;
+    }
+
     private FnMapping resolveFixedTopLocalFnMapping(Key key) {
-        if (!fixedTopLocalFnLocked || key == null || !isFixedTopRowKey(key)
+        if (key == null || !isFixedTopRowKey(key)
                 || isFixedTopLocalFnKey(key)
                 || isTopModeSlotKey(key)) {
             return null;
         }
 
+        boolean page0 = isFixedTopRowsPage0StripKey(key);
+        boolean applyMapping = page0 ? !fixedTopLocalFnLocked : fixedTopLocalFnLocked;
+
+        if (!applyMapping) {
+            return null;
+        }
+
         switch (key.code) {
-            // Fixed-top page 0: row2 F6–F12 → Fn 6 7 8 9 0 + -; row3 F1–F5 + DISPLAY → Fn 1 2 3 4 5 =.
+            // Fixed-top page 0: digit/symbol overlay when local Fn latch is off; F legends when latch is on.
             case 0x41: return new FnMapping("8", 0x25, 0);
             case 0x42: return new FnMapping("9", 0x26, 0);
             case 0x43: return new FnMapping("0", 0x27, 0);
@@ -5321,7 +5337,7 @@ public class CustomKeyboardView extends LinearLayout {
                 setTopShortcutShowActionLabels(!topShortcutShowActionLabels);
                 return;
             }
-            // Local Fn on: F-row DISPLAY shows "=" / non-toggle mapping; DISPLAY is Page 0 only — ignore stray toggles when mapped.
+            // Page 0: digit overlay maps DISPLAY to "=" and blocks toggling until local Fn latch is on (Fn-key row visible).
         }
 
         if (key.code == KEY_NOOP_PLACEHOLDER) {

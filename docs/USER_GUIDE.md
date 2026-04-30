@@ -108,6 +108,13 @@ In keyboard mode, the fixed shortcut strip uses two rows of keys beneath the swi
 - The physical positions do not move across target OS values.
 - Row 2 already has dedicated **Tab** and **Enter** keys.
 
+On **Page 0** of the fixed strip (F‑key / digit row):
+
+- **`Fn` latched / local Fn on:** row 2 is **F6–F12**, row 3 is **F1–F5**, **DISPLAY** (icon/text shortcut strip mode), **`Fn`**.
+- **`Fn` cleared / local Fn off:** row 2 is **`6`** **`7`** **`8`** **`9`** **`0`** **`+`** **`-`** (from F6–F12), row 3 is **`1`** **`2`** **`3`** **`4`** **`5`** and **DISPLAY** shows **`=`** (sends equals); **`Fn`** still toggles latch.
+
+DISPLAY only toggles icon vs action labels when **`Fn`** is latched on this page.
+
 On **Page 1** of the fixed strip (ESC / navigation page), when **local Fn** (row 3 col 7 on that page) is on:
 
 - **Row 2** sends **Scroll Lock**, **PrtSc**, **Caps Lock**, **Pause/Break**, **Home**, **PgUp**; the IME toggle key is unchanged.
