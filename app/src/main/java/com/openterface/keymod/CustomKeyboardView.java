@@ -51,6 +51,7 @@ import androidx.preference.PreferenceManager;
 import com.openterface.keymod.util.HidTextKeystrokeSender;
 import com.openterface.keymod.util.ImeTextForwarder;
 import com.openterface.keymod.util.TopModeShortcutPrefs;
+import com.openterface.keymod.util.TopShortcutProfileSlotPrefs;
 import com.openterface.target.CH9329MSKBMap;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 
@@ -154,6 +155,9 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int KEY_TOP_SHORTCUT_DISPLAY_TOGGLE = 0xF00B;
     /** Local Fn latch for fixed top rows 2-3 only. */
     private static final int KEY_FIXED_TOP_LOCAL_FN = 0xF00C;
+    /** Fixed page-2 row-3: Shortcut Hub profile slots 1–7 (tap = activate, long-press = assign). */
+    private static final int KEY_TOP_PROFILE_SLOT_1 = 0xF00D;
+    private static final int KEY_TOP_PROFILE_SLOT_7 = 0xF013;
     private static final int KEY_NOOP_PLACEHOLDER = -1;
     private static final String APP_PREFS_NAME = "AppPrefs";
     private static final String KEY_SYSTEM_IME_CAPTURE = "system_ime_capture_mode";
@@ -690,6 +694,26 @@ public class CustomKeyboardView extends LinearLayout {
         syncTopPanelViewportContent();
     }
 
+    /** Reload Shortcut Hub profiles from storage into this view's manager (call split partner too if needed). */
+    public void reloadShortcutProfileManagerFromPrefs() {
+        shortcutProfileManager.reloadProfilesFromPreferences();
+    }
+
+    /** Rebuild fixed strip + scrolling row 1 after profile-slot prefs or active profile change. */
+    private void refreshProfileSlotStrip() {
+        rebuildFixedTopRowsPanels();
+        rebuildTopShortcutPanels();
+        if (splitPartner != null) {
+            splitPartner.rebuildFixedTopRowsPanels();
+            splitPartner.rebuildTopShortcutPanels();
+        }
+        syncTopPanelViewportContent();
+        refreshVisibleTopPanelButtonStates();
+        if (splitPartner != null) {
+            splitPartner.refreshVisibleTopPanelButtonStates();
+        }
+    }
+
     private static int topModeSlotIndexFromKeyCode(int code) {
         if (code == KEY_TOP_MODE_SLOT_1) {
             return 1;
@@ -705,6 +729,32 @@ public class CustomKeyboardView extends LinearLayout {
 
     private static boolean isTopModeSlotKey(Key key) {
         return key != null && topModeSlotIndexFromKeyCode(key.code) > 0;
+    }
+
+    private static int topProfileSlotIndexFromKeyCode(int code) {
+        if (code >= KEY_TOP_PROFILE_SLOT_1 && code <= KEY_TOP_PROFILE_SLOT_7) {
+            return code - KEY_TOP_PROFILE_SLOT_1 + 1;
+        }
+        return 0;
+    }
+
+    private static boolean isTopProfileSlotKey(Key key) {
+        return key != null && topProfileSlotIndexFromKeyCode(key.code) > 0;
+    }
+
+    private boolean isTopProfileSlotActive(Key key) {
+        int slot = topProfileSlotIndexFromKeyCode(key != null ? key.code : 0);
+        if (slot <= 0) {
+            return false;
+        }
+        Context ctx = getContext();
+        if (ctx == null) {
+            return false;
+        }
+        String slotProfileId = TopShortcutProfileSlotPrefs.getResolvedProfileIdForSlot(
+                ctx, slot, shortcutProfileManager);
+        ShortcutProfileManager.ShortcutProfile active = shortcutProfileManager.getActiveProfile();
+        return active != null && active.id != null && active.id.equals(slotProfileId);
     }
 
     private static boolean isTopShortcutToggleKey(Key key) {
@@ -744,6 +794,9 @@ public class CustomKeyboardView extends LinearLayout {
                 || key.code == KEY_FIXED_TOP_LOCAL_FN) {
             return false;
         }
+        if (isTopProfileSlotKey(key)) {
+            return true;
+        }
         return key.shortcutModifiers >= 0 || key.code == 0x2B;
     }
 
@@ -779,6 +832,12 @@ public class CustomKeyboardView extends LinearLayout {
     private String formatTopShortcutActionLabel(Key key) {
         if (key == null) {
             return "";
+        }
+        if (isTopProfileSlotKey(key)) {
+            if (!TextUtils.isEmpty(key.symbolLabel)) {
+                return key.symbolLabel;
+            }
+            return key.label != null ? key.label : "";
         }
         String keyPart = topShortcutKeyCodeLabel(key.code, key.label);
         if (keyPart.isEmpty()) {
@@ -894,6 +953,48 @@ public class CustomKeyboardView extends LinearLayout {
                 .setSingleChoiceItems(labels, checked, (dialog, which) -> {
                     TopModeShortcutPrefs.setModeForSlot(act.getApplicationContext(), slotIndex1Based, modes[which]);
                     refreshTopShortcutModeSlots();
+                    dialog.dismiss();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showTopProfileSlotPicker(int slotIndex1Based) {
+        AppCompatActivity act = unwrapAppCompatActivity(getContext());
+        if (act == null) {
+            return;
+        }
+        reloadShortcutProfileManagerFromPrefs();
+        if (splitPartner != null) {
+            splitPartner.reloadShortcutProfileManagerFromPrefs();
+        }
+        java.util.List<ShortcutProfileManager.ShortcutProfile> profiles =
+                shortcutProfileManager.getAllProfiles();
+        if (profiles.isEmpty()) {
+            return;
+        }
+        CharSequence[] labels = new CharSequence[profiles.size()];
+        String[] ids = new String[profiles.size()];
+        for (int i = 0; i < profiles.size(); i++) {
+            ShortcutProfileManager.ShortcutProfile p = profiles.get(i);
+            labels[i] = p.name != null ? p.name : p.id;
+            ids[i] = p.id;
+        }
+        Context ctx = act;
+        String current = TopShortcutProfileSlotPrefs.getProfileIdForSlot(ctx, slotIndex1Based);
+        int checked = 0;
+        for (int i = 0; i < ids.length; i++) {
+            if (ids[i].equals(current)) {
+                checked = i;
+                break;
+            }
+        }
+        new AlertDialog.Builder(act)
+                .setTitle(R.string.top_profile_slot_picker_title)
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    TopShortcutProfileSlotPrefs.setProfileIdForSlot(
+                            act.getApplicationContext(), slotIndex1Based, ids[which]);
+                    refreshProfileSlotStrip();
                     dialog.dismiss();
                 })
                 .setNegativeButton(android.R.string.cancel, null)
@@ -1814,7 +1915,7 @@ public class CustomKeyboardView extends LinearLayout {
         if (key.code >= 0xE0 && key.code <= 0xE7) {
             return false;
         }
-        if (key.code >= 0xF001 && key.code <= 0xF009) {
+        if (key.code >= 0xF001 && key.code <= KEY_TOP_PROFILE_SLOT_7) {
             return false;
         }
         if ("Space".equalsIgnoreCase(key.label) || "Enter".equalsIgnoreCase(key.label)) {
@@ -2813,11 +2914,30 @@ public class CustomKeyboardView extends LinearLayout {
             keys.add(buildNoOpFixedPlaceholder());
         }
         keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f, R.drawable.ic_swap_horiz_24, 0f, false, false, -1, true)));
-        // Row 3: seven placeholders
-        for (int i = 0; i < TOP_PANEL_COLUMNS; i++) {
-            keys.add(buildNoOpFixedPlaceholder());
+        // Row 3: seven Shortcut Hub profile slots (tap = active profile, long-press = assign profile)
+        for (int slot = 1; slot <= TOP_PANEL_COLUMNS; slot++) {
+            keys.add(buildProfileHubSlotKey(slot));
         }
         return keys;
+    }
+
+    private Key buildProfileHubSlotKey(int slotIndex1Based) {
+        Context ctx = getContext();
+        String fullName = "?";
+        if (ctx != null) {
+            String id = TopShortcutProfileSlotPrefs.getResolvedProfileIdForSlot(
+                    ctx, slotIndex1Based, shortcutProfileManager);
+            ShortcutProfileManager.ShortcutProfile profile = shortcutProfileManager.getProfileById(id);
+            if (profile != null && profile.name != null && !profile.name.trim().isEmpty()) {
+                fullName = profile.name.trim();
+            } else {
+                fullName = "?";
+            }
+        }
+        String compact = fullName.length() > 8 ? fullName.substring(0, 8) : fullName;
+        int code = KEY_TOP_PROFILE_SLOT_1 + (slotIndex1Based - 1);
+        String codeStr = Integer.toHexString(code).toUpperCase();
+        return markFixedRowKey(new Key(compact, fullName, code, codeStr, 1f, 0, 0f, false, false, -1, true));
     }
 
     private Key buildNoOpFixedPlaceholder() {
@@ -2981,10 +3101,11 @@ public class CustomKeyboardView extends LinearLayout {
                     || (k.code == 0xE2 && isAltLeftLocked)
                     || (k.code == 0xE3 && isWinLeftLocked);
                 // Fn-layer lock only tints the local Fn key — never other keys (modifier locks stay
-                // independent when Fn toggles).
+                // independent when Fn toggles). Profile hub slots use pressed style when that slot's
+                // profile is the active Shortcut Hub profile.
                 boolean keyLockedVisualState = isFixedTopLocalFnKey(k)
                         ? fixedTopLocalFnLocked
-                        : modifierLocked;
+                        : (modifierLocked || isTopProfileSlotActive(k));
                 FnMapping fixedTopLocalFn = resolveFixedTopLocalFnMapping(k);
                 int effectiveTopIconResId = resolveFixedTopLocalFnIconRes(k, fixedTopLocalFn);
                 String effectiveTopLabel = fixedTopLocalFn != null ? fixedTopLocalFn.label : k.label;
@@ -3061,13 +3182,20 @@ public class CustomKeyboardView extends LinearLayout {
                     b.setGravity(Gravity.CENTER);
                     b.setTextSize(TypedValue.COMPLEX_UNIT_SP, TOP_SHORTCUT_PANEL_TEXT_SP);
                     b.setPadding(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
-                    String topButtonText = renderAsActionLabel
-                        ? formatTopShortcutActionLabel(k)
-                        : (fixedTopLocalFn != null
-                        ? effectiveTopLabel
-                        : k.symbolLabel != null && !k.symbolLabel.isEmpty()
-                        ? k.symbolLabel + "\n" + k.label
-                        : k.label);
+                    // Profile hub row-3 slots: symbolLabel holds full name for action-label mode only;
+                    // do not use symbol+newline+label (that path is for real shortcuts: chord + name).
+                    final String topButtonText;
+                    if (renderAsActionLabel) {
+                        topButtonText = formatTopShortcutActionLabel(k);
+                    } else if (isTopProfileSlotKey(k)) {
+                        topButtonText = k.label != null ? k.label : "";
+                    } else if (fixedTopLocalFn != null) {
+                        topButtonText = effectiveTopLabel;
+                    } else if (k.symbolLabel != null && !k.symbolLabel.isEmpty()) {
+                        topButtonText = k.symbolLabel + "\n" + k.label;
+                    } else {
+                        topButtonText = k.label != null ? k.label : "";
+                    }
                     b.setText(topButtonText);
                     if (renderAsActionLabel) {
                         b.setTextSize(TypedValue.COMPLEX_UNIT_SP, TOP_SHORTCUT_PANEL_ACTION_LABEL_SP);
@@ -3297,9 +3425,11 @@ public class CustomKeyboardView extends LinearLayout {
         final boolean[] isDragging = new boolean[1];
         final boolean[] longPressConsumed = new boolean[1];
         final Runnable[] pendingModifierLongPress = new Runnable[1];
+        final Runnable[] pendingProfileSlotLongPress = new Runnable[1];
         final int touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
         final int swipeThreshold = dpToPx(56);
         final boolean canSwipePanel = !isTopModifierLockCandidate(key);
+        final int profileSlotIndex = key != null ? topProfileSlotIndexFromKeyCode(key.code) : 0;
 
         return (v, event) -> {
             switch (event.getActionMasked()) {
@@ -3307,6 +3437,10 @@ public class CustomKeyboardView extends LinearLayout {
                     if (pendingModifierLongPress[0] != null) {
                         longPressHandler.removeCallbacks(pendingModifierLongPress[0]);
                         pendingModifierLongPress[0] = null;
+                    }
+                    if (pendingProfileSlotLongPress[0] != null) {
+                        longPressHandler.removeCallbacks(pendingProfileSlotLongPress[0]);
+                        pendingProfileSlotLongPress[0] = null;
                     }
                     longPressConsumed[0] = false;
                     startX[0] = event.getRawX();
@@ -3320,6 +3454,13 @@ public class CustomKeyboardView extends LinearLayout {
                             pendingModifierLongPress[0] = null;
                         };
                         longPressHandler.postDelayed(pendingModifierLongPress[0], ALT_LONG_PRESS_TIMEOUT_MS);
+                    } else if (profileSlotIndex > 0) {
+                        pendingProfileSlotLongPress[0] = () -> {
+                            longPressConsumed[0] = true;
+                            showTopProfileSlotPicker(profileSlotIndex);
+                            pendingProfileSlotLongPress[0] = null;
+                        };
+                        longPressHandler.postDelayed(pendingProfileSlotLongPress[0], ALT_LONG_PRESS_TIMEOUT_MS);
                     }
                     if (key != null) {
                         v.setPressed(true);
@@ -3337,6 +3478,10 @@ public class CustomKeyboardView extends LinearLayout {
                             longPressHandler.removeCallbacks(pendingModifierLongPress[0]);
                             pendingModifierLongPress[0] = null;
                         }
+                        if (pendingProfileSlotLongPress[0] != null) {
+                            longPressHandler.removeCallbacks(pendingProfileSlotLongPress[0]);
+                            pendingProfileSlotLongPress[0] = null;
+                        }
                     }
                     if (isDragging[0] && hasAnyFixedRowsPagerMode()) {
                         updateFixedTopRowsDrag(applyFixedTopRowsEdgeResistance(dx));
@@ -3350,6 +3495,10 @@ public class CustomKeyboardView extends LinearLayout {
                     if (pendingModifierLongPress[0] != null) {
                         longPressHandler.removeCallbacks(pendingModifierLongPress[0]);
                         pendingModifierLongPress[0] = null;
+                    }
+                    if (pendingProfileSlotLongPress[0] != null) {
+                        longPressHandler.removeCallbacks(pendingProfileSlotLongPress[0]);
+                        pendingProfileSlotLongPress[0] = null;
                     }
                     float totalDx = event.getRawX() - startX[0];
                     if (isDragging[0]) {
@@ -3925,7 +4074,7 @@ public class CustomKeyboardView extends LinearLayout {
                         || (key.code == 0xE3 && isWinLeftLocked);
                 boolean keyLockedVisualState = isFixedTopLocalFnKey(key)
                         ? fixedTopLocalFnLocked
-                        : modifierLocked;
+                        : (modifierLocked || isTopProfileSlotActive(key));
                 view.setBackgroundResource(keyLockedVisualState
                         ? R.drawable.press_button_background
                         : R.drawable.function_button_background);
@@ -4596,6 +4745,24 @@ public class CustomKeyboardView extends LinearLayout {
             if (ctx != null && onTopModeShortcutListener != null) {
                 String mode = TopModeShortcutPrefs.getModeForSlot(ctx, topSlot);
                 onTopModeShortcutListener.onRequestSwitchToMode(mode);
+            }
+            return;
+        }
+
+        int profileSlot = topProfileSlotIndexFromKeyCode(key.code);
+        if (profileSlot > 0) {
+            Context ctx = getContext();
+            if (ctx != null) {
+                reloadShortcutProfileManagerFromPrefs();
+                if (splitPartner != null) {
+                    splitPartner.reloadShortcutProfileManagerFromPrefs();
+                }
+                String id = TopShortcutProfileSlotPrefs.getResolvedProfileIdForSlot(
+                        ctx, profileSlot, shortcutProfileManager);
+                if (shortcutProfileManager.getProfileById(id) != null) {
+                    shortcutProfileManager.setActiveProfile(id);
+                }
+                refreshProfileSlotStrip();
             }
             return;
         }

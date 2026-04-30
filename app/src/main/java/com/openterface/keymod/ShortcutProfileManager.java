@@ -676,10 +676,25 @@ public class ShortcutProfileManager {
     }
 
     /**
-     * Get active profile
+     * Get active profile. Re-reads active id from preferences so multiple {@link ShortcutProfileManager}
+     * instances (e.g. keyboard vs Shortcut Hub) stay aligned after {@link #setActiveProfile}.
      */
     public ShortcutProfile getActiveProfile() {
+        activeProfileId = prefs.getString(KEY_ACTIVE_PROFILE,
+                activeProfileId != null ? activeProfileId : "default");
         return getProfileById(activeProfileId);
+    }
+
+    /**
+     * Reloads profiles JSON and active profile id from disk. Safe if prefs are unchanged.
+     * Call before listing profiles from the keyboard after edits in Shortcut Hub.
+     */
+    public void reloadProfilesFromPreferences() {
+        List<ShortcutProfile> loaded = loadProfiles();
+        if (loaded != null && !loaded.isEmpty()) {
+            profiles = loaded;
+        }
+        activeProfileId = prefs.getString(KEY_ACTIVE_PROFILE, "default");
     }
 
     /**
