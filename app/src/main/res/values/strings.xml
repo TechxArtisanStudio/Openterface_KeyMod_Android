@@ -334,6 +334,7 @@ by TechxArtisan</string>
     <string name="top_shortcut_ime_toggle_system">System IME (tap for KeyMod keyboard)</string>
     <string name="top_shortcut_ime_toggle_keymod_short">KeyMod</string>
     <string name="top_shortcut_ime_toggle_system_short">Sys IME</string>
+    <string name="top_strip_modifier_long_press_lock_hint">Tip: Long-press this key to lock the modifier.</string>
     <string name="ime_not_connected">Connect USB or Bluetooth to send keystrokes.</string>
     <string name="ime_sub_compose_expand">Expand text area</string>
     <string name="ime_sub_compose_collapse">Show touchpad and shortcuts</string>

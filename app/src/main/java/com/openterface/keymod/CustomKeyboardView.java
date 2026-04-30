@@ -21,6 +21,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.SpannableString;
@@ -279,6 +280,9 @@ public class CustomKeyboardView extends LinearLayout {
     private Runnable repeatRunnable;
     private boolean isRepeating = false;
     private static final int ALT_LONG_PRESS_TIMEOUT_MS = ViewConfiguration.getLongPressTimeout();
+    private static final long MODIFIER_RAPID_TAP_WINDOW_MS = 3000L;
+    private static final long MODIFIER_LOCK_HINT_COOLDOWN_MS = 10_000L;
+    private static final int MODIFIER_RAPID_TAP_HINT_THRESHOLD = 2;
     /** Inside this radius from touch-down, release commits the default alternate (Alt0 or base). */
     private static final int ALT_GESTURE_R_MIN_DP = 12;
     /** Beyond this radius from touch-down, release cancels (no character). */
@@ -311,6 +315,10 @@ public class CustomKeyboardView extends LinearLayout {
     private float alternatesGestureStartRawY;
     private int topPanelPageIndex = 0;
     private int fixedTopRowsPageIndex = FIXED_TOP_ROWS_DEFAULT_PAGE_INDEX;
+    private int rapidTapModifierCode = -1;
+    private int rapidTapModifierCount = 0;
+    private long rapidTapModifierLastTapMs = 0L;
+    private long lastModifierLockHintToastMs = 0L;
     private ShortcutProfileManager shortcutProfileManager;
     private final List<TopShortcutPanel> topShortcutPanels = new ArrayList<>();
     private final List<List<Key>> fixedTopRowsPanels = new ArrayList<>();
@@ -3670,6 +3678,37 @@ public class CustomKeyboardView extends LinearLayout {
         sendKeyData(combinedValue, effectiveKeyCode);
     }
 
+    private void maybeShowModifierLockHint(Key key) {
+        if (key == null || !isTopModifierLockCandidate(key)) {
+            return;
+        }
+        if (fixedTopRowsPageIndex != FIXED_TOP_ROWS_DEFAULT_PAGE_INDEX) {
+            rapidTapModifierCode = -1;
+            rapidTapModifierCount = 0;
+            rapidTapModifierLastTapMs = 0L;
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (rapidTapModifierCode == key.code && (now - rapidTapModifierLastTapMs) <= MODIFIER_RAPID_TAP_WINDOW_MS) {
+            rapidTapModifierCount++;
+        } else {
+            rapidTapModifierCode = key.code;
+            rapidTapModifierCount = 1;
+        }
+        rapidTapModifierLastTapMs = now;
+        if (rapidTapModifierCount >= MODIFIER_RAPID_TAP_HINT_THRESHOLD
+                && (now - lastModifierLockHintToastMs) >= MODIFIER_LOCK_HINT_COOLDOWN_MS) {
+            Context context = getContext();
+            if (context != null) {
+                Toast.makeText(context, R.string.top_strip_modifier_long_press_lock_hint, Toast.LENGTH_LONG).show();
+            }
+            lastModifierLockHintToastMs = now;
+            rapidTapModifierCode = -1;
+            rapidTapModifierCount = 0;
+            rapidTapModifierLastTapMs = 0L;
+        }
+    }
+
     private OnTouchListener createTopPanelTouchListener(Key key) {
         final float[] startX = new float[1];
         final float[] startY = new float[1];
@@ -3789,6 +3828,7 @@ public class CustomKeyboardView extends LinearLayout {
                                 return true;
                             }
                             sendMomentaryModifierClick(key);
+                            maybeShowModifierLockHint(key);
                         } else {
                             handleKeyPress(key);
                         }
@@ -3896,6 +3936,7 @@ public class CustomKeyboardView extends LinearLayout {
                                 return true;
                             }
                             sendMomentaryModifierClick(key);
+                            maybeShowModifierLockHint(key);
                         } else {
                             handleKeyPress(key);
                         }
