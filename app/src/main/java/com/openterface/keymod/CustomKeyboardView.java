@@ -922,7 +922,13 @@ public class CustomKeyboardView extends LinearLayout {
         if ((modifiers & MOD_ALT) != 0) parts.add("Alt");
         if ((modifiers & MOD_SHIFT) != 0) parts.add("Shift");
         if ((modifiers & MOD_WIN) != 0) {
-            parts.add("macos".equals(targetOs) ? "Cmd" : "Win");
+            if ("macos".equals(targetOs)) {
+                parts.add("Cmd");
+            } else if ("linux".equals(targetOs)) {
+                parts.add("Super");
+            } else {
+                parts.add("Win");
+            }
         }
         return TextUtils.join("+", parts);
     }
@@ -3617,12 +3623,27 @@ public class CustomKeyboardView extends LinearLayout {
         if (key == null) {
             return;
         }
+        FnMapping fixedTopLocalFn = resolveFixedTopLocalFnMapping(key);
+        int effectiveKeyCode = fixedTopLocalFn != null ? fixedTopLocalFn.keyCode : key.code;
+        int fnModifierMask = fixedTopLocalFn != null ? fixedTopLocalFn.modifierMask : 0;
         int combinedValue = 0;
         combinedValue += isCtrlLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Ctrl")) : 0;
         combinedValue += isShiftLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift")) : 0;
         combinedValue += isAltLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Alt")) : 0;
         combinedValue += isWinLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Win")) : 0;
-        sendKeyData(combinedValue, key.code);
+        if ((fnModifierMask & MOD_CTRL) != 0) {
+            combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Ctrl"));
+        }
+        if ((fnModifierMask & MOD_SHIFT) != 0) {
+            combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift"));
+        }
+        if ((fnModifierMask & MOD_ALT) != 0) {
+            combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Alt"));
+        }
+        if ((fnModifierMask & MOD_WIN) != 0) {
+            combinedValue |= parseHex(CH9329MSKBMap.KBShortCutKey().get("Win"));
+        }
+        sendKeyData(combinedValue, effectiveKeyCode);
     }
 
     private OnTouchListener createTopPanelTouchListener(Key key) {

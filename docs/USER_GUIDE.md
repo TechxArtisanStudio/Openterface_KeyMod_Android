@@ -97,6 +97,25 @@ The virtual keyboard provides a **full QWERTY layout** with these sections:
 - Tap **Fn** to access F1-F12 keys
 - Tap **?123** to switch to number/symbol layout
 
+### Fixed Shortcut Strip (Top Rows)
+
+In keyboard mode, the fixed shortcut strip uses two rows of keys beneath the swipeable favorites row.
+
+- **Target OS setting** (`Windows`, `Linux`, `macOS`) changes modifier **labels/icons** only:
+  - Row 3 Col 1 (`0xE0`): Ctrl / Control
+  - Row 3 Col 2 (`0xE2`): Alt / Option
+  - Row 3 Col 3 (`0xE3`): Win / Super / Command
+- The physical positions do not move across target OS values.
+- Row 2 already has dedicated **Tab** and **Enter** keys.
+
+When local **Fn** (row 3 col 7) is enabled, row 3 adds temporary overlays:
+
+- Row 3 Col 1 shows and sends **Tab**
+- Row 3 Col 3 shows and sends **Enter**
+- Row 3 Col 2 remains the OS-specific Alt/Option key
+
+Long-press lock for modifiers still uses their native modifier behavior.
+
 ---
 
 ## 🎮 Gamepad Mode
