@@ -355,6 +355,8 @@ public class CustomKeyboardView extends LinearLayout {
         boolean isTopPanelKey;
         String customIconGlyph;
         boolean allowTopPanelPagingGesture;
+        /** If >= 0, scrolling row-1 cell maps to this index in ordered My Shortcuts (long-press to reassign). */
+        int topStripFavoriteSlotIndex = -1;
 
         Key(String label, String symbolLabel, String alternates, String cornerHint, int code, String codeStr, float widthPercent, int iconResId,
             float horizontalGap, boolean isRepeatable, boolean requiresShift, int shortcutModifiers, boolean isTopPanelKey) {
@@ -714,6 +716,18 @@ public class CustomKeyboardView extends LinearLayout {
         }
     }
 
+    private void refreshTopShortcutFavoriteStrip() {
+        rebuildTopShortcutPanels();
+        if (splitPartner != null) {
+            splitPartner.rebuildTopShortcutPanels();
+        }
+        syncTopPanelViewportContent();
+        refreshVisibleTopPanelButtonStates();
+        if (splitPartner != null) {
+            splitPartner.refreshVisibleTopPanelButtonStates();
+        }
+    }
+
     private static int topModeSlotIndexFromKeyCode(int code) {
         if (code == KEY_TOP_MODE_SLOT_1) {
             return 1;
@@ -996,6 +1010,43 @@ public class CustomKeyboardView extends LinearLayout {
                             act.getApplicationContext(), slotIndex1Based, ids[which]);
                     refreshProfileSlotStrip();
                     dialog.dismiss();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showTopStripFavoritePicker(int globalStripIndex) {
+        AppCompatActivity act = unwrapAppCompatActivity(getContext());
+        if (act == null) {
+            return;
+        }
+        reloadShortcutProfileManagerFromPrefs();
+        if (splitPartner != null) {
+            splitPartner.reloadShortcutProfileManagerFromPrefs();
+        }
+        ShortcutProfileManager.ShortcutProfile ap = shortcutProfileManager.getActiveProfile();
+        if (ap == null) {
+            return;
+        }
+        java.util.ArrayList<ShortcutProfileManager.Shortcut> favorites =
+                new java.util.ArrayList<>(shortcutProfileManager.getOrderedShortcutsForTopStrip(ap.id));
+        if (favorites.isEmpty()) {
+            Toast.makeText(act, R.string.top_strip_favorite_picker_empty, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        CharSequence[] labels = new CharSequence[favorites.size()];
+        for (int i = 0; i < favorites.size(); i++) {
+            ShortcutProfileManager.Shortcut s = favorites.get(i);
+            labels[i] = s.name != null ? s.name : (s.label != null ? s.label : "");
+        }
+        new AlertDialog.Builder(act)
+                .setTitle(R.string.top_strip_favorite_picker_title)
+                .setItems(labels, (dialog, which) -> {
+                    ShortcutProfileManager.Shortcut pick = favorites.get(which);
+                    if (pick != null && pick.id != null) {
+                        shortcutProfileManager.assignMyShortcutToStripIndex(ap.id, globalStripIndex, pick.id);
+                        refreshTopShortcutFavoriteStrip();
+                    }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
@@ -2783,7 +2834,7 @@ public class CustomKeyboardView extends LinearLayout {
             int start = pageIndex * TOP_ROW_PAGE_SIZE;
             int end = Math.min(start + TOP_ROW_PAGE_SIZE, ordered.size());
             List<ShortcutProfileManager.Shortcut> slice = ordered.subList(start, end);
-            List<Key> pageKeys = buildTopPanelPageKeys(slice);
+            List<Key> pageKeys = buildTopPanelPageKeys(slice, start);
             String title = activeProfile != null ? activeProfile.name : "Default";
             if (totalPages > 1) {
                 title = title + " " + (pageIndex + 1) + "/" + totalPages;
@@ -2802,29 +2853,42 @@ public class CustomKeyboardView extends LinearLayout {
         }
     }
 
-    private List<Key> buildTopPanelPageKeys(List<ShortcutProfileManager.Shortcut> row1Shortcuts) {
+    private List<Key> buildTopPanelPageKeys(
+            List<ShortcutProfileManager.Shortcut> row1Shortcuts,
+            int row1GlobalStartIndex
+    ) {
         List<Key> keys = new ArrayList<>(TOP_PANEL_PAGE_SIZE);
-        keys.addAll(buildProfileTopRow(row1Shortcuts));
+        keys.addAll(buildProfileTopRow(row1Shortcuts, row1GlobalStartIndex));
         keys.addAll(buildFixedTopPanelRows());
         return keys;
     }
 
-    private List<Key> buildProfileTopRow(List<ShortcutProfileManager.Shortcut> shortcuts) {
+    private List<Key> buildProfileTopRow(
+            List<ShortcutProfileManager.Shortcut> shortcuts,
+            int row1GlobalStartIndex
+    ) {
         List<Key> row = new ArrayList<>(TOP_ROW_PAGE_SIZE);
         for (int i = 0; i < TOP_ROW_PAGE_SIZE; i++) {
             if (shortcuts != null && i < shortcuts.size()) {
                 ShortcutProfileManager.Shortcut shortcut = shortcuts.get(i);
-                row.add(buildTopPanelShortcutKey(shortcut));
+                row.add(buildTopPanelShortcutKey(shortcut, row1GlobalStartIndex + i));
             } else {
-                row.add(new Key("", "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true));
+                Key k = new Key("", "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true);
+                k.topStripFavoriteSlotIndex = -1;
+                row.add(k);
             }
         }
         return row;
     }
 
-    private Key buildTopPanelShortcutKey(ShortcutProfileManager.Shortcut shortcut) {
+    private Key buildTopPanelShortcutKey(
+            ShortcutProfileManager.Shortcut shortcut,
+            int topStripFavoriteSlotIndex
+    ) {
         if (shortcut == null) {
-            return new Key("", "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true);
+            Key k = new Key("", "", KEY_NOOP_PLACEHOLDER, "", 1f, 0, 0f, false, false, -1, true);
+            k.topStripFavoriteSlotIndex = -1;
+            return k;
         }
         String label = compactShortcutName(shortcut);
         String symbol = compactShortcutSymbol(shortcut);
@@ -2843,6 +2907,7 @@ public class CustomKeyboardView extends LinearLayout {
                 normalizedModifiers,
                 true
         );
+        key.topStripFavoriteSlotIndex = topStripFavoriteSlotIndex;
         if (iconResId == 0 && isEmojiIcon(shortcut.icon)) {
             key.customIconGlyph = shortcut.icon.trim();
         }
@@ -2863,24 +2928,24 @@ public class CustomKeyboardView extends LinearLayout {
 
     private List<Key> buildFixedTopRowsPage0() {
         List<Key> keys = new ArrayList<>(TOP_PANEL_COLUMNS * 2);
-        // Row 2: F7..F12, local Fn toggle (Fn on → 6 7 8 9 0 +)
-        keys.add(markFixedRowKey(new Key("F7", "", 0x40, "40", 1f, 0, 0f, false, false, -1, true)));
+        // Row 2: F8..F12, display toggle (col 6), local Fn (Fn on → 8 9 0 + - =)
         keys.add(markFixedRowKey(new Key("F8", "", 0x41, "41", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F9", "", 0x42, "42", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F10", "", 0x43, "43", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F11", "", 0x44, "44", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F12", "", 0x45, "45", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("DISPLAY", "", KEY_TOP_SHORTCUT_DISPLAY_TOGGLE, "", 1f,
+                topShortcutShowActionLabels ? R.drawable.text_on_24 : R.drawable.icon_on_24,
+                0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f, R.drawable.ic_swap_horiz_24, 0f, false, false, -1, true)));
-        // Row 3: F1..F6, display toggle (Fn on → 1 2 3 4 5 - =)
+        // Row 3: F1..F7 (Fn on → 1 2 3 4 5 6 7)
         keys.add(markFixedRowKey(new Key("F1", "", 0x3A, "3A", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F2", "", 0x3B, "3B", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F3", "", 0x3C, "3C", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F4", "", 0x3D, "3D", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F5", "", 0x3E, "3E", 1f, 0, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("F6", "", 0x3F, "3F", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("DISPLAY", "", KEY_TOP_SHORTCUT_DISPLAY_TOGGLE, "", 1f,
-                topShortcutShowActionLabels ? R.drawable.text_on_24 : R.drawable.icon_on_24,
-                0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("F7", "", 0x40, "40", 1f, 0, 0f, false, false, -1, true)));
         return keys;
     }
 
@@ -3316,9 +3381,11 @@ public class CustomKeyboardView extends LinearLayout {
         final boolean[] longPressConsumed = new boolean[1];
         final Runnable[] pendingModeLongPress = new Runnable[1];
         final Runnable[] pendingModifierLongPress = new Runnable[1];
+        final Runnable[] pendingMyFavoritesLongPress = new Runnable[1];
         final int touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
         final int swipeThreshold = dpToPx(56);
         final int modeSlotIndex = key != null ? topModeSlotIndexFromKeyCode(key.code) : 0;
+        final int myFavoritesSlotIndex = key != null ? key.topStripFavoriteSlotIndex : -1;
         final boolean canSwipePanel = (key == null || key.allowTopPanelPagingGesture)
                 && !isTopModifierLockCandidate(key);
 
@@ -3332,6 +3399,10 @@ public class CustomKeyboardView extends LinearLayout {
                     if (pendingModifierLongPress[0] != null) {
                         longPressHandler.removeCallbacks(pendingModifierLongPress[0]);
                         pendingModifierLongPress[0] = null;
+                    }
+                    if (pendingMyFavoritesLongPress[0] != null) {
+                        longPressHandler.removeCallbacks(pendingMyFavoritesLongPress[0]);
+                        pendingMyFavoritesLongPress[0] = null;
                     }
                     longPressConsumed[0] = false;
                     startX[0] = event.getRawX();
@@ -3352,6 +3423,13 @@ public class CustomKeyboardView extends LinearLayout {
                             pendingModifierLongPress[0] = null;
                         };
                         longPressHandler.postDelayed(pendingModifierLongPress[0], ALT_LONG_PRESS_TIMEOUT_MS);
+                    } else if (myFavoritesSlotIndex >= 0) {
+                        pendingMyFavoritesLongPress[0] = () -> {
+                            longPressConsumed[0] = true;
+                            showTopStripFavoritePicker(myFavoritesSlotIndex);
+                            pendingMyFavoritesLongPress[0] = null;
+                        };
+                        longPressHandler.postDelayed(pendingMyFavoritesLongPress[0], ALT_LONG_PRESS_TIMEOUT_MS);
                     }
                     if (key != null) {
                         v.setPressed(true);
@@ -3375,6 +3453,10 @@ public class CustomKeyboardView extends LinearLayout {
                             longPressHandler.removeCallbacks(pendingModifierLongPress[0]);
                             pendingModifierLongPress[0] = null;
                         }
+                        if (pendingMyFavoritesLongPress[0] != null) {
+                            longPressHandler.removeCallbacks(pendingMyFavoritesLongPress[0]);
+                            pendingMyFavoritesLongPress[0] = null;
+                        }
                     }
                     if (isDragging[0] && hasAnyTopPanelMode()) {
                         updateTopPanelDrag(applyTopPanelEdgeResistance(dx));
@@ -3392,6 +3474,10 @@ public class CustomKeyboardView extends LinearLayout {
                     if (pendingModifierLongPress[0] != null) {
                         longPressHandler.removeCallbacks(pendingModifierLongPress[0]);
                         pendingModifierLongPress[0] = null;
+                    }
+                    if (pendingMyFavoritesLongPress[0] != null) {
+                        longPressHandler.removeCallbacks(pendingMyFavoritesLongPress[0]);
+                        pendingMyFavoritesLongPress[0] = null;
                     }
                     float totalDx = event.getRawX() - startX[0];
                     if (isDragging[0]) {
@@ -4533,20 +4619,20 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         switch (key.code) {
-            // Fixed-top page 0 (row2 F7–F12, row3 F1–F6 + display): Fn layer matches rearranged layout.
-            case 0x40: return new FnMapping("6", 0x23, 0);
-            case 0x41: return new FnMapping("7", 0x24, 0);
-            case 0x42: return new FnMapping("8", 0x25, 0);
-            case 0x43: return new FnMapping("9", 0x26, 0);
-            case 0x44: return new FnMapping("0", 0x27, 0);
-            case 0x45: return new FnMapping("+", 0x2E, MOD_SHIFT);
+            // Fixed-top page 0: row2 Fn → 8 9 0 + - =; row3 Fn → 1 2 3 4 5 6 7.
+            case 0x41: return new FnMapping("8", 0x25, 0);
+            case 0x42: return new FnMapping("9", 0x26, 0);
+            case 0x43: return new FnMapping("0", 0x27, 0);
+            case 0x44: return new FnMapping("+", 0x2E, MOD_SHIFT);
+            case 0x45: return new FnMapping("-", 0x2D, 0);
+            case KEY_TOP_SHORTCUT_DISPLAY_TOGGLE: return new FnMapping("=", 0x2E, 0);
             case 0x3A: return new FnMapping("1", 0x1E, 0);
             case 0x3B: return new FnMapping("2", 0x1F, 0);
             case 0x3C: return new FnMapping("3", 0x20, 0);
             case 0x3D: return new FnMapping("4", 0x21, 0);
             case 0x3E: return new FnMapping("5", 0x22, 0);
-            case 0x3F: return new FnMapping("-", 0x2D, 0);
-            case KEY_TOP_SHORTCUT_DISPLAY_TOGGLE: return new FnMapping("=", 0x2E, 0);
+            case 0x3F: return new FnMapping("6", 0x23, 0);
+            case 0x40: return new FnMapping("7", 0x24, 0);
             case 0x4A: return new FnMapping("F1", 0x3A, 0);
             case 0x4D: return new FnMapping("F2", 0x3B, 0);
             case 0x4B: return new FnMapping("F3", 0x3C, 0);

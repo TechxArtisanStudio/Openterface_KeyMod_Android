@@ -115,6 +115,10 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         if (requireActivity() instanceof MainActivity) {
             ((MainActivity) requireActivity()).addOsChangeListener(osChangeListener);
         }
+        if (selectedProfile != null && panelShortcutsDetail.getVisibility() == View.VISIBLE) {
+            profileManager.reloadProfilesFromPreferences();
+            loadProfiles();
+        }
     }
 
     @Override
@@ -163,6 +167,16 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         adapter.notifyDataSetChanged();
         updateActiveProfileDisplay();
         updateEmptyState();
+        if (selectedProfile != null && panelShortcutsDetail != null
+                && panelShortcutsDetail.getVisibility() == View.VISIBLE) {
+            myShortcutsList = profileManager.getMyShortcuts(selectedProfile.id);
+            ShortcutProfile updated = profileManager.getProfileById(selectedProfile.id);
+            if (updated != null) {
+                selectedProfile = updated;
+                rebuildCategoryTabs(selectedProfile);
+            }
+            refreshShortcutsGrid();
+        }
     }
 
     private void setupListeners() {
@@ -347,25 +361,10 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                 }
             }
         } 
-        // Priority 2: Show My Shortcuts favorites
+        // Priority 2: Show My Shortcuts favorites (top strip uses this list only)
         else if (TAB_MY.equals(currentTab)) {
             toShow = myShortcutsList;
             if (toShow.isEmpty()) {
-                // Profiles without categories (e.g., Default) should still show their built-in keys.
-                if (!hasCategories) {
-                    toShow = selectedProfile.shortcuts != null
-                            ? new ArrayList<>(selectedProfile.shortcuts)
-                            : new ArrayList<>();
-                }
-
-                if (!toShow.isEmpty()) {
-                    shortcutsGridView.setVisibility(View.VISIBLE);
-                    emptyMyShortcuts.setVisibility(View.GONE);
-                    shortcutsAdapter.setShortcuts(toShow);
-                    shortcutsAdapter.notifyDataSetChanged();
-                    return;
-                }
-
                 shortcutsGridView.setVisibility(View.GONE);
                 emptyMyShortcuts.setVisibility(View.VISIBLE);
                 return;

@@ -26,6 +26,8 @@ public class ShortcutProfileManager {
     private static final String KEY_PROFILES = "profiles_list";
     private static final String KEY_ACTIVE_PROFILE = "active_profile_id";
     private static final String MY_SHORTCUTS_KEY_PREFIX = "MyShortcuts_";
+    /** One-time: move Default flat shortcuts into a category; seed empty My Shortcuts lists. */
+    private static final String KEY_MIGRATION_MY_STRIP_V1 = "migration_my_strip_favorites_v1";
 
     // ─── HID Keyboard Usage IDs (USB HID Specification) ───────────────────────
     private static final int KEY_A=4,KEY_B=5,KEY_C=6,KEY_D=7,KEY_E=8,KEY_F=9;
@@ -72,6 +74,10 @@ public class ShortcutProfileManager {
         if (migrateDefaultProfileIfNeeded()) {
             saveProfiles();
         }
+        if (migrateDefaultFlatToGeneralCategory()) {
+            saveProfiles();
+        }
+        seedEmptyMyShortcutsIfNeeded();
     }
 
     /**
@@ -165,6 +171,141 @@ public class ShortcutProfileManager {
         }
         profile.shortcuts = ordered;
         return changed;
+    }
+
+    /**
+     * Moves Default profile shortcuts from the flat list into a "General" category so every profile
+     * has at least one section in Shortcut Hub.
+     */
+    private boolean migrateDefaultFlatToGeneralCategory() {
+        ShortcutProfile def = getProfileById("default");
+        if (def == null) {
+            return false;
+        }
+        boolean hasCategories = def.categories != null && !def.categories.isEmpty();
+        if (hasCategories) {
+            return false;
+        }
+        List<Shortcut> flat = def.shortcuts != null ? def.shortcuts : new ArrayList<>();
+        if (flat.isEmpty()) {
+            return false;
+        }
+        ShortcutCategory general = new ShortcutCategory("general", "General");
+        general.shortcuts.addAll(flat);
+        if (def.categories == null) {
+            def.categories = new ArrayList<>();
+        }
+        def.categories.add(general);
+        def.shortcuts = new ArrayList<>();
+        return true;
+    }
+
+    private void seedEmptyMyShortcutsIfNeeded() {
+        if (prefs.getBoolean(KEY_MIGRATION_MY_STRIP_V1, false)) {
+            return;
+        }
+        for (ShortcutProfile p : profiles) {
+            if (p == null || p.id == null) {
+                continue;
+            }
+            List<Shortcut> my = getMyShortcuts(p.id);
+            if (my != null && !my.isEmpty()) {
+                continue;
+            }
+            List<Shortcut> seeded = buildSeededMyShortcuts(p);
+            if (!seeded.isEmpty()) {
+                renumberDisplayOrder(seeded);
+                updateMyShortcuts(p.id, seeded);
+            }
+        }
+        prefs.edit().putBoolean(KEY_MIGRATION_MY_STRIP_V1, true).apply();
+    }
+
+    private void renumberDisplayOrder(List<Shortcut> list) {
+        if (list == null) {
+            return;
+        }
+        for (int i = 0; i < list.size(); i++) {
+            Shortcut s = list.get(i);
+            if (s != null) {
+                s.displayOrder = i + 1;
+            }
+        }
+    }
+
+    private List<Shortcut> buildSeededMyShortcuts(ShortcutProfile p) {
+        String[] ids = myFavoritesSeedIdsForProfile(p.id);
+        List<Shortcut> flat = p.getAllShortcutsFlat();
+        Map<String, Shortcut> byId = new HashMap<>();
+        for (Shortcut s : flat) {
+            if (s != null && s.id != null) {
+                byId.put(s.id, s);
+            }
+        }
+        List<Shortcut> out = new ArrayList<>();
+        if (ids != null) {
+            for (String id : ids) {
+                Shortcut src = byId.get(id);
+                if (src != null) {
+                    out.add(cloneShortcut(src));
+                }
+            }
+        }
+        if (out.isEmpty()) {
+            int n = Math.min(7, flat.size());
+            for (int i = 0; i < n; i++) {
+                out.add(cloneShortcut(flat.get(i)));
+            }
+        }
+        return out;
+    }
+
+    private Shortcut cloneShortcut(Shortcut src) {
+        if (src == null) {
+            return null;
+        }
+        return gson.fromJson(gson.toJson(src), Shortcut.class);
+    }
+
+    private static String[] myFavoritesSeedIdsForProfile(String profileId) {
+        if (profileId == null) {
+            return new String[0];
+        }
+        switch (profileId) {
+            case "default":
+                return new String[]{
+                        "default_select_all", "default_copy", "default_cut", "default_paste",
+                        "default_save", "default_undo", "default_find", "default_redo"
+                };
+            case "blender":
+                return new String[]{"b-t-1", "b-t-2", "b-t-3", "b-s-1", "b-v-1", "b-mo-1", "b-to-1"};
+            case "kicad":
+                return new String[]{"k-vz-1", "k-de-1", "k-c-1", "k-pd-1", "k-f-1", "k-f-4", "k-l-1"};
+            case "nomad":
+                return new String[]{"n-t-1", "n-t-2", "n-tr-1", "n-v-7", "n-e-1", "n-e-3", "n-b-1"};
+            case "fusion360":
+                return new String[]{"f-fi-3", "f-ge-1", "f-ge-3", "f-sk-1", "f-sk-2", "f-mo-1", "f-nav-1"};
+            case "photoshop":
+                return new String[]{"ps-t-1", "ps-t-2", "ps-e-1", "ps-e-3", "ps-e-5", "ps-e-6", "ps-v-3"};
+            case "vscode":
+                return new String[]{"v-nav-1", "v-c-1", "v-e-1", "v-e-5", "v-e-6", "v-nav-7", "v-v-4"};
+            default:
+                return new String[0];
+        }
+    }
+
+    private void sortShortcutsListForStrip(List<Shortcut> sorted) {
+        if (sorted == null || sorted.isEmpty()) {
+            return;
+        }
+        final Map<String, Integer> existingOrder = new HashMap<>();
+        for (int i = 0; i < sorted.size(); i++) {
+            Shortcut shortcut = sorted.get(i);
+            existingOrder.put(shortcut.id != null ? shortcut.id : ("index_" + i), i);
+        }
+        Collections.sort(sorted, Comparator
+                .comparingInt((Shortcut s) -> s.displayOrder > 0 ? s.displayOrder : Integer.MAX_VALUE)
+                .thenComparingInt(s -> existingOrder.getOrDefault(s.id != null ? s.id : "", Integer.MAX_VALUE)));
     }
 
     private boolean addOrCreateDefaultShortcut(
@@ -722,6 +863,8 @@ public class ShortcutProfileManager {
         profile.description = description;
         profile.icon = "ic_custom";
         profile.shortcuts = new ArrayList<>();
+        profile.categories = new ArrayList<>();
+        profile.categories.add(new ShortcutCategory("general", "General"));
         profile.createdAt = System.currentTimeMillis();
         
         profiles.add(profile);
@@ -876,21 +1019,42 @@ public class ShortcutProfileManager {
         }
         List<Shortcut> source = getMyShortcuts(profileId);
         if (source == null || source.isEmpty()) {
-            source = profile.getAllShortcutsFlat();
-        }
-        if (source == null) {
             return new ArrayList<>();
         }
         List<Shortcut> sorted = new ArrayList<>(source);
-        final Map<String, Integer> existingOrder = new HashMap<>();
-        for (int i = 0; i < sorted.size(); i++) {
-            Shortcut shortcut = sorted.get(i);
-            existingOrder.put(shortcut.id != null ? shortcut.id : ("index_" + i), i);
-        }
-        Collections.sort(sorted, Comparator
-                .comparingInt((Shortcut s) -> s.displayOrder > 0 ? s.displayOrder : Integer.MAX_VALUE)
-                .thenComparingInt(s -> existingOrder.getOrDefault(s.id != null ? s.id : "", Integer.MAX_VALUE)));
+        sortShortcutsListForStrip(sorted);
         return sorted;
+    }
+
+    /**
+     * Puts the chosen My-favorite shortcut at {@code stripIndex} in the ordered strip (0 = leftmost).
+     * The shortcut must already exist in My Shortcuts for this profile.
+     */
+    public void assignMyShortcutToStripIndex(String profileId, int stripIndex, String shortcutId) {
+        if (profileId == null || shortcutId == null || stripIndex < 0) {
+            return;
+        }
+        List<Shortcut> ordered = new ArrayList<>(getMyShortcuts(profileId));
+        sortShortcutsListForStrip(ordered);
+        Shortcut chosen = null;
+        for (Shortcut s : ordered) {
+            if (s != null && shortcutId.equals(s.id)) {
+                chosen = s;
+                break;
+            }
+        }
+        if (chosen == null) {
+            return;
+        }
+        ordered.removeIf(s -> s != null && shortcutId.equals(s.id));
+        int pos = Math.min(stripIndex, ordered.size());
+        ordered.add(pos, chosen);
+        renumberDisplayOrder(ordered);
+        updateMyShortcuts(profileId, ordered);
+        ShortcutProfile p = getProfileById(profileId);
+        if (listener != null && p != null) {
+            listener.onProfileUpdated(p);
+        }
     }
 
     /**
