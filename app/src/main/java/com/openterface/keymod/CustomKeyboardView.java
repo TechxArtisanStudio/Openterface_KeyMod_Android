@@ -3243,6 +3243,17 @@ public class CustomKeyboardView extends LinearLayout {
                 .getString("target_os", "macos");
     }
 
+    /**
+     * Idle top-strip keycap: row 1 (Shortcut Hub profile favorites, swipe strip) vs fixed rows 2–3.
+     * Row-1 keys keep {@link Key#allowTopPanelPagingGesture}; fixed rows use {@code markFixedRowKey}.
+     */
+    private int resolveTopPanelIdleBackgroundRes(Key key) {
+        if (key != null && key.isTopPanelKey && key.allowTopPanelPagingGesture) {
+            return R.drawable.function_button_background_profile_strip;
+        }
+        return R.drawable.function_button_background;
+    }
+
     private void addShortcutPanelRows(
             LinearLayout parent,
             List<Key> panelKeys,
@@ -3310,7 +3321,7 @@ public class CustomKeyboardView extends LinearLayout {
                     ib.setLayoutParams(p);
                     ib.setBackgroundResource(keyLockedVisualState
                             ? R.drawable.press_button_background
-                            : R.drawable.function_button_background);
+                            : resolveTopPanelIdleBackgroundRes(k));
                     ib.setSelected(keyLockedVisualState);
                     ib.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
                     ib.setPadding(0, 0, 0, 0);
@@ -3347,7 +3358,7 @@ public class CustomKeyboardView extends LinearLayout {
                     iconTextButton.setLayoutParams(p);
                     iconTextButton.setBackgroundResource(keyLockedVisualState
                             ? R.drawable.press_button_background
-                            : R.drawable.function_button_background);
+                            : resolveTopPanelIdleBackgroundRes(k));
                     iconTextButton.setSelected(keyLockedVisualState);
                     iconTextButton.setGravity(Gravity.CENTER);
                     iconTextButton.setTextSize(TypedValue.COMPLEX_UNIT_SP,
@@ -3367,7 +3378,7 @@ public class CustomKeyboardView extends LinearLayout {
                     b.setLayoutParams(p);
                     b.setBackgroundResource(keyLockedVisualState
                         ? R.drawable.press_button_background
-                        : R.drawable.function_button_background);
+                        : resolveTopPanelIdleBackgroundRes(k));
                     b.setSelected(keyLockedVisualState);
                     b.setGravity(Gravity.CENTER);
                     b.setTextSize(TypedValue.COMPLEX_UNIT_SP,
@@ -4292,7 +4303,7 @@ public class CustomKeyboardView extends LinearLayout {
                         : (modifierLocked || isTopProfileSlotActive(key));
                 view.setBackgroundResource(keyLockedVisualState
                         ? R.drawable.press_button_background
-                        : R.drawable.function_button_background);
+                        : resolveTopPanelIdleBackgroundRes(key));
                 view.setSelected(keyLockedVisualState);
             }
             return;
