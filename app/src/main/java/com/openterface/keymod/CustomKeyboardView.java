@@ -3399,12 +3399,17 @@ public class CustomKeyboardView extends LinearLayout {
                     b.setLayoutParams(p);
                     applyTopPanelKeyCapBackground(b, k, keyLockedVisualState);
                     b.setSelected(keyLockedVisualState);
-                    b.setGravity(Gravity.CENTER);
                     boolean profileHubSlot = isTopProfileSlotKey(k) && fixedRowsSlice;
+                    if (!profileHubSlot) {
+                        b.setGravity(Gravity.CENTER);
+                    }
                     if (profileHubSlot) {
                         int stripPx = Math.round(getResources().getDimension(
                                 R.dimen.profile_hub_slot_bottom_accent_height));
-                        b.setPadding(dpToPx(4), dpToPx(2), dpToPx(4), stripPx + dpToPx(6));
+                        // Symmetric vertical padding so CENTER_VERTICAL sits in the full key, not biased
+                        // toward the top (asymmetric pad was: small top, large bottom reserve).
+                        int vPad = stripPx + dpToPx(6);
+                        b.setPadding(dpToPx(4), vPad, dpToPx(4), vPad);
                     } else {
                         b.setPadding(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
                         b.setTextSize(TypedValue.COMPLEX_UNIT_SP,
@@ -3452,6 +3457,12 @@ public class CustomKeyboardView extends LinearLayout {
                                 maxSp,
                                 TOP_PROFILE_HUB_SLOT_TEXT_STEP_SP,
                                 TypedValue.COMPLEX_UNIT_SP);
+                        b.setGravity(Gravity.CENTER_VERTICAL | Gravity.CENTER_HORIZONTAL);
+                        b.setTextAlignment(View.TEXT_ALIGNMENT_GRAVITY);
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            b.setFirstBaselineToTopHeight(0);
+                            b.setLastBaselineToBottomHeight(0);
+                        }
                     }
                     b.setTextColor(resolveThemeTextColor());
                     b.setAllCaps(false);
