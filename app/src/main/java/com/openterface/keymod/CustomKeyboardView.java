@@ -9,11 +9,14 @@ import android.content.ServiceConnection;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
+import android.graphics.Outline;
 import android.graphics.PorterDuff;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -25,6 +28,7 @@ import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.StateSet;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
@@ -32,6 +36,7 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.ViewOutlineProvider;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
@@ -47,6 +52,7 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.graphics.ColorUtils;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.preference.PreferenceManager;
@@ -95,6 +101,8 @@ public class CustomKeyboardView extends LinearLayout {
     private static final float TOP_FIXED_ROWS_TEXT_SP = 13f;
     private static final float TOP_FIXED_ROWS_ACTION_LABEL_SP = 14f;
     private static final float TOP_FIXED_ROWS_CUSTOM_GLYPH_SP = 21f;
+    /** Profile hub slot row: slightly smaller than other fixed-row text to reduce wrap vs bottom strip. */
+    private static final float TOP_PROFILE_HUB_SLOT_TEXT_SP = 12f;
     /** Single-pane IME: shortcut strip vs text vs space for soft keyboard (sum ~5.15). */
     private static final float IME_SINGLE_TOP_STRIP_WEIGHT = 1.35f;
     private static final float IME_SINGLE_TEXT_WEIGHT = 0.95f;
@@ -3037,7 +3045,7 @@ public class CustomKeyboardView extends LinearLayout {
                 fullName = "?";
             }
         }
-        String compact = fullName.length() > 8 ? fullName.substring(0, 8) : fullName;
+        String compact = fullName.length() > 10 ? fullName.substring(0, 10) : fullName;
         int code = KEY_TOP_PROFILE_SLOT_1 + (slotIndex1Based - 1);
         String codeStr = Integer.toHexString(code).toUpperCase();
         return markFixedRowKey(new Key(compact, fullName, code, codeStr, 1f, 0, 0f, false, false, -1, true));
@@ -3168,6 +3176,105 @@ public class CustomKeyboardView extends LinearLayout {
         return R.drawable.function_button_background;
     }
 
+    /**
+     * Profile hub slot keycaps: base + bottom accent must use {@link ThemeManager} colors — the
+     * keyboard view context often lacks a full Material theme, so {@code ?attr/colorPrimary} in XML
+     * drawables resolves incorrectly (e.g. white strip).
+     */
+    private Drawable buildProfileHubSlotBackground(boolean activeProfileSelected) {
+        Context ctx = getContext();
+        Resources res = ctx.getResources();
+        float cornerPx = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 9f, res.getDisplayMetrics());
+        int stripH = Math.round(res.getDimension(R.dimen.profile_hub_slot_bottom_accent_height));
+        int container = ThemeManager.getColorPrimaryContainer(ctx);
+        int idle = ContextCompat.getColor(ctx, R.color.key_bg_function);
+        int stripOnContainer = resolveProfileHubStripColor(ctx, container);
+        int stripOnIdle = resolveProfileHubStripColor(ctx, idle);
+        if (activeProfileSelected) {
+            return newProfileHubStackedLayers(container, stripOnContainer, cornerPx, stripH);
+        }
+        StateListDrawable states = new StateListDrawable();
+        states.addState(new int[]{android.R.attr.state_pressed},
+                newProfileHubStackedLayers(container, stripOnContainer, cornerPx, stripH));
+        states.addState(StateSet.WILD_CARD, newProfileHubStackedLayers(idle, stripOnIdle, cornerPx, stripH));
+        return states;
+    }
+
+    /**
+     * Softer strip than raw {@link ThemeManager#getColorPrimary} so light keys stay calm; blends
+     * with the key fill so the active (mint) slot still looks cohesive.
+     */
+    private int resolveProfileHubStripColor(Context ctx, int baseFillArgb) {
+        int primary = ThemeManager.getColorPrimary(ctx);
+        int nightMask = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        int toward = (nightMask == Configuration.UI_MODE_NIGHT_YES)
+                ? ColorUtils.blendARGB(baseFillArgb, Color.WHITE, 0.35f)
+                : Color.WHITE;
+        int lightened = ColorUtils.blendARGB(primary, toward, 0.44f);
+        return ColorUtils.blendARGB(lightened, baseFillArgb, 0.2f);
+    }
+
+    private static LayerDrawable newProfileHubStackedLayers(
+            int baseColorArgb, int accentColorArgb, float cornerPx, int stripHeightPx) {
+        GradientDrawable base = new GradientDrawable();
+        base.setShape(GradientDrawable.RECTANGLE);
+        base.setColor(baseColorArgb);
+        base.setCornerRadius(cornerPx);
+        GradientDrawable strip = new GradientDrawable();
+        strip.setShape(GradientDrawable.RECTANGLE);
+        strip.setColor(accentColorArgb);
+        // Bottom strip is a plain rectangle; outer 9dp rounding comes from the base layer and from
+        // {@link #installProfileHubRoundedOutlineClip} so the strip is not double-curved (avoids
+        // corner gaps vs a 3dp-tall layer with 9dp radii).
+        LayerDrawable ld = new LayerDrawable(new Drawable[]{base, strip});
+        ld.setLayerGravity(1, Gravity.BOTTOM);
+        ld.setLayerHeight(1, stripHeightPx);
+        return ld;
+    }
+
+    /** Clips profile-hub keycaps (base + strip) to the same 9dp round-rect as other function keys. */
+    private void installProfileHubRoundedOutlineClip(View view) {
+        Resources res = getResources();
+        final float cornerPx = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 9f, res.getDisplayMetrics());
+        view.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, Outline outline) {
+                int w = v.getWidth();
+                int h = v.getHeight();
+                if (w <= 0 || h <= 0) {
+                    outline.setEmpty();
+                    return;
+                }
+                outline.setRoundRect(0, 0, w, h, cornerPx);
+            }
+        });
+        view.setClipToOutline(true);
+    }
+
+    private static void clearProfileHubRoundedOutlineClip(View view) {
+        if (view == null) {
+            return;
+        }
+        view.setClipToOutline(false);
+        view.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+    }
+
+    private void applyTopPanelKeyCapBackground(View view, Key key, boolean keyLockedVisualState) {
+        if (isTopProfileSlotKey(key)) {
+            view.setBackground(buildProfileHubSlotBackground(keyLockedVisualState));
+            view.setBackgroundTintList(null);
+            installProfileHubRoundedOutlineClip(view);
+            return;
+        }
+        clearProfileHubRoundedOutlineClip(view);
+        int bg = keyLockedVisualState
+                ? R.drawable.press_button_background
+                : resolveTopPanelIdleBackgroundRes(key);
+        view.setBackgroundResource(bg);
+    }
+
     private void addShortcutPanelRows(
             LinearLayout parent,
             List<Key> panelKeys,
@@ -3233,9 +3340,7 @@ public class CustomKeyboardView extends LinearLayout {
                     ImageButton ib = new ImageButton(getContext());
                     applyFlatKeyStyle(ib);
                     ib.setLayoutParams(p);
-                    ib.setBackgroundResource(keyLockedVisualState
-                            ? R.drawable.press_button_background
-                            : resolveTopPanelIdleBackgroundRes(k));
+                    applyTopPanelKeyCapBackground(ib, k, keyLockedVisualState);
                     ib.setSelected(keyLockedVisualState);
                     ib.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
                     ib.setPadding(0, 0, 0, 0);
@@ -3270,9 +3375,7 @@ public class CustomKeyboardView extends LinearLayout {
                     Button iconTextButton = new Button(getContext());
                     applyFlatKeyStyle(iconTextButton);
                     iconTextButton.setLayoutParams(p);
-                    iconTextButton.setBackgroundResource(keyLockedVisualState
-                            ? R.drawable.press_button_background
-                            : resolveTopPanelIdleBackgroundRes(k));
+                    applyTopPanelKeyCapBackground(iconTextButton, k, keyLockedVisualState);
                     iconTextButton.setSelected(keyLockedVisualState);
                     iconTextButton.setGravity(Gravity.CENTER);
                     iconTextButton.setTextSize(TypedValue.COMPLEX_UNIT_SP,
@@ -3290,14 +3393,19 @@ public class CustomKeyboardView extends LinearLayout {
                     Button b = new Button(getContext());
                     applyFlatKeyStyle(b);
                     b.setLayoutParams(p);
-                    b.setBackgroundResource(keyLockedVisualState
-                        ? R.drawable.press_button_background
-                        : resolveTopPanelIdleBackgroundRes(k));
+                    applyTopPanelKeyCapBackground(b, k, keyLockedVisualState);
                     b.setSelected(keyLockedVisualState);
                     b.setGravity(Gravity.CENTER);
-                    b.setTextSize(TypedValue.COMPLEX_UNIT_SP,
-                            fixedRowsSlice ? TOP_FIXED_ROWS_TEXT_SP : TOP_SHORTCUT_PANEL_TEXT_SP);
-                    b.setPadding(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
+                    boolean profileHubSlot = isTopProfileSlotKey(k) && fixedRowsSlice;
+                    if (profileHubSlot) {
+                        int stripPx = Math.round(getResources().getDimension(
+                                R.dimen.profile_hub_slot_bottom_accent_height));
+                        b.setPadding(dpToPx(4), dpToPx(3), dpToPx(4), stripPx + dpToPx(4));
+                    } else {
+                        b.setPadding(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
+                        b.setTextSize(TypedValue.COMPLEX_UNIT_SP,
+                                fixedRowsSlice ? TOP_FIXED_ROWS_TEXT_SP : TOP_SHORTCUT_PANEL_TEXT_SP);
+                    }
                     // Profile hub row-3 slots: symbolLabel holds full name for action-label mode only;
                     // do not use symbol+newline+label (that path is for real shortcuts: chord + name).
                     final String topButtonText;
@@ -3316,6 +3424,9 @@ public class CustomKeyboardView extends LinearLayout {
                     if (renderAsActionLabel) {
                         b.setTextSize(TypedValue.COMPLEX_UNIT_SP,
                                 fixedRowsSlice ? TOP_FIXED_ROWS_ACTION_LABEL_SP : TOP_SHORTCUT_PANEL_ACTION_LABEL_SP);
+                        b.setTypeface(Typeface.DEFAULT_BOLD);
+                    } else if (profileHubSlot) {
+                        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, TOP_PROFILE_HUB_SLOT_TEXT_SP);
                         b.setTypeface(Typeface.DEFAULT_BOLD);
                     }
                     b.setTextColor(resolveThemeTextColor());
@@ -4215,9 +4326,7 @@ public class CustomKeyboardView extends LinearLayout {
                 boolean keyLockedVisualState = isFixedTopLocalFnKey(key)
                         ? fixedTopLocalFnLocked
                         : (modifierLocked || isTopProfileSlotActive(key));
-                view.setBackgroundResource(keyLockedVisualState
-                        ? R.drawable.press_button_background
-                        : resolveTopPanelIdleBackgroundRes(key));
+                applyTopPanelKeyCapBackground(view, key, keyLockedVisualState);
                 view.setSelected(keyLockedVisualState);
             }
             return;

@@ -3,6 +3,7 @@ package com.openterface.keymod;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -17,6 +18,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.tabs.TabLayout;
+import com.openterface.keymod.util.MyShortcutsReorderHelpReadModeDialog;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -106,18 +108,11 @@ public final class MyShortcutsReorderBottomSheet {
         BottomSheetDialog dialog = new BottomSheetDialog(activity);
         dialog.setContentView(root);
 
-        TextView subtitle = root.findViewById(R.id.reorder_sheet_subtitle);
         TextView emptyMyHint = root.findViewById(R.id.reorder_my_empty_hint);
         TabLayout tabLayout = root.findViewById(R.id.reorder_tab_layout);
+        ImageButton infoButton = root.findViewById(R.id.reorder_sheet_info);
         String profileTitleRaw = ap.name != null ? ap.name.trim() : "";
-        final String profileTitleForSubtitle = profileTitleRaw.isEmpty() ? "—" : profileTitleRaw;
-
-        Runnable refreshSubtitle = () -> subtitle.setText(activity.getString(
-                R.string.my_shortcuts_reorder_sheet_subtitle_with_profile,
-                profileTitleForSubtitle,
-                data.size()));
-
-        refreshSubtitle.run();
+        final String profileTitleForHelp = profileTitleRaw.isEmpty() ? "—" : profileTitleRaw;
 
         RecyclerView recycler = root.findViewById(R.id.reorder_recycler);
         int listHeightPx = (int) (activity.getResources().getDisplayMetrics().heightPixels * 0.52f);
@@ -130,6 +125,13 @@ public final class MyShortcutsReorderBottomSheet {
         }
         recycler.setNestedScrollingEnabled(true);
         recycler.setLayoutManager(new LinearLayoutManager(activity));
+
+        if (infoButton != null) {
+            infoButton.setOnClickListener(v -> MyShortcutsReorderHelpReadModeDialog.show(
+                    activity,
+                    MyShortcutsReorderHelpReadModeDialog.formatHelpText(
+                            activity, profileTitleForHelp, data.size())));
+        }
 
         MyShortcutsReorderAdapter myAdapter = new MyShortcutsReorderAdapter(activity, targetOs, data);
         ShortcutSectionPickAdapter pickAdapter = new ShortcutSectionPickAdapter(activity, targetOs, new ArrayList<>());
@@ -193,7 +195,6 @@ public final class MyShortcutsReorderBottomSheet {
                 if (profileManager.appendCloneIfAbsent(data, shortcut)) {
                     myAdapter.notifyDataSetChanged();
                     pickAdapter.notifyDataSetChanged();
-                    refreshSubtitle.run();
                     Toast.makeText(activity, R.string.my_shortcuts_added_to_my, Toast.LENGTH_SHORT).show();
                 } else {
                     pickAdapter.notifyDataSetChanged();
@@ -206,7 +207,6 @@ public final class MyShortcutsReorderBottomSheet {
                 if (removeShortcutFromWorkingListById(data, shortcut.id)) {
                     myAdapter.notifyDataSetChanged();
                     pickAdapter.notifyDataSetChanged();
-                    refreshSubtitle.run();
                     Toast.makeText(activity, R.string.my_shortcuts_removed_from_my, Toast.LENGTH_SHORT).show();
                 }
             }

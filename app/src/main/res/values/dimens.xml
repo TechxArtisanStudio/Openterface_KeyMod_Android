@@ -53,4 +53,7 @@
     <!-- Card -->
     <dimen name="card_corner_radius">12dp</dimen>
     <dimen name="card_elevation">3dp</dimen>
+
+    <!-- Shortcut Hub profile slots (fixed strip page 2): thick bottom accent inside key (~15–20% row) -->
+    <dimen name="profile_hub_slot_bottom_accent_height">3dp</dimen>
 </resources>

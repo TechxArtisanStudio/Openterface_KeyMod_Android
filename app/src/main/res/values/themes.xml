@@ -125,4 +125,12 @@
 
     <!-- Inherits accent from the active KeyMod theme (no fixed orange). -->
     <style name="Theme.KeyMod.Presentation" parent="Base.Theme.KeyMod" />
+
+    <!-- Full-screen “reading mode” help above the reorder bottom sheet (blur/dim behind on API 31+). -->
+    <style name="Theme.KeyMod.FullScreenReadingHelp" parent="Theme.Material3.DayNight.Dialog">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
 </resources>
