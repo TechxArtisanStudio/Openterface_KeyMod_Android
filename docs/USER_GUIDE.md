@@ -108,13 +108,14 @@ In keyboard mode, the fixed shortcut strip uses two rows of keys beneath the swi
 - The physical positions do not move across target OS values.
 - Row 2 already has dedicated **Tab** and **Enter** keys.
 
-When local **Fn** (row 3 col 7) is enabled, row 3 adds temporary overlays:
+On **Page 1** of the fixed strip (ESC / navigation page), when **local Fn** (row 3 col 7 on that page) is on:
 
-- Row 3 Col 1 shows and sends **Tab**
-- Row 3 Col 3 shows and sends **Enter**
-- Row 3 Col 2 remains the OS-specific Alt/Option key
+- **Row 2** sends **Home**, **End**, **PgUp**, **PgDn**, **Insert**, **Scroll Lock**; the IME toggle key is unchanged.
+- **Row 3** sends **Pause**, **`/`**, **`\`**, **`|`** (non‑US `\`/`|` HID usage), **`"`** (Shift+apostrophe), **`-`**; Ctrl/Alt/Win positions still support **long‑press** modifier lock using the underlying modifier keys.
 
-Long-press lock for modifiers still uses their native modifier behavior.
+On **Page 2** of the fixed strip (Shortcut Hub, profile slots), when local Fn is on, the bottom row shows **six empty slots** plus **Fn** only—the **DISPLAY** toggle is hidden until Fn is turned off again.
+
+Media keys are not sent as Consumer HID in this app build; use keyboard shortcuts on the host where needed.
 
 ---
 

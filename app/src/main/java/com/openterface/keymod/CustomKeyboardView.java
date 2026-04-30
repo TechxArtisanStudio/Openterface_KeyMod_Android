@@ -838,6 +838,14 @@ public class CustomKeyboardView extends LinearLayout {
         if (isTopProfileSlotKey(key)) {
             return true;
         }
+        // Fixed strip icon keys use shortcutModifiers == -1; still honor DISPLAY (text) mode.
+        if (key.code == 0xE1 // Shift
+                || key.code == 0x4C // Del / backspace
+                || key.code == KEY_IME_TOGGLE
+                || key.code == 0x52 || key.code == 0x28 // Up, Enter
+                || key.code == 0x50 || key.code == 0x51 || key.code == 0x4F) { // Arrows
+            return true;
+        }
         return key.shortcutModifiers >= 0 || key.code == 0x2B;
     }
 
@@ -873,6 +881,15 @@ public class CustomKeyboardView extends LinearLayout {
     private String formatTopShortcutActionLabel(Key key) {
         if (key == null) {
             return "";
+        }
+        if (key.code == KEY_IME_TOGGLE) {
+            Context ctx = getContext();
+            if (ctx != null) {
+                return ctx.getString(systemImeCaptureMode
+                        ? R.string.top_shortcut_ime_toggle_system_short
+                        : R.string.top_shortcut_ime_toggle_keymod_short);
+            }
+            return "IME";
         }
         if (isTopProfileSlotKey(key)) {
             if (!TextUtils.isEmpty(key.symbolLabel)) {
@@ -3070,15 +3087,21 @@ public class CustomKeyboardView extends LinearLayout {
         for (int slot = 1; slot <= TOP_PANEL_COLUMNS; slot++) {
             keys.add(buildProfileHubSlotKey(slot));
         }
-        // Lower row: five placeholders + DISPLAY toggle (col 6) + local Fn (col 7), same strip mode icons as page 0
-        for (int i = 0; i < 5; i++) {
-            keys.add(buildNoOpFixedPlaceholder());
+        // Lower row: Fn off — five placeholders + DISPLAY + Fn; Fn on — six placeholders + Fn (no DISPLAY toggle).
+        if (fixedTopLocalFnLocked) {
+            for (int i = 0; i < 6; i++) {
+                keys.add(buildNoOpFixedPlaceholder());
+            }
+        } else {
+            for (int i = 0; i < 5; i++) {
+                keys.add(buildNoOpFixedPlaceholder());
+            }
+            Key shortcutHubDisplay = new Key("DISPLAY", "", KEY_TOP_SHORTCUT_DISPLAY_TOGGLE, "", 1f,
+                    topShortcutShowActionLabels ? R.drawable.text_on_24 : R.drawable.icon_on_24,
+                    0f, false, false, -1, true);
+            shortcutHubDisplay.displayToggleLocalFnShowsEquals = false;
+            keys.add(markFixedRowKey(shortcutHubDisplay));
         }
-        Key shortcutHubDisplay = new Key("DISPLAY", "", KEY_TOP_SHORTCUT_DISPLAY_TOGGLE, "", 1f,
-                topShortcutShowActionLabels ? R.drawable.text_on_24 : R.drawable.icon_on_24,
-                0f, false, false, -1, true);
-        shortcutHubDisplay.displayToggleLocalFnShowsEquals = false;
-        keys.add(markFixedRowKey(shortcutHubDisplay));
         keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f, R.drawable.ic_swap_horiz_24, 0f, false, false, -1, true)));
         return keys;
     }
@@ -3121,7 +3144,8 @@ public class CustomKeyboardView extends LinearLayout {
             }
             return mapping.iconResId != 0 ? mapping.iconResId : key.iconResId;
         }
-        return mapping.iconResId != 0 ? mapping.iconResId : (key != null ? key.iconResId : 0);
+        // Fn overlay: prefer text label over the base key's icon (e.g. Shift cap → END).
+        return mapping.iconResId;
     }
 
     private Key markFixedRowKey(Key key) {
@@ -3469,12 +3493,12 @@ public class CustomKeyboardView extends LinearLayout {
                     // Profile hub row-3 slots: symbolLabel holds full name for action-label mode only;
                     // do not use symbol+newline+label (that path is for real shortcuts: chord + name).
                     final String topButtonText;
-                    if (renderAsActionLabel) {
+                    if (fixedTopLocalFn != null) {
+                        topButtonText = effectiveTopLabel;
+                    } else if (renderAsActionLabel) {
                         topButtonText = formatTopShortcutActionLabel(k);
                     } else if (isTopProfileSlotKey(k)) {
                         topButtonText = k.label != null ? k.label : "";
-                    } else if (fixedTopLocalFn != null) {
-                        topButtonText = effectiveTopLabel;
                     } else if (k.symbolLabel != null && !k.symbolLabel.isEmpty()) {
                         if (k.label != null && !k.label.trim().isEmpty()) {
                             topButtonText = k.symbolLabel + "\n" + k.label;
@@ -4908,20 +4932,20 @@ public class CustomKeyboardView extends LinearLayout {
             case 0x3E: return new FnMapping("5", 0x22, 0);
             case 0x3F: return new FnMapping("6", 0x23, 0);
             case 0x40: return new FnMapping("7", 0x24, 0);
-            case 0x4A: return new FnMapping("F1", 0x3A, 0);
-            case 0x4D: return new FnMapping("F2", 0x3B, 0);
-            case 0x4B: return new FnMapping("F3", 0x3C, 0);
-            case 0x4E: return new FnMapping("F4", 0x3D, 0);
             case KEY_IME_TOGGLE: return null;
+            // Fixed-top page 1 (ESC strip): local Fn — row2 navigation cluster, row3 symbols/system.
+            case 0x29: return new FnMapping("HOME", 0x4A, 0);
+            case 0xE1: return new FnMapping("END", 0x4D, 0);
+            case 0x4C: return new FnMapping("PGUP", 0x4B, 0);
+            case 0x2B: return new FnMapping("PGDN", 0x4E, 0);
             case 0x52: return new FnMapping("INS", 0x49, 0);
-            // Keep ESC as ESC under local Fn (no F5 remap).
-            case 0x29: return null;
-            case 0xE0: return new FnMapping("TAB", 0x2B, 0);
-            // Row3 col2 (Alt): no Fn-layer remap — keep OS-aware Alt as-is when toggle has no mapping.
-            case 0xE2: return null;
-            case 0xE3: return new FnMapping("ENTER", 0x28, 0);
-            case 0x50: return new FnMapping("HOME", 0x4A, 0);
-            case 0x51: return new FnMapping("END", 0x4D, 0);
+            case 0x28: return new FnMapping("SCR LK", 0x47, 0);
+            case 0xE0: return new FnMapping("PAUSE", 0x48, 0);
+            case 0xE2: return new FnMapping("/", 0x38, 0);
+            case 0xE3: return new FnMapping("\\", 0x31, 0);
+            case 0x50: return new FnMapping("|", 0x64, 0);
+            case 0x51: return new FnMapping("\"", 0x34, MOD_SHIFT);
+            case 0x4F: return new FnMapping("-", 0x2D, 0);
             default:
                 return null;
         }
@@ -5140,8 +5164,8 @@ public class CustomKeyboardView extends LinearLayout {
                 setTopShortcutShowActionLabels(!topShortcutShowActionLabels);
                 return;
             }
-            // Local Fn on: F-row DISPLAY shows "=" and sends '=' HID; Hub strip keeps toggle icons but still
-            // sends '=' HID. Do not cycle display mode while Fn is on.
+            // Local Fn on: F-row DISPLAY shows "=" and sends '=' HID; Shortcut Hub Page 2 hides DISPLAY when Fn is on.
+            // Do not cycle display mode while Fn is on.
         }
 
         if (key.code == KEY_NOOP_PLACEHOLDER) {
@@ -5165,6 +5189,7 @@ public class CustomKeyboardView extends LinearLayout {
 
         if (key.code == KEY_FIXED_TOP_LOCAL_FN) {
             fixedTopLocalFnLocked = !fixedTopLocalFnLocked;
+            rebuildFixedTopRowsPanels();
             rebuildTopShortcutPanels();
             syncTopPanelViewportContent();
             // Modifier lock flags (Ctrl/Shift/Alt/Win) are unchanged here — only Fn-layer and keycap
@@ -5172,6 +5197,7 @@ public class CustomKeyboardView extends LinearLayout {
             refreshVisibleTopPanelButtonStates();
             if (splitPartner != null) {
                 splitPartner.fixedTopLocalFnLocked = fixedTopLocalFnLocked;
+                splitPartner.rebuildFixedTopRowsPanels();
                 splitPartner.rebuildTopShortcutPanels();
                 splitPartner.syncTopPanelViewportContent();
                 splitPartner.refreshVisibleTopPanelButtonStates();
