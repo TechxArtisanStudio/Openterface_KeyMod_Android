@@ -9,6 +9,7 @@ import android.content.ServiceConnection;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -27,17 +28,21 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
+import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -50,6 +55,7 @@ import androidx.preference.PreferenceManager;
 
 import com.openterface.keymod.util.HidTextKeystrokeSender;
 import com.openterface.keymod.util.ImeTextForwarder;
+import com.openterface.keymod.util.KeyParser;
 import com.openterface.keymod.util.TopModeShortcutPrefs;
 import com.openterface.keymod.util.TopShortcutProfileSlotPrefs;
 import com.openterface.target.CH9329MSKBMap;
@@ -1028,20 +1034,26 @@ public class CustomKeyboardView extends LinearLayout {
         if (ap == null) {
             return;
         }
-        java.util.ArrayList<ShortcutProfileManager.Shortcut> favorites =
-                new java.util.ArrayList<>(shortcutProfileManager.getOrderedShortcutsForTopStrip(ap.id));
+        ArrayList<ShortcutProfileManager.Shortcut> favorites =
+                new ArrayList<>(shortcutProfileManager.getOrderedShortcutsForTopStrip(ap.id));
         if (favorites.isEmpty()) {
             Toast.makeText(act, R.string.top_strip_favorite_picker_empty, Toast.LENGTH_SHORT).show();
             return;
         }
-        CharSequence[] labels = new CharSequence[favorites.size()];
-        for (int i = 0; i < favorites.size(); i++) {
-            ShortcutProfileManager.Shortcut s = favorites.get(i);
-            labels[i] = s.name != null ? s.name : (s.label != null ? s.label : "");
-        }
-        new AlertDialog.Builder(act)
-                .setTitle(R.string.top_strip_favorite_picker_title)
-                .setItems(labels, (dialog, which) -> {
+
+        LayoutInflater inflater = act.getLayoutInflater();
+        View titleView = inflater.inflate(R.layout.dialog_top_strip_favorite_title, null, false);
+        TextView profileName = titleView.findViewById(R.id.favorite_picker_profile_name);
+        TextView subtitle = titleView.findViewById(R.id.favorite_picker_subtitle);
+        String profileTitle = ap.name != null ? ap.name.trim() : "";
+        profileName.setText(profileTitle.isEmpty() ? "—" : profileTitle);
+        subtitle.setText(R.string.top_strip_favorite_picker_subtitle);
+
+        TopStripFavoritePickerAdapter pickerAdapter = new TopStripFavoritePickerAdapter(favorites);
+
+        AlertDialog dialog = new AlertDialog.Builder(act)
+                .setCustomTitle(titleView)
+                .setAdapter(pickerAdapter, (d, which) -> {
                     ShortcutProfileManager.Shortcut pick = favorites.get(which);
                     if (pick != null && pick.id != null) {
                         shortcutProfileManager.assignMyShortcutToStripIndex(ap.id, globalStripIndex, pick.id);
@@ -1049,7 +1061,99 @@ public class CustomKeyboardView extends LinearLayout {
                     }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                .create();
+
+        dialog.setOnShowListener(d -> {
+            ListView lv = dialog.getListView();
+            if (lv == null) {
+                return;
+            }
+            int maxPx = (int) TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP, 380f, act.getResources().getDisplayMetrics());
+            ViewGroup.LayoutParams lp = lv.getLayoutParams();
+            if (lp != null) {
+                lp.height = maxPx;
+                lv.setLayoutParams(lp);
+            }
+        });
+        dialog.show();
+    }
+
+    private void bindTopStripFavoritePickerRow(View row, ShortcutProfileManager.Shortcut shortcut) {
+        ImageView iconDrawable = row.findViewById(R.id.favorite_row_icon_drawable);
+        TextView iconEmoji = row.findViewById(R.id.favorite_row_icon_emoji);
+        TextView nameTv = row.findViewById(R.id.favorite_row_name);
+        TextView chordTv = row.findViewById(R.id.favorite_row_chord);
+
+        String chord = "";
+        if (shortcut.label != null && !shortcut.label.trim().isEmpty()) {
+            chord = KeyParser.displayLabel(shortcut.label.trim(), getTargetOs());
+        }
+        chordTv.setText(chord);
+
+        String displayName = "";
+        if (!TextUtils.isEmpty(shortcut.name)) {
+            displayName = shortcut.name.trim();
+        } else if (shortcut.label != null) {
+            displayName = shortcut.label.trim();
+        }
+        if (displayName.isEmpty()) {
+            displayName = "Key";
+        }
+        nameTv.setText(displayName);
+
+        int iconRes = resolveShortcutIconRes(shortcut.icon);
+        if (iconRes != 0) {
+            iconDrawable.setImageResource(iconRes);
+            iconDrawable.setColorFilter(resolveThemeTextColor(), PorterDuff.Mode.SRC_IN);
+            iconDrawable.setVisibility(View.VISIBLE);
+            iconEmoji.setVisibility(View.GONE);
+        } else {
+            iconDrawable.setImageDrawable(null);
+            iconDrawable.clearColorFilter();
+            iconDrawable.setVisibility(View.GONE);
+            String raw = shortcut.icon != null ? shortcut.icon.trim() : "";
+            if (isEmojiIcon(raw)) {
+                iconEmoji.setText(raw);
+                iconEmoji.setVisibility(View.VISIBLE);
+            } else {
+                iconEmoji.setVisibility(View.GONE);
+            }
+        }
+    }
+
+    private final class TopStripFavoritePickerAdapter extends BaseAdapter {
+        private final List<ShortcutProfileManager.Shortcut> items;
+        private final LayoutInflater inflater;
+
+        TopStripFavoritePickerAdapter(List<ShortcutProfileManager.Shortcut> items) {
+            this.items = items;
+            this.inflater = LayoutInflater.from(getContext());
+        }
+
+        @Override
+        public int getCount() {
+            return items.size();
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return items.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            if (convertView == null) {
+                convertView = inflater.inflate(R.layout.dialog_row_top_strip_favorite, parent, false);
+            }
+            bindTopStripFavoritePickerRow(convertView, items.get(position));
+            return convertView;
+        }
     }
 
     /** Sync modifier lock states to the paired keyboard. */
@@ -2974,10 +3078,13 @@ public class CustomKeyboardView extends LinearLayout {
 
     private List<Key> buildFixedTopRowsPage2() {
         List<Key> keys = new ArrayList<>(TOP_PANEL_COLUMNS * 2);
-        // Row 2: six placeholders + local Fn toggle
-        for (int i = 0; i < 6; i++) {
+        // Row 2: five placeholders + DISPLAY toggle (col 6) + local Fn (col 7), same strip mode icons as page 0
+        for (int i = 0; i < 5; i++) {
             keys.add(buildNoOpFixedPlaceholder());
         }
+        keys.add(markFixedRowKey(new Key("DISPLAY", "", KEY_TOP_SHORTCUT_DISPLAY_TOGGLE, "", 1f,
+                topShortcutShowActionLabels ? R.drawable.text_on_24 : R.drawable.icon_on_24,
+                0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f, R.drawable.ic_swap_horiz_24, 0f, false, false, -1, true)));
         // Row 3: seven Shortcut Hub profile slots (tap = active profile, long-press = assign profile)
         for (int slot = 1; slot <= TOP_PANEL_COLUMNS; slot++) {
@@ -4865,7 +4972,7 @@ public class CustomKeyboardView extends LinearLayout {
                 setTopShortcutShowActionLabels(!topShortcutShowActionLabels);
                 return;
             }
-            // Local Fn on (page 0): keycap shows "=" and sends '=' HID; do not cycle shortcut display mode.
+            // Local Fn on (page 0 / page-2 strip): keycap shows "=" and sends '=' HID; do not cycle display mode.
         }
 
         if (key.code == KEY_NOOP_PLACEHOLDER) {
