@@ -176,18 +176,11 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int KEY_TOP_SHORTCUT_DISPLAY_TOGGLE = 0xF00B;
     /** Local Fn latch for fixed top rows 2-3 only. */
     private static final int KEY_FIXED_TOP_LOCAL_FN = 0xF00C;
-    /** Fixed page-2 row-3: Shortcut Hub profile slots 1–7 (tap = activate, long-press = assign). */
+    /** Shortcut Hub strip (Page 2): profile slot key codes span 7 slots for prefs/back-compat; only 1–2 are shown when local Fn is on. */
     private static final int KEY_TOP_PROFILE_SLOT_1 = 0xF00D;
     private static final int KEY_TOP_PROFILE_SLOT_7 = 0xF013;
     /** Row-1 strip: opens quick-create shortcut sheet (after last favorite on last page). */
     private static final int KEY_TOP_STRIP_CREATE_SHORTCUT = 0xF014;
-    /** Fixed page-2 row-3 (Shortcut Hub) custom punctuation slots while Fn is on. */
-    private static final int KEY_HUB_FN_LPAREN = 0xF015;
-    private static final int KEY_HUB_FN_RPAREN = 0xF016;
-    private static final int KEY_HUB_FN_LBRACKET = 0xF017;
-    private static final int KEY_HUB_FN_RBRACKET = 0xF018;
-    private static final int KEY_HUB_FN_AT = 0xF019;
-    private static final int KEY_HUB_FN_COLON = 0xF01A;
     private static final int KEY_NOOP_PLACEHOLDER = -1;
     private static final String APP_PREFS_NAME = "AppPrefs";
     private static final String KEY_SYSTEM_IME_CAPTURE = "system_ime_capture_mode";
@@ -399,8 +392,8 @@ public class CustomKeyboardView extends LinearLayout {
         /** If >= 0, scrolling row-1 cell maps to this index in ordered My Shortcuts (long-press to reassign). */
         int topStripFavoriteSlotIndex = -1;
         /**
-         * When false (Shortcut Hub fixed strip DISPLAY only), local Fn keeps icon/text toggle visuals
-         * instead of the "=" keycap; F-row strip DISPLAY uses true.
+         * {@code true}: under local Fn the strip DISPLAY cell shows "=" / sends '=' (Page 0 F-row).
+         * {@code false}: keep icon/text toggle visuals instead of "=" (Shortcut Hub historically; Page 2 has no DISPLAY now).
          */
         boolean displayToggleLocalFnShowsEquals = true;
 
@@ -3187,34 +3180,46 @@ public class CustomKeyboardView extends LinearLayout {
 
     private List<Key> buildFixedTopRowsPage2() {
         List<Key> keys = new ArrayList<>(TOP_PANEL_COLUMNS * 2);
-        // Upper row: seven Shortcut Hub profile slots (tap = active profile, long-press = assign profile)
-        for (int slot = 1; slot <= TOP_PANEL_COLUMNS; slot++) {
-            keys.add(buildProfileHubSlotKey(slot));
-        }
-        // Lower row:
-        // Fn off -> / \ | ? # + DISPLAY + Fn
-        // Fn on  -> ( ) [ ] @ : + Fn
+        // Page 2 (Shortcut Hub): local Fn swaps between punctuation rows and two profile hub slots (+ symbols).
         if (fixedTopLocalFnLocked) {
-            keys.add(markFixedRowKey(new Key("(", "", KEY_HUB_FN_LPAREN, "F015", 1f, 0, 0f, false, false, -1, true)));
-            keys.add(markFixedRowKey(new Key(")", "", KEY_HUB_FN_RPAREN, "F016", 1f, 0, 0f, false, false, -1, true)));
-            keys.add(markFixedRowKey(new Key("[", "", KEY_HUB_FN_LBRACKET, "F017", 1f, 0, 0f, false, false, -1, true)));
-            keys.add(markFixedRowKey(new Key("]", "", KEY_HUB_FN_RBRACKET, "F018", 1f, 0, 0f, false, false, -1, true)));
-            keys.add(markFixedRowKey(new Key("@", "", KEY_HUB_FN_AT, "F019", 1f, 0, 0f, false, false, -1, true)));
-            keys.add(markFixedRowKey(new Key(":", "", KEY_HUB_FN_COLON, "F01A", 1f, 0, 0f, false, false, -1, true)));
+            keys.add(markFixedRowKey(buildProfileHubSlotKey(1)));
+            keys.add(markFixedRowKey(buildProfileHubSlotKey(2)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("~", 0x35, true)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("'", 0x34, false)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("\"", 0x34, true)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("%", 0x22, true)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("^", 0x23, true)));
         } else {
-            keys.add(markFixedRowKey(new Key("/", "", 0x38, "38", 1f, 0, 0f, false, false, -1, true)));
-            keys.add(markFixedRowKey(new Key("\\", "", 0x31, "31", 1f, 0, 0f, false, false, -1, true)));
-            keys.add(markFixedRowKey(new Key("|", "", 0x64, "64", 1f, 0, 0f, false, false, -1, true)));
-            keys.add(markFixedRowKey(new Key("?", "", 0x38, "38", 1f, 0, 0f, false, true, -1, true)));
-            keys.add(markFixedRowKey(new Key("#", "", 0x20, "20", 1f, 0, 0f, false, true, -1, true)));
-            Key shortcutHubDisplay = new Key("DISPLAY", "", KEY_TOP_SHORTCUT_DISPLAY_TOGGLE, "", 1f,
-                    topShortcutShowActionLabels ? R.drawable.text_on_24 : R.drawable.icon_on_24,
-                    0f, false, false, -1, true);
-            shortcutHubDisplay.displayToggleLocalFnShowsEquals = false;
-            keys.add(markFixedRowKey(shortcutHubDisplay));
+            keys.add(markFixedRowKey(buildPage2PunctKey("(", 0x26, true)));
+            keys.add(markFixedRowKey(buildPage2PunctKey(")", 0x27, true)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("[", 0x2F, false)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("]", 0x30, false)));
+            keys.add(markFixedRowKey(buildPage2PunctKey(":", 0x33, true)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("#", 0x20, true)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("@", 0x1F, true)));
+        }
+        if (fixedTopLocalFnLocked) {
+            keys.add(markFixedRowKey(buildPage2PunctKey("<", 0x36, true)));
+            keys.add(markFixedRowKey(buildPage2PunctKey(">", 0x37, true)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("*", 0x25, true)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("&", 0x24, true)));
+            keys.add(markFixedRowKey(buildPage2PunctKey(",", 0x36, false)));
+            keys.add(markFixedRowKey(buildPage2PunctKey(".", 0x37, false)));
+        } else {
+            keys.add(markFixedRowKey(buildPage2PunctKey("/", 0x38, false)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("\\", 0x31, false)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("|", 0x64, false)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("?", 0x38, true)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("-", 0x2D, false)));
+            keys.add(markFixedRowKey(buildPage2PunctKey("_", 0x2D, true)));
         }
         keys.add(markFixedRowKey(new Key("FN", "", KEY_FIXED_TOP_LOCAL_FN, "F00C", 1f, R.drawable.ic_swap_horiz_24, 0f, false, false, -1, true)));
         return keys;
+    }
+
+    private static Key buildPage2PunctKey(String label, int hidScanCode, boolean requiresShift) {
+        String hex = Integer.toHexString(hidScanCode).toUpperCase();
+        return new Key(label, "", hidScanCode, hex, 1f, 0, 0f, false, requiresShift, -1, true);
     }
 
     private Key buildProfileHubSlotKey(int slotIndex1Based) {
@@ -3248,7 +3253,7 @@ public class CustomKeyboardView extends LinearLayout {
         if (mapping == null) {
             return key != null ? key.iconResId : 0;
         }
-        // F-row DISPLAY under local Fn: "=" text only. Shortcut Hub strip DISPLAY keeps icon/text glyphs.
+        // F-row DISPLAY under local Fn: "=" text only vs icon glyphs (Page 0 only).
         if (key != null && key.code == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE) {
             if (key.displayToggleLocalFnShowsEquals) {
                 return 0;
@@ -5098,14 +5103,6 @@ public class CustomKeyboardView extends LinearLayout {
             case 0x50: return new FnMapping("INS", 0x49, 0);
             case 0x51: return new FnMapping("END", 0x4D, 0);
             case 0x4F: return new FnMapping("PGDN", 0x4E, 0);
-            // Fixed-top page 2 (Shortcut Hub): dedicated sentinel keys avoid collisions with page-0/1
-            // switch arms while allowing explicit shifted punctuation sends.
-            case KEY_HUB_FN_LPAREN: return new FnMapping("(", 0x26, MOD_SHIFT);
-            case KEY_HUB_FN_RPAREN: return new FnMapping(")", 0x27, MOD_SHIFT);
-            case KEY_HUB_FN_LBRACKET: return new FnMapping("[", 0x2F, 0);
-            case KEY_HUB_FN_RBRACKET: return new FnMapping("]", 0x30, 0);
-            case KEY_HUB_FN_AT: return new FnMapping("@", 0x1F, MOD_SHIFT);
-            case KEY_HUB_FN_COLON: return new FnMapping(":", 0x33, MOD_SHIFT);
             default:
                 return null;
         }
@@ -5324,8 +5321,7 @@ public class CustomKeyboardView extends LinearLayout {
                 setTopShortcutShowActionLabels(!topShortcutShowActionLabels);
                 return;
             }
-            // Local Fn on: F-row DISPLAY shows "=" and sends '=' HID; Shortcut Hub Page 2 hides DISPLAY when Fn is on.
-            // Do not cycle display mode while Fn is on.
+            // Local Fn on: F-row DISPLAY shows "=" / non-toggle mapping; DISPLAY is Page 0 only — ignore stray toggles when mapped.
         }
 
         if (key.code == KEY_NOOP_PLACEHOLDER) {

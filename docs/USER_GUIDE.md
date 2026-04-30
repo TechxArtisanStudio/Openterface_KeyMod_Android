@@ -114,12 +114,14 @@ On **Page 1** of the fixed strip (ESC / navigation page), when **local Fn** (row
 - **Row 3** sends **Space**, **Bksp**, **Del**, **Insert**, **End**, **PgDn**.  
   Ctrl/Alt/Win positions still support **long‑press** modifier lock using the underlying modifier keys.
 
-On **Page 2** of the fixed strip (Shortcut Hub, profile slots), the bottom row is:
+On **Page 2** of the fixed strip (**Shortcut Hub**), **local Fn** toggles two full punctuation rows (**no DISPLAY** on this page; use Page 0 for icon/text DISPLAY).
 
-- **Fn off:** **`/`**, **`\`**, **`|`**, **`?`**, **`#`**, **DISPLAY**, **Fn**
-- **Fn on:** **`(`**, **`)`**, **`[`**, **`]`**, **`@`**, **`:`**, **Fn**
+- **Fn off — upper row:** **`(`**, **`)`**, **`[`**, **`]`**, **`:`**, **`#`**, **`@`**
+- **Fn off — lower row:** **`/`**, **`\`**, **`|`**, **`?`**, **`-`**, **`_`**, **`Fn`** (toggle)
+- **Fn on — upper row:** two **Shortcut Hub profile** slots (**tap** = activate profile, **long‑press** = assign), then **`~`** **`'`** **`"`** **`%`** **`^`**
+- **Fn on — lower row:** **`<`** **`>`** **`*`** **`&`** **`,`** **`.`**, **`Fn`**
 
-For characters like **`# @ ( ) : ? "`**, legends assume a US-QWERTY style host layout (Shift+digit / Shift+punctuation). On other host layouts, output glyphs can differ.
+Shifted glyphs assume a US‑QWERTY‑style host layout; other layouts may produce different characters.
 
 Media keys are not sent as Consumer HID in this app build; use keyboard shortcuts on the host where needed.
 
