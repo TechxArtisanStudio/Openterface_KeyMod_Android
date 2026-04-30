@@ -1,7 +1,6 @@
 package com.openterface.keymod.util;
 
 import android.content.Context;
-import android.content.res.Configuration;
 import android.graphics.PorterDuff;
 import android.text.TextUtils;
 import android.view.View;
@@ -10,6 +9,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 
+import com.google.android.material.color.MaterialColors;
 import com.openterface.keymod.R;
 import com.openterface.keymod.ShortcutProfileManager;
 
@@ -40,8 +40,7 @@ public final class ShortcutFavoriteRowViews {
     }
 
     private static int listRowIconTint(@NonNull Context ctx) {
-        int nightMode = ctx.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
-        return nightMode == Configuration.UI_MODE_NIGHT_YES ? 0xFFFFFFFF : 0xFF000000;
+        return MaterialColors.getColor(ctx, com.google.android.material.R.attr.colorOnSurface, 0xFF212121);
     }
 
     /**

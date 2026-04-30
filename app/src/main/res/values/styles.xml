@@ -43,4 +43,24 @@
         <item name="chipStartPadding">8dp</item>
         <item name="chipEndPadding">8dp</item>
     </style>
+
+    <!-- Favorites reorder sheet visual alignment with New Shortcut -->
+    <style name="TextAppearance.KeyMod.SectionCaption" parent="TextAppearance.MaterialComponents.Caption">
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/text_secondary</item>
+    </style>
+
+    <style name="Widget.KeyMod.Favorites.Action.Secondary" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="android:textColor">@color/text_secondary</item>
+    </style>
+
+    <style name="Widget.KeyMod.Favorites.Action.Tertiary" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="android:textColor">@color/text_secondary</item>
+    </style>
+
+    <style name="Widget.KeyMod.Favorites.Action.Primary" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
 </resources>

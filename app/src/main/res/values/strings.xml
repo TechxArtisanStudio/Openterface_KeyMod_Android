@@ -266,6 +266,7 @@ by TechxArtisan</string>
     <string name="top_strip_favorite_picker_subtitle">Place a shortcut from your favourites list in this slot.</string>
     <string name="top_strip_favorite_picker_empty">Add shortcuts to ⭐ Favorites in Shortcut Hub first.</string>
     <string name="my_shortcuts_reorder_sheet_title">Favorites</string>
+    <string name="my_shortcuts_reorder_section_title">Favorites</string>
     <string name="my_shortcuts_reorder_done">Done</string>
     <string name="my_shortcuts_reorder_create">Create</string>
     <string name="my_shortcuts_reorder_reset">Reset</string>

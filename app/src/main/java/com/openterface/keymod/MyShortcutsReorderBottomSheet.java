@@ -12,6 +12,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.widget.NestedScrollView;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -119,6 +120,8 @@ public final class MyShortcutsReorderBottomSheet {
         final String profileTitleForHelp = profileTitleRaw.isEmpty() ? "—" : profileTitleRaw;
 
         RecyclerView recycler = root.findViewById(R.id.reorder_recycler);
+        recycler.setFocusable(false);
+        recycler.setFocusableInTouchMode(false);
         int listHeightPx = (int) (activity.getResources().getDisplayMetrics().heightPixels * 0.52f);
         ViewGroup.LayoutParams lpRv = recycler.getLayoutParams();
         if (lpRv instanceof LinearLayout.LayoutParams) {
@@ -129,6 +132,25 @@ public final class MyShortcutsReorderBottomSheet {
         }
         recycler.setNestedScrollingEnabled(true);
         recycler.setLayoutManager(new LinearLayoutManager(activity));
+        NestedScrollView containerScroll = root instanceof NestedScrollView ? (NestedScrollView) root : null;
+
+        Runnable anchorListsToTop = () -> {
+            if (containerScroll != null) {
+                containerScroll.scrollTo(0, 0);
+                containerScroll.post(() -> containerScroll.scrollTo(0, 0));
+            }
+            recycler.stopScroll();
+            RecyclerView.LayoutManager lm = recycler.getLayoutManager();
+            if (lm instanceof LinearLayoutManager) {
+                ((LinearLayoutManager) lm).scrollToPositionWithOffset(0, 0);
+                recycler.post(() -> {
+                    RecyclerView.LayoutManager innerLm = recycler.getLayoutManager();
+                    if (innerLm instanceof LinearLayoutManager) {
+                        ((LinearLayoutManager) innerLm).scrollToPositionWithOffset(0, 0);
+                    }
+                });
+            }
+        };
 
         if (infoButton != null) {
             infoButton.setOnClickListener(v -> MyShortcutsReorderHelpReadModeDialog.show(
@@ -216,10 +238,7 @@ public final class MyShortcutsReorderBottomSheet {
             myAdapter.setDragHelper(touchHelper);
             touchHelper.attachToRecyclerView(recycler);
             myAdapter.notifyDataSetChanged();
-            RecyclerView.LayoutManager lm = recycler.getLayoutManager();
-            if (lm instanceof LinearLayoutManager) {
-                ((LinearLayoutManager) lm).scrollToPositionWithOffset(0, 0);
-            }
+            anchorListsToTop.run();
             updateEmptyHint.run();
         };
 
@@ -237,10 +256,7 @@ public final class MyShortcutsReorderBottomSheet {
             selectedCategoryId[0] = page.categoryId;
             pickAdapter.setItems(page.shortcuts);
             recycler.setAdapter(pickAdapter);
-            RecyclerView.LayoutManager lm = recycler.getLayoutManager();
-            if (lm instanceof LinearLayoutManager) {
-                ((LinearLayoutManager) lm).scrollToPositionWithOffset(0, 0);
-            }
+            anchorListsToTop.run();
             updateEmptyHint.run();
         };
 
@@ -302,12 +318,7 @@ public final class MyShortcutsReorderBottomSheet {
 
         refreshDataFromManager.run();
 
-        recycler.post(() -> {
-            RecyclerView.LayoutManager lm = recycler.getLayoutManager();
-            if (lm instanceof LinearLayoutManager) {
-                ((LinearLayoutManager) lm).scrollToPositionWithOffset(0, 0);
-            }
-        });
+        recycler.post(anchorListsToTop);
 
         Button cancel = root.findViewById(R.id.reorder_cancel);
         cancel.setOnClickListener(v -> dialog.dismiss());
@@ -381,6 +392,12 @@ public final class MyShortcutsReorderBottomSheet {
                 behavior.setSkipCollapsed(true);
                 behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
             }
+            View cancelButton = root.findViewById(R.id.reorder_cancel);
+            if (cancelButton != null) {
+                cancelButton.requestFocus();
+            }
+            anchorListsToTop.run();
+            recycler.post(anchorListsToTop);
         });
 
         dialog.show();

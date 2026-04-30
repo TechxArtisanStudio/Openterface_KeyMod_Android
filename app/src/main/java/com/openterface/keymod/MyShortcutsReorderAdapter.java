@@ -28,7 +28,6 @@ public class MyShortcutsReorderAdapter extends RecyclerView.Adapter<MyShortcutsR
         void onRowLongClick(ShortcutProfileManager.Shortcut shortcut);
     }
 
-    private final Context appCtx;
     private final String targetOs;
     private final List<ShortcutProfileManager.Shortcut> items;
     private ItemTouchHelper dragHelper;
@@ -41,7 +40,6 @@ public class MyShortcutsReorderAdapter extends RecyclerView.Adapter<MyShortcutsR
 
     public MyShortcutsReorderAdapter(Context context, String targetOs,
             List<ShortcutProfileManager.Shortcut> items) {
-        this.appCtx = context.getApplicationContext();
         this.targetOs = targetOs != null ? targetOs : "macos";
         this.items = items;
     }
@@ -91,7 +89,7 @@ public class MyShortcutsReorderAdapter extends RecyclerView.Adapter<MyShortcutsR
     public void onBindViewHolder(@NonNull VH holder, int position) {
         ShortcutProfileManager.Shortcut shortcut = items.get(position);
         ShortcutFavoriteRowViews.bindFavoriteStripRow(
-                appCtx, holder.content, shortcut, targetOs);
+                holder.itemView.getContext(), holder.content, shortcut, targetOs);
         if (dragHelper != null) {
             holder.dragHandle.setOnTouchListener((v, event) -> {
                 if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {

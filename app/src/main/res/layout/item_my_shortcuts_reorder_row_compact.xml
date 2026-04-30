@@ -6,7 +6,9 @@
     android:orientation="horizontal"
     android:gravity="center_vertical"
     android:paddingStart="4dp"
-    android:paddingEnd="8dp">
+    android:paddingEnd="8dp"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp">
 
     <ImageView
         android:id="@+id/reorder_drag_handle"
@@ -15,8 +17,9 @@
         android:padding="12dp"
         android:scaleType="centerInside"
         android:src="@drawable/ic_drag_handle_24"
+        android:tint="@color/text_secondary"
         android:contentDescription="@string/my_shortcuts_reorder_drag_handle_cd"
-        android:focusable="true"
+        android:focusable="false"
         android:background="?attr/selectableItemBackgroundBorderless" />
 
     <include
@@ -34,6 +37,7 @@
         android:contentDescription="@string/cd_remove_from_favorites"
         android:padding="12dp"
         android:scaleType="centerInside"
-        app:srcCompat="@drawable/bookmark_remove_24" />
+        app:srcCompat="@drawable/bookmark_remove_24"
+        app:tint="@color/text_secondary" />
 
 </LinearLayout>

@@ -30,7 +30,6 @@ public class ShortcutSectionPickAdapter extends RecyclerView.Adapter<ShortcutSec
         void onRemoveFromFavorites(@NonNull ShortcutProfileManager.Shortcut shortcut);
     }
 
-    private final Context appCtx;
     private final String targetOs;
     private final List<ShortcutProfileManager.Shortcut> items;
     @Nullable
@@ -40,7 +39,6 @@ public class ShortcutSectionPickAdapter extends RecyclerView.Adapter<ShortcutSec
 
     public ShortcutSectionPickAdapter(Context context, String targetOs,
             List<ShortcutProfileManager.Shortcut> items) {
-        this.appCtx = context.getApplicationContext();
         this.targetOs = targetOs != null ? targetOs : "macos";
         this.items = items != null ? new ArrayList<>(items) : new ArrayList<>();
     }
@@ -72,7 +70,7 @@ public class ShortcutSectionPickAdapter extends RecyclerView.Adapter<ShortcutSec
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
         ShortcutProfileManager.Shortcut shortcut = items.get(position);
-        ShortcutFavoriteRowViews.bindFavoriteStripRow(appCtx, holder.contentRow, shortcut, targetOs);
+        ShortcutFavoriteRowViews.bindFavoriteStripRow(holder.itemView.getContext(), holder.contentRow, shortcut, targetOs);
 
         boolean inFavorites = favoriteChecker != null && favoriteChecker.isInMyFavorites(shortcut);
         holder.bookmark.setImageResource(inFavorites ? R.drawable.ic_bookmark_star_24 : R.drawable.ic_bookmark_add_24);

@@ -4,7 +4,15 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:gravity="center_vertical"
-    android:orientation="horizontal">
+    android:orientation="horizontal"
+    android:paddingStart="4dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp">
+
+    <Space
+        android:layout_width="48dp"
+        android:layout_height="48dp" />
 
     <include
         android:id="@+id/pick_row_favorite_content"
@@ -22,5 +30,5 @@
         android:padding="12dp"
         android:scaleType="fitCenter"
         app:srcCompat="@drawable/ic_bookmark_add_24"
-        app:tint="?attr/colorPrimary" />
+        app:tint="@color/text_secondary" />
 </LinearLayout>
