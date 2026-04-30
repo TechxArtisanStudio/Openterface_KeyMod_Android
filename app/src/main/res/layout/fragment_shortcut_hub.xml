@@ -178,7 +178,7 @@
 
         </LinearLayout>
 
-        <!-- Tab Bar: ⭐ My (fixed) | Category buttons (scrollable) -->
+        <!-- Tab bar: My favorites (fixed) | Category buttons (scrollable) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -191,7 +191,7 @@
                 android:id="@+id/tab_my"
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
-                android:text="⭐ My"
+                android:text="@string/my_shortcuts_tab_favorites"
                 android:textSize="12sp"
                 android:minWidth="0dp"
                 android:paddingStart="16dp"
@@ -227,7 +227,7 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
-        <!-- ⭐ My: vertical drag-reorder list; other tabs: 3-column grid -->
+        <!-- My favorites: vertical drag-reorder list; other tabs: 3-column grid -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/my_shortcuts_recycler"
             android:layout_width="match_parent"

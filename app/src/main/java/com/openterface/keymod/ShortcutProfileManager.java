@@ -267,6 +267,31 @@ public class ShortcutProfileManager {
         return gson.fromJson(gson.toJson(src), Shortcut.class);
     }
 
+    /**
+     * Appends a deep copy of {@code source} to {@code workingMy} if no entry with the same non-null
+     * {@link Shortcut#id} exists. Used by the reorder bottom sheet staging list.
+     *
+     * @return true if appended, false if duplicate (same id) or invalid input
+     */
+    public boolean appendCloneIfAbsent(List<Shortcut> workingMy, Shortcut source) {
+        if (workingMy == null || source == null) {
+            return false;
+        }
+        if (source.id != null && !source.id.isEmpty()) {
+            for (Shortcut s : workingMy) {
+                if (s != null && source.id.equals(s.id)) {
+                    return false;
+                }
+            }
+        }
+        Shortcut copy = cloneShortcut(source);
+        if (copy == null) {
+            return false;
+        }
+        workingMy.add(copy);
+        return true;
+    }
+
     private static String[] myFavoritesSeedIdsForProfile(String profileId) {
         if (profileId == null) {
             return new String[0];

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
@@ -22,6 +23,19 @@
         android:maxLines="2"
         android:ellipsize="end" />
 
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/reorder_tab_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="4dp"
+        app:tabGravity="start"
+        app:tabIndicatorColor="?attr/colorPrimary"
+        app:tabIndicatorFullWidth="false"
+        app:tabMode="scrollable"
+        app:tabSelectedTextColor="?attr/colorPrimary"
+        app:tabTextAppearance="@style/TextAppearance.MaterialComponents.Body2"
+        app:tabTextColor="?attr/colorOnSurfaceVariant" />
+
     <TextView
         android:id="@+id/reorder_sheet_subtitle"
         android:layout_width="match_parent"
@@ -32,6 +46,18 @@
         android:textColor="@color/text_secondary"
         android:textSize="13sp"
         android:lineSpacingMultiplier="1.15" />
+
+    <TextView
+        android:id="@+id/reorder_my_empty_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="8dp"
+        android:text="@string/my_shortcuts_sheet_empty_my_hint"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp"
+        android:visibility="gone" />
 
     <LinearLayout
         android:layout_width="match_parent"

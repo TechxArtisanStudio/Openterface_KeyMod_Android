@@ -507,7 +507,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         for (ShortcutProfileManager.Shortcut s : myShortcutsList) {
             if (s.id.equals(shortcut.id)) {
                 new AlertDialog.Builder(requireContext())
-                        .setTitle("Already in ⭐ My")
+                        .setTitle(R.string.shortcut_hub_already_in_favorites_title)
                         .setMessage("'" + shortcut.name + "' is already in your favorites.")
                         .setPositiveButton("OK", null)
                         .show();
@@ -515,7 +515,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
             }
         }
         new AlertDialog.Builder(requireContext())
-                .setTitle("Add to ⭐ My Shortcuts")
+                .setTitle(R.string.shortcut_hub_add_to_favorites_title)
                 .setMessage("Add '" + shortcut.name + "' (" + shortcut.label + ") to your favorites?")
                 .setPositiveButton("Add", (d, w) -> {
                     myShortcutsList.add(shortcut);
@@ -523,7 +523,9 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                     if (vibrator != null && vibrator.hasVibrator()) {
                         vibrator.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE));
                     }
-                    Toast.makeText(getContext(), "Added to ⭐ My: " + shortcut.name, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(),
+                            getString(R.string.shortcut_hub_added_to_favorites_toast, shortcut.name),
+                            Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
@@ -532,7 +534,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
     private void confirmRemoveFromFavorites(ShortcutProfileManager.Shortcut shortcut) {
         new AlertDialog.Builder(requireContext())
                 .setTitle("Remove Favorite")
-                .setMessage("Remove '" + shortcut.name + "' from My Shortcuts?")
+                .setMessage(getString(R.string.shortcut_hub_remove_from_favorites_message, shortcut.name))
                 .setPositiveButton("Remove", (d, w) -> {
                     myShortcutsList.removeIf(s -> s.id.equals(shortcut.id));
                     profileManager.updateMyShortcuts(selectedProfile.id, myShortcutsList);

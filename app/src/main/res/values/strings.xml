@@ -264,11 +264,24 @@ by TechxArtisan</string>
     <string name="top_strip_favorite_picker_title">Choose shortcut for this slot</string>
     <!-- Top strip long-press: subtitle for favourite picker (title above). -->
     <string name="top_strip_favorite_picker_subtitle">Place a shortcut from your favourites list in this slot.</string>
-    <string name="top_strip_favorite_picker_empty">Add shortcuts to ⭐ My in Shortcut Hub first.</string>
-    <string name="my_shortcuts_reorder_sheet_title">Reorder ⭐ My shortcuts</string>
+    <string name="top_strip_favorite_picker_empty">Add shortcuts to ⭐ My favorites in Shortcut Hub first.</string>
+    <string name="my_shortcuts_reorder_sheet_title">Reorder ⭐ My favorites</string>
     <string name="my_shortcuts_reorder_done">Done</string>
     <string name="my_shortcuts_reorder_sheet_subtitle_with_profile">Profile: %1$s · %2$d shortcuts\nDrag using the handle to change order. The first seven appear on the top strip (swipe for more pages).</string>
     <string name="my_shortcuts_reorder_drag_handle_cd">Drag to reorder</string>
+    <string name="my_shortcuts_tab_favorites">⭐ My favorites</string>
+    <string name="my_shortcuts_tab_all">All</string>
+    <string name="my_shortcuts_added_to_my">Added to My favorites</string>
+    <string name="my_shortcuts_already_in_my">Already in My favorites</string>
+    <string name="my_shortcuts_removed_from_my">Removed from My favorites</string>
+    <string name="cd_add_to_favorites">Add to My favorites</string>
+    <string name="cd_remove_from_favorites">Remove from My favorites</string>
+    <string name="shortcut_hub_already_in_favorites_title">Already in My favorites</string>
+    <string name="shortcut_hub_add_to_favorites_title">Add to My favorites</string>
+    <string name="shortcut_hub_added_to_favorites_toast">Added to My favorites: %1$s</string>
+    <string name="shortcut_hub_remove_from_favorites_message">Remove \'%1$s\' from My favorites?</string>
+    <string name="my_shortcuts_sheet_empty_profile">No shortcuts in this profile to add.</string>
+    <string name="my_shortcuts_sheet_empty_my_hint">Use the tabs above to browse shortcuts, tap the bookmark icon to add to My favorites, then return here to drag and reorder.</string>
     <string name="top_mode_label_keyboard_mouse">Keyboard &amp; Mouse</string>
     <string name="top_mode_label_gamepad">Gamepad</string>
     <string name="top_mode_label_shortcuts">Shortcuts</string>
