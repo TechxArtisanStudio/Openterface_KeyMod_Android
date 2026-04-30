@@ -16,11 +16,11 @@ Keep **landscape and portrait** definitions aligned unless you intentionally div
 | Layer | Location | Purpose |
 |--------|----------|---------|
 | Parse XML | `CustomKeyboardView.parseKeyboard()` | Reads `android:codes`, `keyLabel`, `keySymbolLabel`, `keyAlternates`, `keyCornerHint`. Custom attrs are passed through `decodeKeyboardXmlEntities` so values like `&#92;` / `&amp;` become real single characters (XmlPullParser does not decode these in custom attrs). |
-| Slot fill | `fillAlternateSlotOptions(Key, AlternateOption[])` | **Alt0** = capital of base when `keyLabel` is one lowercase letter `a`–`z` (mapped via `mapAsciiAlternate`). **Alt1–Alt4** = first up to four comma-separated tokens from `keyAlternates` (same token rules as before). **Base** = single-character `keyLabel` when mappable. For **`/`** only: if **Alt1** is still empty after parsing, code fills **`\`** then **`|`** in Alt1/Alt2 so backslash is never dropped when XML entities mis-parse. |
-| Popup layout | `showAlternatesPopup` | 3×2 grid: row1 Alt1, Alt0, Alt2; row2 Alt3, Base, Alt4. Empty slots stay blank and are not selectable. |
-| Gesture → slot | `AlternatePopupGeometry.pickSlot` | Delta from touch-down: inner radius → default; outer radius → cancel; else six 60° sectors (unit-tested in `AlternatePopupGeometryTest`). |
+| Slot fill | `fillAlternateSlotOptions(Key, AlternateOption[])` | Nine logical slots (`SLOT_CENTER` … `SLOT_DOWN_RIGHT`). **Center** = capital when `keyLabel` is `a`–`z`, else mappable single-character label. **`keyAlternates` tokens** (up to four) map in order to **Up, Down, Left, Right**. There is no automatic lowercase fill for Down. For **`/`**, if parsing fails or Up is mis-set, code forces **`\`** on **Up** and **`|`** on **Down**. |
+| Popup layout | `showAlternatesPopup` | **3×3** grid matching screen directions (see diagram below). Only primary slot values are displayed; empty corners remain blank and non-selective. |
+| Gesture → slot | `AlternatePopupGeometry.pickSlot` | Delta from touch-down: inner radius → default (center); outer radius → cancel; else classify into outer cells using **axis deadbands** plus a **neutral cross** (both axes weak → stays default highlight). Corner cells use the same thresholds as cardinals (`AlternatePopupGeometryTest`). |
 | Character → HID | `mapAsciiAlternate(String token)` | Each label must be **exactly one character** and supported here, or that slot is **empty**. |
-| Default commit | `AlternatePopupModel.defaultOption` | First occupied slot in order **Alt0 → Alt1 → Alt2 → Alt3 → Alt4 → Base** (lift without moving past the inner gesture radius). |
+| Default commit | `AlternatePopupModel.defaultOption` | **Center** slot only — lift inside inner radius / neutral cross sends **capital** for `a`–`z` or the center-mapped symbol (e.g. **`/`** on slash key). |
 | Send | `sendAlternateOption(...)` | Applies Shift lock + per-option `requiresShift`, then `sendKeyData`. |
 
 ## XML attributes (letter keys)
@@ -30,8 +30,8 @@ Keep **landscape and portrait** definitions aligned unless you intentionally div
 | `android:codes` | Base key HID usage (hex string in XML). |
 | `android:keyLabel` | Main label (often one letter). |
 | `custom:keySymbolLabel` | Shift/preview label on key face; not an extra long-press slot. |
-| `custom:keyAlternates` | Comma-separated **single-character** tokens (after trim). Tokens fill **Alt1**, then **Alt2**, **Alt3**, **Alt4** in order (max four). **Alt0** is not set from XML; it is the shifted letter for `a`–`z` bases. |
-| `custom:keyCornerHint` | Legacy small hint (top-end) when there is **no** Alt1–4 hint row from `keyAlternates`; prefer defining alternates so the top hint row appears. |
+| `custom:keyAlternates` | Comma-separated **single-character** tokens (after trim). Order is **Up**, **Down**, **Left**, **Right** on the picker (max four). **Center** is not set from XML (capital `A`–`Z` from `keyLabel`). |
+| `custom:keyCornerHint` | Legacy small hint (top-end); prefer defining `keyAlternates` so the hint row matches **U,D,L,R** order. |
 
 ### XML escaping (common)
 
@@ -48,13 +48,26 @@ Use these inside attribute values when needed:
 
 ---
 
-## Current letter layout: key face + alternates (keycap row shows Alt1–4)
+## Picker geometry (logical)
 
-Base HID = `android:codes` (hex). The table’s `keyAlternates` column is unchanged in XML; the app maps tokens to **Alt1+** as above. **Alt0** is implicit for letter keys.
+```
+ UL    U    UR
+  L    C     R
+ DL    D    DR
+```
 
-| Base key | `codes` | `keySymbolLabel` (key face) | `keyAlternates` (comma-separated) | Corner hint |
+- **Swipe up** selects **U** (first comma token).
+- **Release** inside inner/neutral zone selects **C** (capital `Q` for `q`; digit `1` is **U**).
+
+## Current letter layout: key face + alternates (hint row follows U,D,L,R)
+
+Base HID = `android:codes` (hex). The table’s **`keyAlternates`** column reads top-to-bottom in this doc as token order (**Up**, **Down**, **Left**, **Right**) as shown in parentheses for multi-token keys.
+
+**Implicit for `a`–`z`**: **Center** = capital letter only.
+
+| Base key | `codes` | `keySymbolLabel` | `keyAlternates` (↑,↓,←,→) | Corner hint |
 |----------|---------|-------------------------------|-----------------------------------|---------------|
-| q | 14 | Q | 1 | 1 |
+| q | 14 | Q | 1 (↑ only) | 1 |
 | w | 1A | W | 2 | 2 |
 | e | 08 | E | 3 | 3 |
 | r | 15 | R | 4 | 4 |
@@ -71,8 +84,8 @@ Base HID = `android:codes` (hex). The table’s `keyAlternates` column is unchan
 | g | 0A | G | ^ | ^ |
 | h | 0B | H | & | & |
 | j | 0D | J | * | * |
-| k | 0E | K | ( , { , [ , < | ( |
-| l | 0F | L | ) , } , ] , > | ) |
+| k | 0E | K | ( , { , [ , < (↑↓←→) | ( |
+| l | 0F | L | ) , } , ] , > (↑↓←→) | ) |
 | z | 1D | Z | ! | ! |
 | x | 1B | X | ? | ? |
 | c | 06 | C | ; | ; |
@@ -80,9 +93,9 @@ Base HID = `android:codes` (hex). The table’s `keyAlternates` column is unchan
 | b | 05 | B | ' | ' |
 | n | 11 | N | " , ' | " |
 | m | 10 | M | + , _ | + |
-| / | 38 | ? | `&#92;,&#124;` → `\`, `\|` | backslash |
-| , | 36 | ; | ` , - , ~ | ` |
-| . | 37 | ' | = | = |
+| / | 38 | ? | `&#92;,&#124;` → `\` **↑**, `\|` **↓** (`/` is **release** center) | backslash |
+| , | 36 | ; | `` ` ``, `-`, `~` (↑↓←→) | ` |
+| . | 37 | ' | = (↑ only or as listed) | = |
 
 Keys in this layout that **do not** use `mapAsciiAlternate` via the above pattern include **Shift**, **BackSpace**, **Fn**, **Win/Cmd/Super** (string label + icon), **Space**, and **Enter** (icons / strings / special handling).
 
@@ -154,10 +167,10 @@ Any character **not** listed above will not produce a valid long-press option un
 
 ## Quick checklist when adding a new alternate
 
-1. Add a **single character** to `custom:keyAlternates` (comma-separated) in **both** portrait and landscape XML if they should match. Order is **Alt1**, then **Alt2**, **Alt3**, **Alt4** (up to four tokens).
+1. Add a **single character** to `custom:keyAlternates` (comma-separated) in **both** portrait and landscape XML if they should match. Order is **Up**, **Down**, **Left**, **Right** (up to four tokens).
 2. If the character is new, add a `case` in `mapAsciiAlternate` with the correct HID usage and `requiresShift`.
 3. If the character needs XML escaping, use entities from the table above.
-4. Confirm the key still has **at least two** selectable slots (base + at least one mapped alternate, counting implicit **Alt0** for `a`–`z`), or long-press will not open.
-5. **`keyCornerHint`** is optional fallback UI when no Alt1–4 hint row is shown; prefer listing symbols in `keyAlternates` so the top hint row appears.
-6. Default long-press (lift without moving past the inner radius) sends the first available character in order **Alt0** (capital for `a`–`z`), then **Alt1**…**Alt4**, then **Base**. For **`/`**, with no letter Alt0, default is **Alt1** `\` when present. Use **`&#124;`** for pipe so the list parses reliably.
-7. For **`n`**, keep `"` before `'` in `keyAlternates` if **Alt1** should be `"` and **Alt2** `'`; **`keySymbolLabel`** stays **`N`** for shift.
+4. Confirm the key still has **at least two** selectable cells (typically **Center** + at least one **cardinal**), or long-press will not open.
+5. **`keyCornerHint`** is optional fallback UI; prefer defining `keyAlternates` so hints stay accurate.
+6. Default long-press (lift inside inner/neutral gesture zone) commits **Center** (**capital** for `a`–`z`; slash key commits **`/`**, with **`\`**/**`|`** on **Up**/**Down**). Use **`&#124;`** for pipe so the second token parses reliably.
+7. For **`n`**, keep `"` before `'` if **Up** should be **`"`** and **Down** **`'`**. **`keySymbolLabel`** stays **`N`** for shift.

@@ -290,11 +290,13 @@ public class CustomKeyboardView extends LinearLayout {
     private static final long MODIFIER_RAPID_TAP_WINDOW_MS = 3000L;
     private static final long MODIFIER_LOCK_HINT_COOLDOWN_MS = 10_000L;
     private static final int MODIFIER_RAPID_TAP_HINT_THRESHOLD = 2;
-    /** Inside this radius from touch-down, release commits the default alternate (Alt0 or base). */
+    /** Inside this radius from touch-down, release commits the default alternate (center). */
     private static final int ALT_GESTURE_R_MIN_DP = 12;
     /** Beyond this radius from touch-down, release cancels (no character). */
     private static final int ALT_GESTURE_R_CANCEL_DP = 220;
-    private static final int ALT_POPUP_VERTICAL_OFFSET_DP = 72;
+    /** Half-width of neutral band on X/Y for 3×3 classification (cardinal vs diagonal vs default cross). */
+    private static final int ALT_GESTURE_AXIS_DEADZONE_DP = 14;
+    private static final int ALT_POPUP_VERTICAL_OFFSET_DP = 96;
     private static final int ALT_POPUP_CONTAINER_PADDING_DP_PORTRAIT = 6;
     private static final int ALT_POPUP_CONTAINER_PADDING_DP_LANDSCAPE = 8;
     private static final int ALT_POPUP_OPTION_MARGIN_DP_PORTRAIT = 2;
@@ -312,8 +314,8 @@ public class CustomKeyboardView extends LinearLayout {
     private PopupWindow alternatePopupWindow;
     private ViewGroup alternatePopupContainer;
     private View alternateAnchorView;
-    /** TextView per slot index {@link AlternatePopupGeometry#SLOT_ALT0}…{@link AlternatePopupGeometry#SLOT_BASE}. */
-    private final TextView[] alternateSlotViews = new TextView[6];
+    /** TextView per slot index {@link AlternatePopupGeometry#SLOT_CENTER}…{@link AlternatePopupGeometry#SLOT_DOWN_RIGHT}. */
+    private final TextView[] alternateSlotViews = new TextView[AlternatePopupGeometry.SLOT_COUNT];
     private AlternatePopupModel currentAlternatePopupModel;
     /** Latest pick from {@link AlternatePopupGeometry#pickSlot}. */
     private int currentAlternatePick = AlternatePopupGeometry.RESULT_DEFAULT;
@@ -451,27 +453,15 @@ public class CustomKeyboardView extends LinearLayout {
         }
     }
 
-    /** Long-press popup: fixed slots Alt0–Alt4 + base (see {@link AlternatePopupGeometry}). */
+    /** Long-press popup: 3×3 grid (see {@link AlternatePopupGeometry}). */
     private static class AlternatePopupModel {
-        final AlternateOption[] slotOptions = new AlternateOption[6];
-        /** First occupied slot in order Alt0 → Alt4 → Base (long-press default if finger does not move). */
+        final AlternateOption[] slotOptions = new AlternateOption[AlternatePopupGeometry.SLOT_COUNT];
+        /** Center cell: lift-in-inner-radius default (capital for a–z, primary label otherwise). */
         final AlternateOption defaultOption;
-        final int defaultSlotIndex;
 
         AlternatePopupModel(AlternateOption[] srcSlots) {
-            System.arraycopy(srcSlots, 0, this.slotOptions, 0, 6);
-            int ds = -1;
-            for (int s = AlternatePopupGeometry.SLOT_ALT0; s <= AlternatePopupGeometry.SLOT_ALT4; s++) {
-                if (slotOptions[s] != null) {
-                    ds = s;
-                    break;
-                }
-            }
-            if (ds < 0 && slotOptions[AlternatePopupGeometry.SLOT_BASE] != null) {
-                ds = AlternatePopupGeometry.SLOT_BASE;
-            }
-            this.defaultSlotIndex = ds;
-            this.defaultOption = ds >= 0 ? slotOptions[ds] : null;
+            System.arraycopy(srcSlots, 0, this.slotOptions, 0, AlternatePopupGeometry.SLOT_COUNT);
+            this.defaultOption = slotOptions[AlternatePopupGeometry.SLOT_CENTER];
         }
 
         int countSelectable() {
@@ -485,18 +475,25 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         boolean[] slotOccupiedFlags() {
-            boolean[] b = new boolean[6];
-            for (int i = 0; i < 6; i++) {
+            boolean[] b = new boolean[AlternatePopupGeometry.SLOT_COUNT];
+            for (int i = 0; i < AlternatePopupGeometry.SLOT_COUNT; i++) {
                 b[i] = slotOptions[i] != null;
             }
             return b;
         }
 
-        int defaultHighlightSlot() {
-            if (defaultSlotIndex >= 0) {
-                return defaultSlotIndex;
+        AlternateOption resolveCommittedOption(int pick) {
+            if (pick == AlternatePopupGeometry.RESULT_DEFAULT) {
+                return defaultOption;
             }
-            return AlternatePopupGeometry.SLOT_BASE;
+            if (pick < 0 || pick >= AlternatePopupGeometry.SLOT_COUNT) {
+                return null;
+            }
+            return slotOptions[pick];
+        }
+
+        int defaultHighlightSlot() {
+            return AlternatePopupGeometry.SLOT_CENTER;
         }
     }
 
@@ -2155,8 +2152,8 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     /**
-     * Fills {@code slots[0..5]} for Alt0–Alt4 and base. Legacy {@code keyAlternates} tokens fill
-     * Alt1–Alt4 in order; Alt0 is the capital of a–z when the base label is a single lowercase letter.
+     * Fills {@code slots[0..8]} for the 3×3 alternate grid. Comma tokens map in order to
+     * Up, Down, Left, Right; center is capital for {@code a–z} or the mappable base label.
      */
     private void fillAlternateSlotOptions(Key key, AlternateOption[] slots) {
         Arrays.fill(slots, null);
@@ -2165,23 +2162,33 @@ public class CustomKeyboardView extends LinearLayout {
         }
         if (!TextUtils.isEmpty(key.alternates)) {
             List<String> tokens = splitAlternatesTokens(key.alternates);
+            int[] tokenSlot = {
+                    AlternatePopupGeometry.SLOT_UP,
+                    AlternatePopupGeometry.SLOT_DOWN,
+                    AlternatePopupGeometry.SLOT_LEFT,
+                    AlternatePopupGeometry.SLOT_RIGHT
+            };
             for (int t = 0; t < tokens.size() && t < 4; t++) {
                 String trimmed = tokens.get(t).trim();
                 if (trimmed.length() == 1) {
                     AlternateOption mapped = mapAsciiAlternate(trimmed);
                     if (mapped != null) {
-                        slots[AlternatePopupGeometry.SLOT_ALT1 + t] = mapped;
+                        slots[tokenSlot[t]] = mapped;
                     }
                 }
             }
         }
         if (!TextUtils.isEmpty(key.label) && key.label.length() == 1) {
-            slots[AlternatePopupGeometry.SLOT_BASE] = mapAsciiAlternate(key.label);
             char c = key.label.charAt(0);
             if (c >= 'a' && c <= 'z') {
                 AlternateOption cap = mapAsciiAlternate(String.valueOf(Character.toUpperCase(c)));
                 if (cap != null) {
-                    slots[AlternatePopupGeometry.SLOT_ALT0] = cap;
+                    slots[AlternatePopupGeometry.SLOT_CENTER] = cap;
+                }
+            } else {
+                AlternateOption baseOpt = mapAsciiAlternate(key.label);
+                if (baseOpt != null) {
+                    slots[AlternatePopupGeometry.SLOT_CENTER] = baseOpt;
                 }
             }
         }
@@ -2189,8 +2196,7 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     /**
-     * Ensures {@code /} always offers backslash and pipe.
-     * Some builds can drop/mis-parse the first XML token (`&#92;`) and end up with Alt1=`|`.
+     * Ensures {@code /} always offers backslash and pipe on Up / Down when tokens fail to parse.
      */
     private void normalizeSlashKeyAlternates(Key key, AlternateOption[] slots) {
         if (key == null || TextUtils.isEmpty(key.label) || key.label.length() != 1 || key.label.charAt(0) != '/') {
@@ -2199,28 +2205,34 @@ public class CustomKeyboardView extends LinearLayout {
         AlternateOption bs = mapAsciiAlternate("\\");
         AlternateOption pipe = mapAsciiAlternate("|");
         if (bs != null) {
-            AlternateOption alt1 = slots[AlternatePopupGeometry.SLOT_ALT1];
-            if (alt1 == null || "|".equals(alt1.display)) {
-                slots[AlternatePopupGeometry.SLOT_ALT1] = bs;
+            AlternateOption up = slots[AlternatePopupGeometry.SLOT_UP];
+            if (up == null || "|".equals(up.display)) {
+                slots[AlternatePopupGeometry.SLOT_UP] = bs;
             }
         }
-        if (slots[AlternatePopupGeometry.SLOT_ALT2] == null && pipe != null) {
-            slots[AlternatePopupGeometry.SLOT_ALT2] = pipe;
+        if (slots[AlternatePopupGeometry.SLOT_DOWN] == null && pipe != null) {
+            slots[AlternatePopupGeometry.SLOT_DOWN] = pipe;
         }
     }
 
     private AlternatePopupModel buildAlternatePopupModel(Key key) {
-        AlternateOption[] slots = new AlternateOption[6];
+        AlternateOption[] slots = new AlternateOption[AlternatePopupGeometry.SLOT_COUNT];
         fillAlternateSlotOptions(key, slots);
         return new AlternatePopupModel(slots);
     }
 
     private String buildAlternateHintsLineForKeycap(Key key, boolean compactHintRow) {
-        AlternateOption[] slots = new AlternateOption[6];
+        AlternateOption[] slots = new AlternateOption[AlternatePopupGeometry.SLOT_COUNT];
         fillAlternateSlotOptions(key, slots);
         StringBuilder sb = new StringBuilder();
         String sep = compactHintRow ? "" : " ";
-        for (int s = AlternatePopupGeometry.SLOT_ALT1; s <= AlternatePopupGeometry.SLOT_ALT4; s++) {
+        int[] cardinalOrder = {
+                AlternatePopupGeometry.SLOT_UP,
+                AlternatePopupGeometry.SLOT_DOWN,
+                AlternatePopupGeometry.SLOT_LEFT,
+                AlternatePopupGeometry.SLOT_RIGHT
+        };
+        for (int s : cardinalOrder) {
             if (slots[s] != null) {
                 if (sb.length() > 0) {
                     sb.append(sep);
@@ -2253,11 +2265,11 @@ public class CustomKeyboardView extends LinearLayout {
             performAlternatesPopupHaptic(anchor, HapticFeedbackConstants.REJECT);
         } else if (newPick != AlternatePopupGeometry.RESULT_CANCEL && old == AlternatePopupGeometry.RESULT_CANCEL) {
             performAlternatesPopupHaptic(anchor, HapticFeedbackConstants.VIRTUAL_KEY);
-        } else if (newPick >= 0 && newPick <= AlternatePopupGeometry.SLOT_BASE && old >= 0 && old <= AlternatePopupGeometry.SLOT_BASE && newPick != old) {
+        } else if (newPick >= 0 && newPick < AlternatePopupGeometry.SLOT_COUNT && old >= 0 && old < AlternatePopupGeometry.SLOT_COUNT && newPick != old) {
             performAlternatesPopupHaptic(anchor, HapticFeedbackConstants.KEYBOARD_TAP);
-        } else if (newPick >= 0 && newPick <= AlternatePopupGeometry.SLOT_BASE && old == AlternatePopupGeometry.RESULT_DEFAULT) {
+        } else if (newPick >= 0 && newPick < AlternatePopupGeometry.SLOT_COUNT && old == AlternatePopupGeometry.RESULT_DEFAULT) {
             performAlternatesPopupHaptic(anchor, HapticFeedbackConstants.VIRTUAL_KEY);
-        } else if (newPick == AlternatePopupGeometry.RESULT_DEFAULT && old >= 0 && old <= AlternatePopupGeometry.SLOT_BASE) {
+        } else if (newPick == AlternatePopupGeometry.RESULT_DEFAULT && old >= 0 && old < AlternatePopupGeometry.SLOT_COUNT) {
             performAlternatesPopupHaptic(anchor, HapticFeedbackConstants.VIRTUAL_KEY);
         }
     }
@@ -2278,7 +2290,7 @@ public class CustomKeyboardView extends LinearLayout {
                 highlightSlot = currentAlternatePick;
             }
         }
-        for (int s = 0; s < 6; s++) {
+        for (int s = 0; s < AlternatePopupGeometry.SLOT_COUNT; s++) {
             TextView tv = alternateSlotViews[s];
             if (tv == null) {
                 continue;
@@ -2327,29 +2339,67 @@ public class CustomKeyboardView extends LinearLayout {
 
         GridLayout grid = new GridLayout(getContext());
         grid.setColumnCount(3);
-        grid.setRowCount(2);
+        grid.setRowCount(3);
         grid.setBackgroundResource(R.drawable.alternate_popup_background);
         int containerPaddingPx = dpToPx(containerPaddingDp);
         grid.setPadding(containerPaddingPx, containerPaddingPx, containerPaddingPx, containerPaddingPx);
 
         int[][] slotPlacement = {
-                {AlternatePopupGeometry.SLOT_ALT1, AlternatePopupGeometry.SLOT_ALT0, AlternatePopupGeometry.SLOT_ALT2},
-                {AlternatePopupGeometry.SLOT_ALT3, AlternatePopupGeometry.SLOT_BASE, AlternatePopupGeometry.SLOT_ALT4}
+                {
+                        AlternatePopupGeometry.SLOT_UP_LEFT,
+                        AlternatePopupGeometry.SLOT_UP,
+                        AlternatePopupGeometry.SLOT_UP_RIGHT,
+                },
+                {
+                        AlternatePopupGeometry.SLOT_LEFT,
+                        AlternatePopupGeometry.SLOT_CENTER,
+                        AlternatePopupGeometry.SLOT_RIGHT,
+                },
+                {
+                        AlternatePopupGeometry.SLOT_DOWN_LEFT,
+                        AlternatePopupGeometry.SLOT_DOWN,
+                        AlternatePopupGeometry.SLOT_DOWN_RIGHT,
+                }
         };
-        int marginPx = dpToPx(optionMarginDp);
-        for (int row = 0; row < 2; row++) {
+        int minRow = 2;
+        int maxRow = 0;
+        int minCol = 2;
+        int maxCol = 0;
+        boolean hasAnyDisplayedCell = false;
+        for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 3; col++) {
+                int slot = slotPlacement[row][col];
+                if (model.slotOptions[slot] != null) {
+                    hasAnyDisplayedCell = true;
+                    if (row < minRow) minRow = row;
+                    if (row > maxRow) maxRow = row;
+                    if (col < minCol) minCol = col;
+                    if (col > maxCol) maxCol = col;
+                }
+            }
+        }
+        if (!hasAnyDisplayedCell) {
+            minRow = 1;
+            maxRow = 1;
+            minCol = 1;
+            maxCol = 1;
+        }
+        grid.setRowCount(maxRow - minRow + 1);
+        grid.setColumnCount(maxCol - minCol + 1);
+        int marginPx = dpToPx(optionMarginDp);
+        for (int row = minRow; row <= maxRow; row++) {
+            for (int col = minCol; col <= maxCol; col++) {
                 int slot = slotPlacement[row][col];
                 TextView cell = new TextView(getContext());
                 GridLayout.LayoutParams glp = new GridLayout.LayoutParams(
-                        GridLayout.spec(row),
-                        GridLayout.spec(col));
+                        GridLayout.spec(row - minRow),
+                        GridLayout.spec(col - minCol));
                 glp.width = LayoutParams.WRAP_CONTENT;
                 glp.height = LayoutParams.WRAP_CONTENT;
                 glp.setMargins(marginPx, marginPx, marginPx, marginPx);
                 cell.setLayoutParams(glp);
-                AlternateOption opt = model.slotOptions[slot];
-                cell.setText(opt != null ? opt.display : "");
+                AlternateOption shown = model.slotOptions[slot];
+                cell.setText(shown != null ? shown.display : "");
                 cell.setTextSize(TypedValue.COMPLEX_UNIT_SP, optionTextSp);
                 cell.setTypeface(Typeface.MONOSPACE);
                 int ph = dpToPx(optionPadHorizontalDp);
@@ -2357,8 +2407,10 @@ public class CustomKeyboardView extends LinearLayout {
                 cell.setPadding(ph, pv, ph, pv);
                 cell.setGravity(Gravity.CENTER);
                 cell.setTextColor(resolveThemeTextColor());
-                if (opt == null) {
+                if (shown == null) {
                     cell.setAlpha(0.35f);
+                } else {
+                    cell.setAlpha(1f);
                 }
                 grid.addView(cell);
                 alternateSlotViews[slot] = cell;
@@ -2396,7 +2448,10 @@ public class CustomKeyboardView extends LinearLayout {
         float dy = rawY - alternatesGestureStartRawY;
         boolean[] occ = currentAlternatePopupModel.slotOccupiedFlags();
         int pick = AlternatePopupGeometry.pickSlot(dx, dy,
-                dpToPx(ALT_GESTURE_R_MIN_DP), dpToPx(ALT_GESTURE_R_CANCEL_DP), occ);
+                dpToPx(ALT_GESTURE_R_MIN_DP),
+                dpToPx(ALT_GESTURE_R_CANCEL_DP),
+                dpToPx(ALT_GESTURE_AXIS_DEADZONE_DP),
+                occ);
         if (pick != currentAlternatePick) {
             onAlternatePickChanged(alternateAnchorView, pick);
             currentAlternatePick = pick;
@@ -2411,12 +2466,7 @@ public class CustomKeyboardView extends LinearLayout {
         if (currentAlternatePick == AlternatePopupGeometry.RESULT_CANCEL) {
             return;
         }
-        AlternateOption opt;
-        if (currentAlternatePick == AlternatePopupGeometry.RESULT_DEFAULT) {
-            opt = currentAlternatePopupModel.defaultOption;
-        } else {
-            opt = currentAlternatePopupModel.slotOptions[currentAlternatePick];
-        }
+        AlternateOption opt = currentAlternatePopupModel.resolveCommittedOption(currentAlternatePick);
         if (opt != null) {
             sendAlternateOption(opt);
         }
