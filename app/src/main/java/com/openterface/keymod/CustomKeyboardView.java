@@ -101,13 +101,17 @@ public class CustomKeyboardView extends LinearLayout {
     private static final float TOP_SHORTCUT_PANEL_ACTION_LABEL_SP = 13f;
     private static final float TOP_SHORTCUT_PANEL_CUSTOM_GLYPH_SP = 20f;
     /** Fixed top rows only (page 0–2 strip): slightly larger than scroll row + bold; tuned to limit wrap. */
-    private static final float TOP_FIXED_ROWS_TEXT_SP = 13f;
-    private static final float TOP_FIXED_ROWS_ACTION_LABEL_SP = 14f;
+    private static final float TOP_FIXED_ROWS_TEXT_SP = 12f;
+    private static final float TOP_FIXED_ROWS_ACTION_LABEL_SP = 13f;
     private static final float TOP_FIXED_ROWS_CUSTOM_GLYPH_SP = 21f;
     /** Profile hub slots: autosize within [min,max] sp so two-line names fit above the bottom strip. */
     private static final int TOP_PROFILE_HUB_SLOT_TEXT_MIN_SP = 9;
     private static final int TOP_PROFILE_HUB_SLOT_TEXT_MAX_SP = 11;
     private static final int TOP_PROFILE_HUB_SLOT_TEXT_STEP_SP = 1;
+    /** Fixed rows 2–3: Fn-layer alternate (same placement as main-keyboard {@code keyCornerHint}; stronger alpha for strip). */
+    private static final float TOP_FIXED_ROWS_FN_HINT_SP = 7f;
+    private static final float TOP_FIXED_ROWS_FN_HINT_ALPHA = 0.36f;
+    private static final int TOP_FIXED_ROWS_FN_HINT_MAX_CHARS = 8;
     /** Single-pane IME: shortcut strip vs text vs space for soft keyboard (sum ~5.15). */
     private static final float IME_SINGLE_TOP_STRIP_WEIGHT = 1.35f;
     private static final float IME_SINGLE_TEXT_WEIGHT = 0.95f;
@@ -3526,14 +3530,23 @@ public class CustomKeyboardView extends LinearLayout {
                         && fixedTopLocalFn == null
                         && k.customIconGlyph != null
                         && !k.customIconGlyph.trim().isEmpty();
-                if (effectiveTopIconResId != 0 && !renderAsActionLabel) {
+                String fnCornerHint = fixedRowsSlice
+                        ? resolveFixedTopLocalFnCornerHint(k, fixedTopLocalFn, renderAsActionLabel)
+                        : null;
+                final boolean iconPrimaryCap = effectiveTopIconResId != 0 && !renderAsActionLabel;
+                if (iconPrimaryCap) {
+                    // Icon-primary caps: skip Fn corner hint (avoids clutter with centered icon + overlay text).
+                    fnCornerHint = null;
+                }
+                if (iconPrimaryCap) {
                     ImageButton ib = new ImageButton(getContext());
                     applyFlatKeyStyle(ib);
                     ib.setLayoutParams(p);
                     applyTopPanelKeyCapBackground(ib, k, keyLockedVisualState);
                     ib.setSelected(keyLockedVisualState);
                     ib.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
-                    ib.setPadding(0, 0, 0, 0);
+                    int iconPad = fixedRowsSlice ? dpToPx(5) : 0;
+                    ib.setPadding(iconPad, iconPad, iconPad, iconPad);
                     ib.setImageResource(effectiveTopIconResId);
                     boolean forwardDelIcon = effectiveTopIconResId == R.drawable.backspace_24
                             && (k.code == 0x4C
@@ -3591,7 +3604,11 @@ public class CustomKeyboardView extends LinearLayout {
                 } else {
                     Button b = new Button(getContext());
                     applyFlatKeyStyle(b);
-                    b.setLayoutParams(p);
+                    b.setLayoutParams(fixedRowsSlice && !TextUtils.isEmpty(fnCornerHint)
+                            ? new FrameLayout.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT)
+                            : p);
                     applyTopPanelKeyCapBackground(b, k, keyLockedVisualState);
                     b.setSelected(keyLockedVisualState);
                     boolean profileHubSlot = isTopProfileSlotKey(k) && fixedRowsSlice;
@@ -3606,7 +3623,8 @@ public class CustomKeyboardView extends LinearLayout {
                         int vPad = stripPx + dpToPx(6);
                         b.setPadding(dpToPx(4), vPad, dpToPx(4), vPad);
                     } else {
-                        b.setPadding(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
+                        int textPad = fixedRowsSlice ? dpToPx(2) : dpToPx(1);
+                        b.setPadding(textPad, textPad, textPad, textPad);
                         b.setTextSize(TypedValue.COMPLEX_UNIT_SP,
                                 fixedRowsSlice ? TOP_FIXED_ROWS_TEXT_SP : TOP_SHORTCUT_PANEL_TEXT_SP);
                     }
@@ -3615,6 +3633,16 @@ public class CustomKeyboardView extends LinearLayout {
                     final String topButtonText;
                     if (fixedTopLocalFn != null) {
                         topButtonText = effectiveTopLabel;
+                    } else if (k.allowTopPanelPagingGesture && k.topStripFavoriteSlotIndex >= 0) {
+                        // Row-1 favorites: DISPLAY on = shortcut name only; off = chord only (no F1 + Zoom In stack).
+                        if (renderAsActionLabel) {
+                            String name = k.label != null ? k.label.trim() : "";
+                            topButtonText = !TextUtils.isEmpty(name)
+                                    ? name
+                                    : formatTopShortcutActionLabel(k);
+                        } else {
+                            topButtonText = formatTopShortcutActionLabel(k);
+                        }
                     } else if (renderAsActionLabel) {
                         topButtonText = formatTopShortcutActionLabel(k);
                     } else if (isTopProfileSlotKey(k)) {
@@ -3683,7 +3711,11 @@ public class CustomKeyboardView extends LinearLayout {
                     b.setOnTouchListener(fixedRowsSlice
                             ? createFixedTopRowsTouchListener(k)
                             : createTopPanelTouchListener(k));
-                    rowLayout.addView(b);
+                    if (fixedRowsSlice && !TextUtils.isEmpty(fnCornerHint)) {
+                        addFixedRowCellWithOptionalFnHint(rowLayout, p, b, fnCornerHint);
+                    } else {
+                        rowLayout.addView(b);
+                    }
                 }
             }
             parent.addView(rowLayout);
@@ -5071,20 +5103,66 @@ public class CustomKeyboardView extends LinearLayout {
         return (c >= 0x3A && c <= 0x45) || c == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE;
     }
 
+    /** Page 2 (Shortcut Hub) fixed-row keys: profile slots + punctuation grid. */
+    private boolean isFixedTopRowsPage2StripKey(Key key) {
+        if (key == null) {
+            return false;
+        }
+        int c = key.code;
+        if (c >= KEY_TOP_PROFILE_SLOT_1 && c <= KEY_TOP_PROFILE_SLOT_7) {
+            return true;
+        }
+        switch (c) {
+            case 0x1F: // @
+            case 0x20: // #
+            case 0x22: // %
+            case 0x23: // ^
+            case 0x24: // &
+            case 0x25: // *
+            case 0x2D: // -, _
+            case 0x2F: // [
+            case 0x30: // ]
+            case 0x31: // \
+            case 0x33: // :
+            case 0x34: // ', "
+            case 0x35: // ~
+            case 0x36: // <, ,
+            case 0x37: // >, .
+            case 0x38: // /, ?
+            case 0x64: // |
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Local Fn overlay mapping for fixed rows when the latch matches the current strip page
+     * (page 0: overlay when latch off; page 1–2: overlay when latch on). Keys with no overlay
+     * return null.
+     */
     private FnMapping resolveFixedTopLocalFnMapping(Key key) {
+        FnMapping overlay = resolveFixedTopOverlayMapping(key);
+        if (overlay == null) {
+            return null;
+        }
+        // Page 2 already rebuilds row-2/3 key lists by latch state; avoid double remapping.
+        if (isFixedTopRowsPage2StripKey(key)) {
+            return null;
+        }
+        boolean page0 = isFixedTopRowsPage0StripKey(key);
+        boolean applyMapping = page0 ? !fixedTopLocalFnLocked : fixedTopLocalFnLocked;
+        return applyMapping ? overlay : null;
+    }
+
+    /** Overlay target for fixed-row keys (independent of latch); null if key has no Fn-layer pair. */
+    @Nullable
+    private FnMapping resolveFixedTopOverlayMapping(Key key) {
         if (key == null || !isFixedTopRowKey(key)
                 || isFixedTopLocalFnKey(key)
                 || isTopModeSlotKey(key)) {
             return null;
         }
-
-        boolean page0 = isFixedTopRowsPage0StripKey(key);
-        boolean applyMapping = page0 ? !fixedTopLocalFnLocked : fixedTopLocalFnLocked;
-
-        if (!applyMapping) {
-            return null;
-        }
-
         switch (key.code) {
             // Fixed-top page 0: digit/symbol overlay when local Fn latch is off; F legends when latch is on.
             case 0x41: return new FnMapping("8", 0x25, 0);
@@ -5113,15 +5191,147 @@ public class CustomKeyboardView extends LinearLayout {
             case 0x2B: return new FnMapping("PAUSE", 0x48, 0);
             case 0x52: return new FnMapping("HOME", 0x4A, 0);
             case 0x28: return new FnMapping("PGUP", 0x4B, 0);
-            case 0x29: return new FnMapping("SPACE", 0x2C, 0);
+            case 0x29: return new FnMapping("SPACE", 0x2C, 0, R.drawable.space_bar_24px);
             case 0xE1: return new FnMapping("BKSP", 0x2A, 0, R.drawable.backspace_24);
             case 0x4C: return new FnMapping("DEL", 0x4C, 0, R.drawable.backspace_24);
             case 0x50: return new FnMapping("INS", 0x49, 0);
             case 0x51: return new FnMapping("END", 0x4D, 0);
             case 0x4F: return new FnMapping("PGDN", 0x4E, 0);
+            // Fixed-top page 2: punctuation pairs by fixed slot (profile slots remain hint-suppressed).
+            case 0x2F: return new FnMapping("~", 0x35, MOD_SHIFT); // [ -> ~
+            case 0x30: return new FnMapping("'", 0x34, 0);         // ] -> '
+            case 0x33: return new FnMapping("\"", 0x34, MOD_SHIFT); // : -> "
+            case 0x20: return new FnMapping("%", 0x22, MOD_SHIFT); // # -> %
+            case 0x1F: return new FnMapping("^", 0x23, MOD_SHIFT); // @ -> ^
+            case 0x38:
+                return key.requiresShift
+                        ? new FnMapping("&", 0x24, MOD_SHIFT)      // ? -> &
+                        : new FnMapping("<", 0x36, MOD_SHIFT);     // / -> <
+            case 0x31: return new FnMapping(">", 0x37, MOD_SHIFT); // \ -> >
+            case 0x64: return new FnMapping("*", 0x25, MOD_SHIFT); // | -> *
+            case 0x2D:
+                return key.requiresShift
+                        ? new FnMapping(".", 0x37, 0)              // _ -> .
+                        : new FnMapping(",", 0x36, 0);             // - -> ,
+            case 0x35: return new FnMapping("[", 0x2F, 0);         // ~ -> [
+            case 0x34:
+                return key.requiresShift
+                        ? new FnMapping(":", 0x33, MOD_SHIFT)      // " -> :
+                        : new FnMapping("]", 0x30, 0);             // ' -> ]
+            case 0x22: return new FnMapping("#", 0x20, MOD_SHIFT); // % -> #
+            case 0x23: return new FnMapping("@", 0x1F, MOD_SHIFT); // ^ -> @
+            case 0x36:
+                return key.requiresShift
+                        ? new FnMapping("/", 0x38, 0)              // < -> /
+                        : new FnMapping("-", 0x2D, 0);             // , -> -
+            case 0x37:
+                return key.requiresShift
+                        ? new FnMapping("\\", 0x31, 0)             // > -> \
+                        : new FnMapping("_", 0x2D, MOD_SHIFT);     // . -> _
+            case 0x25: return new FnMapping("|", 0x64, 0);         // * -> |
+            case 0x24: return new FnMapping("?", 0x38, MOD_SHIFT); // & -> ?
             default:
                 return null;
         }
+    }
+
+    @Nullable
+    private String resolveFixedTopLocalFnCornerHint(Key k,
+            @Nullable FnMapping activeOverlay,
+            boolean renderAsActionLabel) {
+        if (k == null || isFixedTopLocalFnKey(k) || isTopProfileSlotKey(k)) {
+            return null;
+        }
+        FnMapping overlay = resolveFixedTopOverlayMapping(k);
+        if (overlay == null) {
+            return null;
+        }
+        String raw = activeOverlay != null
+                ? fixedTopFnBaseLegendForHint(k, renderAsActionLabel)
+                : fixedTopFnOverlayLegendForHint(overlay, k);
+        String hint = truncateFixedTopFnCornerHint(raw);
+        return TextUtils.isEmpty(hint) ? null : hint;
+    }
+
+    private String fixedTopFnOverlayLegendForHint(FnMapping overlay, Key key) {
+        if (!TextUtils.isEmpty(overlay.label)) {
+            return overlay.label;
+        }
+        if (key.code == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE && overlay.keyCode == 0x2E) {
+            return "=";
+        }
+        return "";
+    }
+
+    private String fixedTopFnBaseLegendForHint(Key k, boolean renderAsActionLabel) {
+        if (renderAsActionLabel && isTopShortcutActionLabelEligible(k)) {
+            String s = formatTopShortcutActionLabel(k);
+            if (!TextUtils.isEmpty(s)) {
+                return s;
+            }
+        }
+        if (k.code == KEY_TOP_SHORTCUT_DISPLAY_TOGGLE) {
+            return "DISP";
+        }
+        if (!TextUtils.isEmpty(k.label)) {
+            String lbl = k.label.trim();
+            int nl = lbl.indexOf('\n');
+            if (nl >= 0) {
+                return lbl.substring(0, nl).trim();
+            }
+            return lbl;
+        }
+        return k.symbolLabel != null ? k.symbolLabel.trim() : "";
+    }
+
+    private static String truncateFixedTopFnCornerHint(@Nullable String s) {
+        if (s == null) {
+            return "";
+        }
+        String t = s.trim();
+        if (t.length() <= TOP_FIXED_ROWS_FN_HINT_MAX_CHARS) {
+            return t;
+        }
+        return t.substring(0, TOP_FIXED_ROWS_FN_HINT_MAX_CHARS - 1) + "\u2026";
+    }
+
+    /** Wraps {@code inner} when hint non-empty; {@code inner} must use {@link FrameLayout.LayoutParams} filling the wrap. */
+    private void addFixedRowCellWithOptionalFnHint(
+            LinearLayout rowLayout,
+            LinearLayout.LayoutParams outerCellParams,
+            View inner,
+            @Nullable String fnCornerHint) {
+        if (TextUtils.isEmpty(fnCornerHint)) {
+            inner.setLayoutParams(outerCellParams);
+            rowLayout.addView(inner);
+            return;
+        }
+        FrameLayout wrap = new FrameLayout(getContext());
+        wrap.setLayoutParams(outerCellParams);
+        wrap.addView(inner);
+        TextView hintTv = new TextView(getContext());
+        FrameLayout.LayoutParams hp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.END | Gravity.TOP);
+        hp.setMargins(0, dpToPx(2), dpToPx(4), 0);
+        hintTv.setLayoutParams(hp);
+        hintTv.setText(fnCornerHint);
+        hintTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, TOP_FIXED_ROWS_FN_HINT_SP);
+        hintTv.setTextColor(resolveThemeTextColor());
+        hintTv.setAlpha(TOP_FIXED_ROWS_FN_HINT_ALPHA);
+        hintTv.setTypeface(hintTv.getTypeface(), Typeface.BOLD);
+        hintTv.setIncludeFontPadding(false);
+        hintTv.setBackgroundColor(Color.TRANSPARENT);
+        hintTv.setPadding(0, 0, 0, 0);
+        hintTv.setClickable(false);
+        hintTv.setFocusable(false);
+        hintTv.setSingleLine(true);
+        hintTv.setMaxLines(1);
+        hintTv.setEllipsize(TextUtils.TruncateAt.END);
+        wrap.addView(hintTv);
+        hintTv.bringToFront();
+        rowLayout.addView(wrap);
     }
 
     private void refreshExtraNumpadGridUi() {
