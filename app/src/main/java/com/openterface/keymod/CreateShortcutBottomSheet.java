@@ -34,6 +34,11 @@ import com.openterface.keymod.util.MyShortcutsReorderHelpReadModeDialog;
  */
 public final class CreateShortcutBottomSheet {
 
+    public enum CreateMode {
+        GENERAL_AND_FAVORITES,
+        CATEGORY_ONLY
+    }
+
     private CreateShortcutBottomSheet() {
     }
 
@@ -204,6 +209,8 @@ public final class CreateShortcutBottomSheet {
             @NonNull ShortcutProfileManager profileManager,
             @NonNull String profileId,
             @NonNull String targetOs,
+            @NonNull CreateMode mode,
+            @Nullable String categoryId,
             @Nullable Runnable onSaved
     ) {
         ShortcutProfileManager.ShortcutProfile profile = profileManager.getProfileById(profileId);
@@ -342,8 +349,14 @@ public final class CreateShortcutBottomSheet {
                 Toast.makeText(activity, R.string.create_shortcut_duplicate, Toast.LENGTH_LONG).show();
                 return;
             }
-            ShortcutProfileManager.Shortcut created = profileManager.addQuickShortcutToGeneralAndFavorites(
-                    profileId, parsed.keyCode, parsed.modifiers, targetOs);
+            ShortcutProfileManager.Shortcut created;
+            if (mode == CreateMode.CATEGORY_ONLY) {
+                created = profileManager.addQuickShortcutToCategoryOnly(
+                        profileId, categoryId, parsed.keyCode, parsed.modifiers, targetOs);
+            } else {
+                created = profileManager.addQuickShortcutToGeneralAndFavorites(
+                        profileId, parsed.keyCode, parsed.modifiers, targetOs);
+            }
             if (created == null) {
                 Toast.makeText(activity, R.string.create_shortcut_save_failed, Toast.LENGTH_SHORT).show();
                 return;
@@ -360,5 +373,16 @@ public final class CreateShortcutBottomSheet {
 
         updatePreview.run();
         dialog.show();
+    }
+
+    public static void show(
+            @NonNull AppCompatActivity activity,
+            @NonNull ShortcutProfileManager profileManager,
+            @NonNull String profileId,
+            @NonNull String targetOs,
+            @Nullable Runnable onSaved
+    ) {
+        show(activity, profileManager, profileId, targetOs,
+                CreateMode.GENERAL_AND_FAVORITES, null, onSaved);
     }
 }

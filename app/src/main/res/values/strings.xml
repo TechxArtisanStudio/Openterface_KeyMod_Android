@@ -267,11 +267,18 @@ by TechxArtisan</string>
     <string name="top_strip_favorite_picker_empty">Add shortcuts to ⭐ Favorites in Shortcut Hub first.</string>
     <string name="my_shortcuts_reorder_sheet_title">Favorites</string>
     <string name="my_shortcuts_reorder_done">Done</string>
+    <string name="my_shortcuts_reorder_create">Create</string>
+    <string name="my_shortcuts_reorder_reset">Reset</string>
+    <string name="my_shortcuts_reorder_reset_confirm_title">Reset Favorites</string>
+    <string name="my_shortcuts_reorder_reset_confirm_message">Reset Favorites for \"%1$s\" to the default app list? Your current Favorites order will be lost.</string>
+    <string name="my_shortcuts_reorder_reset_success">Favorites reset to defaults.</string>
+    <string name="my_shortcuts_reorder_reset_unsupported">Reset is available only for built-in profiles.</string>
     <string name="my_shortcuts_reorder_info_cd">Show help for reordering Favorites</string>
     <string name="my_shortcuts_reorder_help_read_mode_title">%1$s · %2$d in Favorites</string>
     <!-- HTML for bold labels (HtmlCompat.fromHtml). -->
     <string name="my_shortcuts_reorder_help_read_mode_block1"><![CDATA[<b>Order</b> — Drag the handle to reorder. <b>Top</b> = first on the keyboard strip; swipe the strip sideways for more pages.]]></string>
-    <string name="my_shortcuts_reorder_help_read_mode_block2"><![CDATA[<b>Browse</b> — In other tabs, tap <b>+</b> to add here, or the <b>star</b> to remove from this list only (shortcuts stay in their section). <b>Done</b> saves; <b>Cancel</b> discards.]]></string>
+    <string name="my_shortcuts_reorder_help_read_mode_block2"><![CDATA[<b>Create</b> — In <b>Favorites</b>, Create adds a new shortcut to <b>General</b> and to Favorites. In <b>General/other tabs</b>, Create adds to that tab only (not Favorites).]]></string>
+    <string name="my_shortcuts_reorder_help_read_mode_block3"><![CDATA[<b>Reset</b> — Restores this active built-in profile’s Favorites to fresh-install defaults after confirmation. Custom/imported profiles do not support Reset. <b>Done</b> saves; <b>Cancel</b> discards staged reordering.]]></string>
     <string name="my_shortcuts_reorder_help_read_mode_footer">Tap anywhere to close.</string>
     <string name="my_shortcuts_reorder_drag_handle_cd">Drag to reorder</string>
     <string name="my_shortcuts_tab_favorites">⭐ Favorites</string>

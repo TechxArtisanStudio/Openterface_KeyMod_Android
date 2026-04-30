@@ -4,6 +4,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
+import androidx.annotation.Nullable;
+
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.openterface.keymod.util.KeyParser;
@@ -1262,6 +1264,112 @@ public class ShortcutProfileManager {
 
         updateProfile(profile);
         return shortcut;
+    }
+
+    private ShortcutCategory findCategoryById(ShortcutProfile profile, String categoryId) {
+        if (profile == null || categoryId == null || profile.categories == null) {
+            return null;
+        }
+        for (ShortcutCategory c : profile.categories) {
+            if (c != null && categoryId.equals(c.id)) {
+                if (c.shortcuts == null) {
+                    c.shortcuts = new ArrayList<>();
+                }
+                return c;
+            }
+        }
+        return null;
+    }
+
+    private Shortcut buildQuickShortcut(int keyCode, int modifiers, String targetOs, ShortcutProfile profile) {
+        String label = KeyParser.toLabelForTargetOs(keyCode, modifiers, targetOs);
+        Shortcut shortcut = new Shortcut(
+                "user-" + System.currentTimeMillis(),
+                "",
+                label,
+                modifiers,
+                keyCode);
+        shortcut.icon = "";
+        shortcut.displayOrder = nextDisplayOrderAcrossProfile(profile);
+        return shortcut;
+    }
+
+    /**
+     * Adds a new shortcut to a specific category (or to flat shortcuts if profile is legacy-only),
+     * without adding it to Favorites.
+     *
+     * @return new shortcut, or null if invalid / duplicate / category missing
+     */
+    public Shortcut addQuickShortcutToCategoryOnly(
+            String profileId,
+            @Nullable String categoryId,
+            int keyCode,
+            int modifiers,
+            String targetOs
+    ) {
+        ShortcutProfile profile = getProfileById(profileId);
+        if (profile == null || keyCode < 0) {
+            return null;
+        }
+        if (profileContainsChordNormalized(profile, keyCode, modifiers, targetOs)) {
+            return null;
+        }
+        Shortcut shortcut = buildQuickShortcut(keyCode, modifiers, targetOs, profile);
+        if (profile.categories != null && !profile.categories.isEmpty()) {
+            if (categoryId == null || categoryId.trim().isEmpty()) {
+                return null;
+            }
+            ShortcutCategory target = findCategoryById(profile, categoryId);
+            if (target == null) {
+                return null;
+            }
+            target.shortcuts.add(shortcut);
+        } else {
+            if (profile.shortcuts == null) {
+                profile.shortcuts = new ArrayList<>();
+            }
+            profile.shortcuts.add(shortcut);
+        }
+        updateProfile(profile);
+        return shortcut;
+    }
+
+    public boolean isBuiltInProfileId(@Nullable String profileId) {
+        if (profileId == null) {
+            return false;
+        }
+        switch (profileId) {
+            case "default":
+            case "blender":
+            case "kicad":
+            case "nomad":
+            case "fusion360":
+            case "photoshop":
+            case "vscode":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Resets Favorites for the given built-in profile to seeded defaults used by fresh install flow.
+     */
+    public boolean resetMyShortcutsToDefaultForProfile(String profileId) {
+        if (!isBuiltInProfileId(profileId)) {
+            return false;
+        }
+        ShortcutProfile profile = getProfileById(profileId);
+        if (profile == null) {
+            return false;
+        }
+        List<Shortcut> seeded = buildSeededMyShortcuts(profile);
+        renumberDisplayOrder(seeded);
+        updateMyShortcuts(profileId, seeded);
+        if (listener != null) {
+            listener.onProfileUpdated(profile);
+        }
+        return true;
     }
 
     /**

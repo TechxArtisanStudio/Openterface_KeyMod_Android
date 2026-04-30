@@ -52,6 +52,9 @@ public final class MyShortcutsReorderHelpReadModeDialog {
         sb.append("\n\n");
         sb.append(HtmlCompat.fromHtml(
                 context.getString(R.string.my_shortcuts_reorder_help_read_mode_block2), htmlMode));
+        sb.append("\n\n");
+        sb.append(HtmlCompat.fromHtml(
+                context.getString(R.string.my_shortcuts_reorder_help_read_mode_block3), htmlMode));
         return sb;
     }
 

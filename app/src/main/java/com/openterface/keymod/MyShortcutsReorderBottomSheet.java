@@ -11,6 +11,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -34,10 +35,12 @@ public final class MyShortcutsReorderBottomSheet {
 
     private static final class BrowsePage {
         final String title;
+        final String categoryId;
         final List<ShortcutProfileManager.Shortcut> shortcuts;
 
-        BrowsePage(String title, List<ShortcutProfileManager.Shortcut> shortcuts) {
+        BrowsePage(String title, String categoryId, List<ShortcutProfileManager.Shortcut> shortcuts) {
             this.title = title;
+            this.categoryId = categoryId;
             this.shortcuts = shortcuts;
         }
     }
@@ -53,13 +56,14 @@ public final class MyShortcutsReorderBottomSheet {
                     continue;
                 }
                 String label = cat.name != null && !cat.name.trim().isEmpty() ? cat.name.trim() : cat.id;
-                out.add(new BrowsePage(label, new ArrayList<>(cat.shortcuts)));
+                out.add(new BrowsePage(label, cat.id, new ArrayList<>(cat.shortcuts)));
             }
         } else {
             List<ShortcutProfileManager.Shortcut> flat = ap.getAllShortcutsFlat();
             if (flat != null && !flat.isEmpty()) {
                 out.add(new BrowsePage(
                         activity.getString(R.string.my_shortcuts_tab_all),
+                        null,
                         new ArrayList<>(flat)));
             }
         }
@@ -96,9 +100,9 @@ public final class MyShortcutsReorderBottomSheet {
         if (ap == null) {
             return;
         }
-        List<ShortcutProfileManager.Shortcut> data = new ArrayList<>(
+        final List<ShortcutProfileManager.Shortcut> data = new ArrayList<>(
                 profileManager.getOrderedShortcutsForTopStrip(profileId));
-        List<BrowsePage> browsePages = buildBrowsePages(activity, ap);
+        final List<BrowsePage> browsePages = new ArrayList<>(buildBrowsePages(activity, ap));
         if (data.isEmpty() && browsePages.isEmpty()) {
             Toast.makeText(activity, R.string.my_shortcuts_sheet_empty_profile, Toast.LENGTH_SHORT).show();
             return;
@@ -167,6 +171,33 @@ public final class MyShortcutsReorderBottomSheet {
             emptyMyHint.setVisibility(
                     idx == 0 && myAdapter.getItemCount() == 0 ? View.VISIBLE : View.GONE);
         };
+
+        final String[] selectedCategoryId = new String[]{null};
+
+        Runnable refreshDataFromManager = () -> {
+            data.clear();
+            data.addAll(profileManager.getOrderedShortcutsForTopStrip(profileId));
+            ShortcutProfileManager.ShortcutProfile p = profileManager.getProfileById(profileId);
+            browsePages.clear();
+            if (p != null) {
+                browsePages.addAll(buildBrowsePages(activity, p));
+            }
+            tabLayout.removeAllTabs();
+            tabLayout.addTab(tabLayout.newTab().setText(R.string.my_shortcuts_tab_favorites));
+            for (BrowsePage page : browsePages) {
+                tabLayout.addTab(tabLayout.newTab().setText(page.title));
+            }
+            int current = tabLayout.getSelectedTabPosition();
+            if (current < 0) {
+                current = 0;
+            }
+            int safe = Math.min(current, Math.max(0, tabLayout.getTabCount() - 1));
+            TabLayout.Tab target = tabLayout.getTabAt(safe);
+            if (target != null) {
+                target.select();
+            }
+        };
+
         myAdapter.setRemoveFavoriteClickListener((shortcut, position) -> {
             if (shortcut == null || shortcut.id == null || shortcut.id.isEmpty()) {
                 return;
@@ -185,6 +216,27 @@ public final class MyShortcutsReorderBottomSheet {
             myAdapter.setDragHelper(touchHelper);
             touchHelper.attachToRecyclerView(recycler);
             myAdapter.notifyDataSetChanged();
+            RecyclerView.LayoutManager lm = recycler.getLayoutManager();
+            if (lm instanceof LinearLayoutManager) {
+                ((LinearLayoutManager) lm).scrollToPositionWithOffset(0, 0);
+            }
+            updateEmptyHint.run();
+        };
+
+        Runnable selectBrowseTab = () -> {
+            int idx = tabLayout.getSelectedTabPosition();
+            if (idx <= 0) {
+                return;
+            }
+            touchHelper.attachToRecyclerView(null);
+            int pageIndex = idx - 1;
+            if (pageIndex < 0 || pageIndex >= browsePages.size()) {
+                return;
+            }
+            BrowsePage page = browsePages.get(pageIndex);
+            selectedCategoryId[0] = page.categoryId;
+            pickAdapter.setItems(page.shortcuts);
+            recycler.setAdapter(pickAdapter);
             RecyclerView.LayoutManager lm = recycler.getLayoutManager();
             if (lm instanceof LinearLayoutManager) {
                 ((LinearLayoutManager) lm).scrollToPositionWithOffset(0, 0);
@@ -232,13 +284,10 @@ public final class MyShortcutsReorderBottomSheet {
             public void onTabSelected(TabLayout.Tab tab) {
                 int idx = tab.getPosition();
                 if (idx == 0) {
+                    selectedCategoryId[0] = null;
                     selectMyTab.run();
                 } else {
-                    touchHelper.attachToRecyclerView(null);
-                    BrowsePage page = browsePages.get(idx - 1);
-                    pickAdapter.setItems(page.shortcuts);
-                    recycler.setAdapter(pickAdapter);
-                    updateEmptyHint.run();
+                    selectBrowseTab.run();
                 }
             }
 
@@ -251,12 +300,7 @@ public final class MyShortcutsReorderBottomSheet {
             }
         });
 
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.my_shortcuts_tab_favorites));
-        for (BrowsePage page : browsePages) {
-            tabLayout.addTab(tabLayout.newTab().setText(page.title));
-        }
-
-        selectMyTab.run();
+        refreshDataFromManager.run();
 
         recycler.post(() -> {
             RecyclerView.LayoutManager lm = recycler.getLayoutManager();
@@ -267,6 +311,59 @@ public final class MyShortcutsReorderBottomSheet {
 
         Button cancel = root.findViewById(R.id.reorder_cancel);
         cancel.setOnClickListener(v -> dialog.dismiss());
+
+        Button create = root.findViewById(R.id.reorder_create);
+        create.setOnClickListener(v -> {
+            int idx = tabLayout.getSelectedTabPosition();
+            CreateShortcutBottomSheet.CreateMode mode =
+                    idx == 0
+                            ? CreateShortcutBottomSheet.CreateMode.GENERAL_AND_FAVORITES
+                            : CreateShortcutBottomSheet.CreateMode.CATEGORY_ONLY;
+            String categoryId = idx == 0 ? null : selectedCategoryId[0];
+            CreateShortcutBottomSheet.show(
+                    activity,
+                    profileManager,
+                    profileId,
+                    targetOs,
+                    mode,
+                    categoryId,
+                    () -> {
+                        refreshDataFromManager.run();
+                        if (onSaved != null) {
+                            onSaved.run();
+                        }
+                    });
+        });
+
+        Button reset = root.findViewById(R.id.reorder_reset);
+        boolean resetSupported = profileManager.isBuiltInProfileId(profileId);
+        reset.setEnabled(resetSupported);
+        reset.setAlpha(resetSupported ? 1f : 0.45f);
+        reset.setOnClickListener(v -> {
+            if (!profileManager.isBuiltInProfileId(profileId)) {
+                Toast.makeText(activity, R.string.my_shortcuts_reorder_reset_unsupported, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            ShortcutProfileManager.ShortcutProfile p = profileManager.getProfileById(profileId);
+            String profileName = p != null && p.name != null && !p.name.trim().isEmpty() ? p.name.trim() : profileId;
+            new AlertDialog.Builder(activity)
+                    .setTitle(R.string.my_shortcuts_reorder_reset_confirm_title)
+                    .setMessage(activity.getString(
+                            R.string.my_shortcuts_reorder_reset_confirm_message, profileName))
+                    .setPositiveButton(R.string.my_shortcuts_reorder_reset, (d, w) -> {
+                        if (profileManager.resetMyShortcutsToDefaultForProfile(profileId)) {
+                            refreshDataFromManager.run();
+                            if (onSaved != null) {
+                                onSaved.run();
+                            }
+                            Toast.makeText(activity, R.string.my_shortcuts_reorder_reset_success, Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(activity, R.string.my_shortcuts_reorder_reset_unsupported, Toast.LENGTH_SHORT).show();
+                        }
+                    })
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+        });
 
         Button done = root.findViewById(R.id.reorder_done);
         done.setOnClickListener(v -> {
