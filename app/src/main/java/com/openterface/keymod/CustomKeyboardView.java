@@ -3439,6 +3439,10 @@ public class CustomKeyboardView extends LinearLayout {
                     ib.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);
                     ib.setPadding(0, 0, 0, 0);
                     ib.setImageResource(effectiveTopIconResId);
+                    boolean forwardDelIcon = effectiveTopIconResId == R.drawable.backspace_24
+                            && (k.code == 0x4C
+                            || (fixedTopLocalFn != null && fixedTopLocalFn.keyCode == 0x4C));
+                    ib.setScaleX(forwardDelIcon ? -1f : 1f);
                     ib.setColorFilter(resolveThemeTextColor());
                     if (isTopModeSlotKey(k)) {
                         Context ctx = getContext();
@@ -4998,8 +5002,8 @@ public class CustomKeyboardView extends LinearLayout {
             case 0x52: return new FnMapping("HOME", 0x4A, 0);
             case 0x28: return new FnMapping("PGUP", 0x4B, 0);
             case 0x29: return new FnMapping("SPACE", 0x2C, 0);
-            case 0xE1: return new FnMapping("BKSP", 0x2A, 0);
-            case 0x4C: return new FnMapping("DEL", 0x4C, 0);
+            case 0xE1: return new FnMapping("BKSP", 0x2A, 0, R.drawable.backspace_24);
+            case 0x4C: return new FnMapping("DEL", 0x4C, 0, R.drawable.backspace_24);
             case 0x50: return new FnMapping("INS", 0x49, 0);
             case 0x51: return new FnMapping("END", 0x4D, 0);
             case 0x4F: return new FnMapping("PGDN", 0x4E, 0);
