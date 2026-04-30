@@ -102,18 +102,24 @@ The virtual keyboard provides a **full QWERTY layout** with these sections:
 In keyboard mode, the fixed shortcut strip uses two rows of keys beneath the swipeable favorites row.
 
 - **Target OS setting** (`Windows`, `Linux`, `macOS`) changes modifier **labels/icons** only:
-  - Row 3 Col 1 (`0xE0`): Ctrl / Control
-  - Row 3 Col 2 (`0xE2`): Alt / Option
-  - Row 3 Col 3 (`0xE3`): Win / Super / Command
+  - Row 2 Col 1 (`0xE0`): Ctrl / Control
+  - Row 2 Col 2 (`0xE2`): Alt / Option
+  - Row 2 Col 3 (`0xE3`): Win / Super / Command
 - The physical positions do not move across target OS values.
 - Row 2 already has dedicated **Tab** and **Enter** keys.
 
 On **Page 1** of the fixed strip (ESC / navigation page), when **local Fn** (row 3 col 7 on that page) is on:
 
-- **Row 2** sends **Home**, **End**, **PgUp**, **PgDn**, **Insert**, **Scroll Lock**; the IME toggle key is unchanged.
-- **Row 3** sends **Pause**, **`/`**, **`\`**, **`|`** (non‑US `\`/`|` HID usage), **`"`** (Shift+apostrophe), **`-`**; Ctrl/Alt/Win positions still support **long‑press** modifier lock using the underlying modifier keys.
+- **Row 2** sends **Scroll Lock**, **PrtSc**, **Caps Lock**, **Pause/Break**, **Home**, **PgUp**; the IME toggle key is unchanged.
+- **Row 3** sends **Space**, **Bksp**, **Del**, **Insert**, **End**, **PgDn**.  
+  Ctrl/Alt/Win positions still support **long‑press** modifier lock using the underlying modifier keys.
 
-On **Page 2** of the fixed strip (Shortcut Hub, profile slots), when local Fn is on, the bottom row shows **six empty slots** plus **Fn** only—the **DISPLAY** toggle is hidden until Fn is turned off again.
+On **Page 2** of the fixed strip (Shortcut Hub, profile slots), the bottom row is:
+
+- **Fn off:** **`/`**, **`\`**, **`|`**, **`?`**, **`#`**, **DISPLAY**, **Fn**
+- **Fn on:** **`(`**, **`)`**, **`[`**, **`]`**, **`@`**, **`:`**, **Fn**
+
+For characters like **`# @ ( ) : ? "`**, legends assume a US-QWERTY style host layout (Shift+digit / Shift+punctuation). On other host layouts, output glyphs can differ.
 
 Media keys are not sent as Consumer HID in this app build; use keyboard shortcuts on the host where needed.
 

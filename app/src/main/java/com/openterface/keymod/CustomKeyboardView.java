@@ -181,6 +181,13 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int KEY_TOP_PROFILE_SLOT_7 = 0xF013;
     /** Row-1 strip: opens quick-create shortcut sheet (after last favorite on last page). */
     private static final int KEY_TOP_STRIP_CREATE_SHORTCUT = 0xF014;
+    /** Fixed page-2 row-3 (Shortcut Hub) custom punctuation slots while Fn is on. */
+    private static final int KEY_HUB_FN_LPAREN = 0xF015;
+    private static final int KEY_HUB_FN_RPAREN = 0xF016;
+    private static final int KEY_HUB_FN_LBRACKET = 0xF017;
+    private static final int KEY_HUB_FN_RBRACKET = 0xF018;
+    private static final int KEY_HUB_FN_AT = 0xF019;
+    private static final int KEY_HUB_FN_COLON = 0xF01A;
     private static final int KEY_NOOP_PLACEHOLDER = -1;
     private static final String APP_PREFS_NAME = "AppPrefs";
     private static final String KEY_SYSTEM_IME_CAPTURE = "system_ime_capture_mode";
@@ -819,10 +826,8 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     /**
-     * Fixed shortcut page 1: long-press lock targets these HID usages (layout is column order within
-     * the fixed two-row strip — row2 col2 Shift {@code 0xE1}, row3 col1 Ctrl {@code 0xE0}, col2 Alt
-     * {@code 0xE2}, col3 Win/Command {@code 0xE3}). Labels vary with target OS; logic must use
-     * {@code key.code} only.
+     * Fixed shortcut page 1: long-press lock targets these HID usages. Page-1 placement can change,
+     * but lock behavior must continue to follow the underlying modifier key codes only.
      */
     private static boolean isTopModifierLockCandidate(Key key) {
         return key != null
@@ -3068,20 +3073,20 @@ public class CustomKeyboardView extends LinearLayout {
 
     private List<Key> buildFixedTopRowsPage1() {
         List<Key> keys = new ArrayList<>(TOP_PANEL_COLUMNS * 2);
-        // Row 2: ESC, Shift(icon), DEL(icon), TAB(icon), Up, Enter(icon), keyboard (IME) toggle
-        keys.add(markFixedRowKey(new Key("ESC", "", 0x29, "29", 1f, 0, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("SHIFT", "", 0xE1, "E1", 1f, R.drawable.shift_24px, 0f, false, false, -1, true)));
-        keys.add(markFixedRowKey(new Key("DEL", "", 0x4C, "4C", 1f, R.drawable.backspace_24, 0f, false, false, -1, true)));
+        // Row 2: CTRL, ALT, WIN/Command (target-OS aware), TAB(icon), Up, Enter(icon), keyboard (IME) toggle
+        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE0)));
+        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE2)));
+        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE3)));
         keys.add(markFixedRowKey(new Key("TAB", "", 0x2B, "2B", 1f, R.drawable.keyboard_tab_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("UP", "", 0x52, "52", 1f, R.drawable.keyboard_arrow_up_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("ENTER", "", 0x28, "28", 1f, R.drawable.keyboard_return_24px, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("PH1", "", KEY_IME_TOGGLE, "", 1f,
                 systemImeCaptureMode ? R.drawable.ic_keyboard_ime_24 : R.drawable.ic_keyboard_keymod_24,
                 0f, false, false, -1, true)));
-        // Row 3: CTRL, ALT, WIN/Command (target-OS aware), Left(icon), Down(icon), Right(icon), local Fn toggle
-        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE0)));
-        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE2)));
-        keys.add(markFixedRowKey(buildTopPanelModifierKey(0xE3)));
+        // Row 3: ESC, SHIFT, DEL, Left(icon), Down(icon), Right(icon), local Fn toggle
+        keys.add(markFixedRowKey(new Key("ESC", "", 0x29, "29", 1f, 0, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("SHIFT", "", 0xE1, "E1", 1f, R.drawable.shift_24px, 0f, false, false, -1, true)));
+        keys.add(markFixedRowKey(new Key("DEL", "", 0x4C, "4C", 1f, R.drawable.backspace_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("LEFT", "", 0x50, "50", 1f, R.drawable.keyboard_arrow_left_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("DOWN", "", 0x51, "51", 1f, R.drawable.keyboard_arrow_down_24, 0f, false, false, -1, true)));
         keys.add(markFixedRowKey(new Key("RIGHT", "", 0x4F, "4F", 1f, R.drawable.keyboard_arrow_right_24, 0f, false, false, -1, true)));
@@ -3095,15 +3100,22 @@ public class CustomKeyboardView extends LinearLayout {
         for (int slot = 1; slot <= TOP_PANEL_COLUMNS; slot++) {
             keys.add(buildProfileHubSlotKey(slot));
         }
-        // Lower row: Fn off — five placeholders + DISPLAY + Fn; Fn on — six placeholders + Fn (no DISPLAY toggle).
+        // Lower row:
+        // Fn off -> / \ | ? # + DISPLAY + Fn
+        // Fn on  -> ( ) [ ] @ : + Fn
         if (fixedTopLocalFnLocked) {
-            for (int i = 0; i < 6; i++) {
-                keys.add(buildNoOpFixedPlaceholder());
-            }
+            keys.add(markFixedRowKey(new Key("(", "", KEY_HUB_FN_LPAREN, "F015", 1f, 0, 0f, false, false, -1, true)));
+            keys.add(markFixedRowKey(new Key(")", "", KEY_HUB_FN_RPAREN, "F016", 1f, 0, 0f, false, false, -1, true)));
+            keys.add(markFixedRowKey(new Key("[", "", KEY_HUB_FN_LBRACKET, "F017", 1f, 0, 0f, false, false, -1, true)));
+            keys.add(markFixedRowKey(new Key("]", "", KEY_HUB_FN_RBRACKET, "F018", 1f, 0, 0f, false, false, -1, true)));
+            keys.add(markFixedRowKey(new Key("@", "", KEY_HUB_FN_AT, "F019", 1f, 0, 0f, false, false, -1, true)));
+            keys.add(markFixedRowKey(new Key(":", "", KEY_HUB_FN_COLON, "F01A", 1f, 0, 0f, false, false, -1, true)));
         } else {
-            for (int i = 0; i < 5; i++) {
-                keys.add(buildNoOpFixedPlaceholder());
-            }
+            keys.add(markFixedRowKey(new Key("/", "", 0x38, "38", 1f, 0, 0f, false, false, -1, true)));
+            keys.add(markFixedRowKey(new Key("\\", "", 0x31, "31", 1f, 0, 0f, false, false, -1, true)));
+            keys.add(markFixedRowKey(new Key("|", "", 0x64, "64", 1f, 0, 0f, false, false, -1, true)));
+            keys.add(markFixedRowKey(new Key("?", "", 0x38, "38", 1f, 0, 0f, false, true, -1, true)));
+            keys.add(markFixedRowKey(new Key("#", "", 0x20, "20", 1f, 0, 0f, false, true, -1, true)));
             Key shortcutHubDisplay = new Key("DISPLAY", "", KEY_TOP_SHORTCUT_DISPLAY_TOGGLE, "", 1f,
                     topShortcutShowActionLabels ? R.drawable.text_on_24 : R.drawable.icon_on_24,
                     0f, false, false, -1, true);
@@ -3754,6 +3766,8 @@ public class CustomKeyboardView extends LinearLayout {
                     } else if (isTopModifierLockCandidate(key)) {
                         pendingModifierLongPress[0] = () -> {
                             longPressConsumed[0] = true;
+                            // Option A: local-Fn overlays on these cells still long-press lock the
+                            // underlying modifier state (Ctrl/Shift/Alt/Win).
                             setModifierLockedStateForKey(key, !isModifierLockedStateForKey(key));
                             pendingModifierLongPress[0] = null;
                         };
@@ -3872,6 +3886,8 @@ public class CustomKeyboardView extends LinearLayout {
                     if (isTopModifierLockCandidate(key)) {
                         pendingModifierLongPress[0] = () -> {
                             longPressConsumed[0] = true;
+                            // Option A: local-Fn overlays on these cells still long-press lock the
+                            // underlying modifier state (Ctrl/Shift/Alt/Win).
                             setModifierLockedStateForKey(key, !isModifierLockedStateForKey(key));
                             pendingModifierLongPress[0] = null;
                         };
@@ -4974,19 +4990,27 @@ public class CustomKeyboardView extends LinearLayout {
             case 0x3F: return new FnMapping("6", 0x23, 0);
             case 0x40: return new FnMapping("7", 0x24, 0);
             case KEY_IME_TOGGLE: return null;
-            // Fixed-top page 1 (ESC strip): local Fn — row2 navigation cluster, row3 symbols/system.
-            case 0x29: return new FnMapping("HOME", 0x4A, 0);
-            case 0xE1: return new FnMapping("END", 0x4D, 0);
-            case 0x4C: return new FnMapping("PGUP", 0x4B, 0);
-            case 0x2B: return new FnMapping("PGDN", 0x4E, 0);
-            case 0x52: return new FnMapping("INS", 0x49, 0);
-            case 0x28: return new FnMapping("SCR LK", 0x47, 0);
-            case 0xE0: return new FnMapping("PAUSE", 0x48, 0);
-            case 0xE2: return new FnMapping("/", 0x38, 0);
-            case 0xE3: return new FnMapping("\\", 0x31, 0);
-            case 0x50: return new FnMapping("|", 0x64, 0);
-            case 0x51: return new FnMapping("\"", 0x34, MOD_SHIFT);
-            case 0x4F: return new FnMapping("-", 0x2D, 0);
+            // Fixed-top page 1: local Fn overlay matches page-1 row/column arrangement.
+            case 0xE0: return new FnMapping("SCR LK", 0x47, 0);
+            case 0xE2: return new FnMapping("PRT SC", 0x46, 0);
+            case 0xE3: return new FnMapping("CAPS", 0x39, 0);
+            case 0x2B: return new FnMapping("PAUSE", 0x48, 0);
+            case 0x52: return new FnMapping("HOME", 0x4A, 0);
+            case 0x28: return new FnMapping("PGUP", 0x4B, 0);
+            case 0x29: return new FnMapping("SPACE", 0x2C, 0);
+            case 0xE1: return new FnMapping("BKSP", 0x2A, 0);
+            case 0x4C: return new FnMapping("DEL", 0x4C, 0);
+            case 0x50: return new FnMapping("INS", 0x49, 0);
+            case 0x51: return new FnMapping("END", 0x4D, 0);
+            case 0x4F: return new FnMapping("PGDN", 0x4E, 0);
+            // Fixed-top page 2 (Shortcut Hub): dedicated sentinel keys avoid collisions with page-0/1
+            // switch arms while allowing explicit shifted punctuation sends.
+            case KEY_HUB_FN_LPAREN: return new FnMapping("(", 0x26, MOD_SHIFT);
+            case KEY_HUB_FN_RPAREN: return new FnMapping(")", 0x27, MOD_SHIFT);
+            case KEY_HUB_FN_LBRACKET: return new FnMapping("[", 0x2F, 0);
+            case KEY_HUB_FN_RBRACKET: return new FnMapping("]", 0x30, 0);
+            case KEY_HUB_FN_AT: return new FnMapping("@", 0x1F, MOD_SHIFT);
+            case KEY_HUB_FN_COLON: return new FnMapping(":", 0x33, MOD_SHIFT);
             default:
                 return null;
         }
