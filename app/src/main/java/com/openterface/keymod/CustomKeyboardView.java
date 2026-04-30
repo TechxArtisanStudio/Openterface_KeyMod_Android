@@ -24,6 +24,7 @@ import android.os.Looper;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.SpannableString;
+import android.text.Layout;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
@@ -55,6 +56,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.graphics.ColorUtils;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.core.widget.TextViewCompat;
 import androidx.preference.PreferenceManager;
 
 import com.openterface.keymod.util.HidTextKeystrokeSender;
@@ -101,8 +103,10 @@ public class CustomKeyboardView extends LinearLayout {
     private static final float TOP_FIXED_ROWS_TEXT_SP = 13f;
     private static final float TOP_FIXED_ROWS_ACTION_LABEL_SP = 14f;
     private static final float TOP_FIXED_ROWS_CUSTOM_GLYPH_SP = 21f;
-    /** Profile hub slot row: slightly smaller than other fixed-row text to reduce wrap vs bottom strip. */
-    private static final float TOP_PROFILE_HUB_SLOT_TEXT_SP = 12f;
+    /** Profile hub slots: autosize within [min,max] sp so two-line names fit above the bottom strip. */
+    private static final int TOP_PROFILE_HUB_SLOT_TEXT_MIN_SP = 9;
+    private static final int TOP_PROFILE_HUB_SLOT_TEXT_MAX_SP = 11;
+    private static final int TOP_PROFILE_HUB_SLOT_TEXT_STEP_SP = 1;
     /** Single-pane IME: shortcut strip vs text vs space for soft keyboard (sum ~5.15). */
     private static final float IME_SINGLE_TOP_STRIP_WEIGHT = 1.35f;
     private static final float IME_SINGLE_TEXT_WEIGHT = 0.95f;
@@ -3400,7 +3404,7 @@ public class CustomKeyboardView extends LinearLayout {
                     if (profileHubSlot) {
                         int stripPx = Math.round(getResources().getDimension(
                                 R.dimen.profile_hub_slot_bottom_accent_height));
-                        b.setPadding(dpToPx(4), dpToPx(3), dpToPx(4), stripPx + dpToPx(4));
+                        b.setPadding(dpToPx(4), dpToPx(2), dpToPx(4), stripPx + dpToPx(6));
                     } else {
                         b.setPadding(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1));
                         b.setTextSize(TypedValue.COMPLEX_UNIT_SP,
@@ -3422,12 +3426,32 @@ public class CustomKeyboardView extends LinearLayout {
                     }
                     b.setText(topButtonText);
                     if (renderAsActionLabel) {
-                        b.setTextSize(TypedValue.COMPLEX_UNIT_SP,
-                                fixedRowsSlice ? TOP_FIXED_ROWS_ACTION_LABEL_SP : TOP_SHORTCUT_PANEL_ACTION_LABEL_SP);
+                        if (!profileHubSlot) {
+                            b.setTextSize(TypedValue.COMPLEX_UNIT_SP,
+                                    fixedRowsSlice ? TOP_FIXED_ROWS_ACTION_LABEL_SP
+                                            : TOP_SHORTCUT_PANEL_ACTION_LABEL_SP);
+                        }
                         b.setTypeface(Typeface.DEFAULT_BOLD);
                     } else if (profileHubSlot) {
-                        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, TOP_PROFILE_HUB_SLOT_TEXT_SP);
                         b.setTypeface(Typeface.DEFAULT_BOLD);
+                    }
+                    if (profileHubSlot) {
+                        b.setIncludeFontPadding(false);
+                        b.setMaxLines(2);
+                        b.setSingleLine(false);
+                        b.setLineSpacing(0f, 0.92f);
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            b.setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE);
+                            b.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
+                        }
+                        int minSp = renderAsActionLabel ? 8 : TOP_PROFILE_HUB_SLOT_TEXT_MIN_SP;
+                        int maxSp = renderAsActionLabel ? 13 : TOP_PROFILE_HUB_SLOT_TEXT_MAX_SP;
+                        TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                                b,
+                                minSp,
+                                maxSp,
+                                TOP_PROFILE_HUB_SLOT_TEXT_STEP_SP,
+                                TypedValue.COMPLEX_UNIT_SP);
                     }
                     b.setTextColor(resolveThemeTextColor());
                     b.setAllCaps(false);

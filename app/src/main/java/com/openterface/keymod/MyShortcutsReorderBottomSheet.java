@@ -24,8 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Bottom sheet: scrollable section tabs (My favorites + profile categories or All), drag-reorder My,
- * bookmark control on browse rows to stage copies in My or remove them from the staged list; Done persists once.
+ * Bottom sheet: scrollable section tabs (Favorites + profile categories or All), drag-reorder list,
+ * bookmark control on browse rows to stage copies in Favorites or remove them from the staged list; Done persists once.
  */
 public final class MyShortcutsReorderBottomSheet {
 

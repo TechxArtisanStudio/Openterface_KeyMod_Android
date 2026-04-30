@@ -508,7 +508,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
             if (s.id.equals(shortcut.id)) {
                 new AlertDialog.Builder(requireContext())
                         .setTitle(R.string.shortcut_hub_already_in_favorites_title)
-                        .setMessage("'" + shortcut.name + "' is already in your favorites.")
+                        .setMessage("'" + shortcut.name + "' is already in Favorites.")
                         .setPositiveButton("OK", null)
                         .show();
                 return;
@@ -516,7 +516,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         }
         new AlertDialog.Builder(requireContext())
                 .setTitle(R.string.shortcut_hub_add_to_favorites_title)
-                .setMessage("Add '" + shortcut.name + "' (" + shortcut.label + ") to your favorites?")
+                .setMessage("Add '" + shortcut.name + "' (" + shortcut.label + ") to Favorites?")
                 .setPositiveButton("Add", (d, w) -> {
                     myShortcutsList.add(shortcut);
                     profileManager.updateMyShortcuts(selectedProfile.id, myShortcutsList);
