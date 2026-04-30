@@ -439,16 +439,26 @@ public class CustomKeyboardView extends LinearLayout {
         final int keyCode;
         final boolean requiresShift;
         final int modifierMask;
+        /**
+         * When non-zero, {@link #sendAlternateOption} sends this code point with
+         * {@link HidTextKeystrokeSender} (Unicode entry) instead of {@link #keyCode}.
+         */
+        final int unicodeCodePoint;
 
         AlternateOption(String display, int keyCode, boolean requiresShift) {
-            this(display, keyCode, requiresShift, 0);
+            this(display, keyCode, requiresShift, 0, 0);
         }
 
         AlternateOption(String display, int keyCode, boolean requiresShift, int modifierMask) {
+            this(display, keyCode, requiresShift, modifierMask, 0);
+        }
+
+        AlternateOption(String display, int keyCode, boolean requiresShift, int modifierMask, int unicodeCodePoint) {
             this.display = display;
             this.keyCode = keyCode;
             this.requiresShift = requiresShift;
             this.modifierMask = modifierMask;
+            this.unicodeCodePoint = unicodeCodePoint;
         }
     }
 
@@ -2184,7 +2194,8 @@ public class CustomKeyboardView extends LinearLayout {
 
     /**
      * Fills {@code slots[0..8]} for the 3×3 alternate grid. Comma tokens map in order to
-     * Up, Down, Left, Right; center is capital for {@code a–z} or the mappable base label.
+     * Up, Down, Left, Right; optional tokens 5–8 map to Up-Left, Up-Right, Down-Left, Down-Right.
+     * Center is capital for {@code a–z} or the mappable base label.
      */
     private void fillAlternateSlotOptions(Key key, AlternateOption[] slots) {
         Arrays.fill(slots, null);
@@ -2193,7 +2204,7 @@ public class CustomKeyboardView extends LinearLayout {
         }
         if (!TextUtils.isEmpty(key.alternates)) {
             List<String> tokens = splitAlternatesTokens(key.alternates);
-            int[] tokenSlot = {
+            int[] cardinalSlots = {
                     AlternatePopupGeometry.SLOT_UP,
                     AlternatePopupGeometry.SLOT_DOWN,
                     AlternatePopupGeometry.SLOT_LEFT,
@@ -2201,11 +2212,30 @@ public class CustomKeyboardView extends LinearLayout {
             };
             for (int t = 0; t < tokens.size() && t < 4; t++) {
                 String trimmed = tokens.get(t).trim();
-                if (trimmed.length() == 1) {
-                    AlternateOption mapped = mapAsciiAlternate(trimmed);
-                    if (mapped != null) {
-                        slots[tokenSlot[t]] = mapped;
-                    }
+                if (trimmed.isEmpty() || trimmed.codePointCount(0, trimmed.length()) != 1) {
+                    continue;
+                }
+                String symbol = new String(Character.toChars(trimmed.codePointAt(0)));
+                AlternateOption mapped = mapAsciiAlternate(symbol);
+                if (mapped != null) {
+                    slots[cardinalSlots[t]] = mapped;
+                }
+            }
+            int[] cornerSlots = {
+                    AlternatePopupGeometry.SLOT_UP_LEFT,
+                    AlternatePopupGeometry.SLOT_UP_RIGHT,
+                    AlternatePopupGeometry.SLOT_DOWN_LEFT,
+                    AlternatePopupGeometry.SLOT_DOWN_RIGHT
+            };
+            for (int i = 0; i < cornerSlots.length && i + 4 < tokens.size(); i++) {
+                String trimmed = tokens.get(i + 4).trim();
+                if (trimmed.isEmpty() || trimmed.codePointCount(0, trimmed.length()) != 1) {
+                    continue;
+                }
+                String symbol = new String(Character.toChars(trimmed.codePointAt(0)));
+                AlternateOption mapped = mapAsciiAlternate(symbol);
+                if (mapped != null) {
+                    slots[cornerSlots[i]] = mapped;
                 }
             }
         }
@@ -2511,6 +2541,24 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private void sendAlternateOption(AlternateOption option) {
+        if (option.unicodeCodePoint != 0) {
+            ConnectionManager cm = peekConnectionManager();
+            if (cm == null) {
+                Log.w(TAG, "Unicode alternate needs ConnectionManager; skipping U+"
+                        + Integer.toHexString(option.unicodeCodePoint));
+                return;
+            }
+            String targetOs = getTargetOs();
+            String ch = new String(Character.toChars(option.unicodeCodePoint));
+            imeTextExecutor.execute(() -> {
+                try {
+                    HidTextKeystrokeSender.send(ch, cm, targetOs, true, null);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+            return;
+        }
         int combinedValue = 0;
         combinedValue += isCtrlLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Ctrl")) : 0;
         combinedValue += isShiftLeftLocked ? parseHex(CH9329MSKBMap.KBShortCutKey().get("Shift")) : 0;
@@ -2624,6 +2672,11 @@ public class CustomKeyboardView extends LinearLayout {
             case '€': return new AlternateOption(token, 0x1F, false, MOD_ALT | MOD_SHIFT);
             case '¥': return new AlternateOption(token, 0x1C, false, MOD_ALT);
             case '£': return new AlternateOption(token, 0x20, false, MOD_ALT);
+            // No single standard HID usage; host entry via Unicode compose (see HidTextKeystrokeSender).
+            case '₹': return new AlternateOption(token, 0, false, 0, 0x20B9);
+            case '₩': return new AlternateOption(token, 0, false, 0, 0x20A9);
+            case '₽': return new AlternateOption(token, 0, false, 0, 0x20BD);
+            case '₺': return new AlternateOption(token, 0, false, 0, 0x20BA);
             default: return null;
         }
     }
