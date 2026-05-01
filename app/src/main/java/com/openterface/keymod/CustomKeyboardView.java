@@ -65,8 +65,9 @@ import com.openterface.keymod.util.ImeTextForwarder;
 import com.openterface.keymod.util.KeyParser;
 import com.openterface.keymod.util.TopModeShortcutPrefs;
 import com.openterface.keymod.util.TopShortcutProfileSlotPrefs;
-import com.openterface.target.CH9329MSKBMap;
+import com.google.android.material.color.MaterialColors;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
+import com.openterface.target.CH9329MSKBMap;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -306,6 +307,8 @@ public class CustomKeyboardView extends LinearLayout {
     private static final int ALT_POPUP_OPTION_PADDING_HORIZONTAL_DP_LANDSCAPE = 10;
     private static final int ALT_POPUP_OPTION_PADDING_VERTICAL_DP_PORTRAIT = 5;
     private static final int ALT_POPUP_OPTION_PADDING_VERTICAL_DP_LANDSCAPE = 7;
+    /** Minimum width/height so cardinal wash pills read clearly (single glyphs otherwise shrink too small). */
+    private static final int ALT_POPUP_CELL_MIN_SIZE_DP = 40;
     private static final float BASE_KEYCAP_TEXT_SP_PORTRAIT = 17f;
     private static final float BASE_KEYCAP_TEXT_SP_LANDSCAPE = 19f;
     private static final int KEY_OUTER_MARGIN_DP = 2;
@@ -2316,6 +2319,43 @@ public class CustomKeyboardView extends LinearLayout {
         anchor.performHapticFeedback(feedbackType, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
     }
 
+    /**
+     * Long-press picker slots {@link AlternatePopupGeometry#SLOT_UP}…{@link AlternatePopupGeometry#SLOT_RIGHT}
+     * (first four {@code keyAlternates} tokens), as opposed to diagonals 5–8.
+     */
+    private static boolean isAlternateCardinalSlot(int slot) {
+        return slot == AlternatePopupGeometry.SLOT_UP
+                || slot == AlternatePopupGeometry.SLOT_DOWN
+                || slot == AlternatePopupGeometry.SLOT_LEFT
+                || slot == AlternatePopupGeometry.SLOT_RIGHT;
+    }
+
+    /**
+     * Idle fill for cardinal long-press cells (Up/Down/Left/Right): opaque blend of
+     * {@code colorPrimaryContainer} toward the popup card color so it always paints reliably
+     * (translucent {@link GradientDrawable} can appear invisible on some devices with
+     * {@link PopupWindow}). Corners/center stay on the plain popup until selected.
+     */
+    private int resolveAlternateCardinalWashArgb() {
+        Context ctx = getContext();
+        if (ctx == null) {
+            return 0;
+        }
+        int container = MaterialColors.getColor(
+                ctx, com.google.android.material.R.attr.colorPrimaryContainer, 0xFFFFE0B2);
+        int popupBg = ContextCompat.getColor(ctx, R.color.background_light);
+        // ~60% primary-container hue: clearly distinct from bare popup, weaker than solid selected pill.
+        return ColorUtils.blendARGB(container, popupBg, 0.40f);
+    }
+
+    private static void setAlternateCardinalIdleBackground(TextView tv, int washArgb, float cornerRadiusPx) {
+        GradientDrawable gd = new GradientDrawable();
+        gd.setShape(GradientDrawable.RECTANGLE);
+        gd.setColor(washArgb);
+        gd.setCornerRadius(cornerRadiusPx);
+        tv.setBackground(gd);
+    }
+
     private void onAlternatePickChanged(View anchor, int newPick) {
         int old = lastAlternatePickForHaptic;
         if (newPick == old) {
@@ -2351,6 +2391,8 @@ public class CustomKeyboardView extends LinearLayout {
                 highlightSlot = currentAlternatePick;
             }
         }
+        int cardinalWashArgb = resolveAlternateCardinalWashArgb();
+        float cardinalCornerPx = dpToPx(10);
         for (int s = 0; s < AlternatePopupGeometry.SLOT_COUNT; s++) {
             TextView tv = alternateSlotViews[s];
             if (tv == null) {
@@ -2363,6 +2405,8 @@ public class CustomKeyboardView extends LinearLayout {
             }
             if (highlightSlot >= 0 && s == highlightSlot) {
                 tv.setBackgroundResource(R.drawable.alternate_popup_option_selected_background);
+            } else if (isAlternateCardinalSlot(s) && cardinalWashArgb != 0) {
+                setAlternateCardinalIdleBackground(tv, cardinalWashArgb, cardinalCornerPx);
             } else {
                 tv.setBackgroundResource(android.R.color.transparent);
             }
@@ -2472,6 +2516,9 @@ public class CustomKeyboardView extends LinearLayout {
                 cell.setPadding(ph, pv, ph, pv);
                 cell.setGravity(Gravity.CENTER);
                 cell.setTextColor(resolveThemeTextColor());
+                int minCell = dpToPx(ALT_POPUP_CELL_MIN_SIZE_DP);
+                cell.setMinimumWidth(minCell);
+                cell.setMinimumHeight(minCell);
                 if (shown == null) {
                     cell.setAlpha(0.35f);
                 } else {
@@ -2504,6 +2551,7 @@ public class CustomKeyboardView extends LinearLayout {
                     + (hasBottomRowAlternates ? ALT_POPUP_BOTTOM_ROW_EXTRA_OFFSET_DP : 0);
             int popupY = loc[1] - dpToPx(verticalOffsetDp);
             alternatePopupWindow.showAtLocation(anchor, Gravity.NO_GRAVITY, popupX, popupY);
+            applyAlternatePickHighlight();
         });
     }
 
