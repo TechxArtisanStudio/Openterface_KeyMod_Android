@@ -1,0 +1,47 @@
+package com.openterface.keymod.util;
+
+import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+
+public class KeyParserParseTest {
+
+    @Test
+    public void parse_wrappedCtrlLowercaseC_preservesCtrlAfterCloseTag() {
+        KeyParser.ParsedKey pk = KeyParser.parse("<CTRL>c</CTRL>");
+        assertEquals(6, pk.keyCode);
+        assertEquals(0x01, pk.modifiers);
+    }
+
+    @Test
+    public void parse_wrappedCtrlUppercaseC_includesShiftFromChar() {
+        KeyParser.ParsedKey pk = KeyParser.parse("<CTRL>C</CTRL>");
+        assertEquals(6, pk.keyCode);
+        assertEquals(0x01 | 0x02, pk.modifiers);
+    }
+
+    @Test
+    public void parse_wrappedShiftLowercaseC_preservesShift() {
+        KeyParser.ParsedKey pk = KeyParser.parse("<SHIFT>c</SHIFT>");
+        assertEquals(6, pk.keyCode);
+        assertEquals(0x02, pk.modifiers);
+    }
+
+    @Test
+    public void toLabel_windows_usesWinNotCmd() {
+        int mods = 0x08 | 0x01;
+        assertEquals("Win+Ctrl+C", KeyParser.toLabelForTargetOs(6, mods, "windows"));
+    }
+
+    @Test
+    public void toLabel_macos_usesCmd() {
+        int mods = 0x08 | 0x01;
+        assertEquals("Cmd+Ctrl+C", KeyParser.toLabelForTargetOs(6, mods, "macos"));
+    }
+
+    @Test
+    public void toLabel_linux_usesSuper() {
+        int mods = 0x08;
+        assertEquals("Super+C", KeyParser.toLabelForTargetOs(6, mods, "linux"));
+    }
+}

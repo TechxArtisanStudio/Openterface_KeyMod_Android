@@ -40,11 +40,11 @@ public final class TopModeShortcutPrefs {
     private static String defaultForSlot(int slotIndex1Based) {
         switch (slotIndex1Based) {
             case 1:
-                return LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
+                return LaunchPanelActivity.MODE_MACROS;
             case 2:
                 return LaunchPanelActivity.MODE_PRESENTATION;
             case 3:
-                return LaunchPanelActivity.MODE_MACROS;
+                return LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
             default:
                 return LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
         }

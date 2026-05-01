@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="?attr/colorPrimaryContainer" />
+            <corners android:radius="9dp" />
+        </shape>
+    </item>
+    <!-- Idle: same neutral base as fixed strip keys, plus theme accent wash (per Theme.KeyMod.*). -->
+    <item android:state_pressed="false">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/key_bg_function" />
+                    <corners android:radius="9dp" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="?attr/presentationControlButtonIdleFill" />
+                    <corners android:radius="9dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

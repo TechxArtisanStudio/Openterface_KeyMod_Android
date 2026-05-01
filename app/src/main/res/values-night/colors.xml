@@ -19,6 +19,7 @@
     <!-- Bluetooth dialogs -->
     <color name="bluetooth_dialog_bg">#FF121212</color>
     <color name="bluetooth_surface">#FF1E1E1E</color>
+    <color name="connection_dialog_header_bg">#FF26262A</color>
 
     <!-- Keyboard Colors (Dark) -->
     <color name="key_bg_normal">#FF3A3A3C</color>

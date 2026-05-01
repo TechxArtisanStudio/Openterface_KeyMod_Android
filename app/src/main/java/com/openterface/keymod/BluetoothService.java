@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,6 +35,7 @@ public class BluetoothService extends Service {
     private static final UUID WRITE_CHARACTERISTIC_UUID = UUID.fromString("0000fff2-0000-1000-8000-00805f9b34fb");
     private static final UUID NOTIFY_CHARACTERISTIC_UUID = UUID.fromString("0000fff1-0000-1000-8000-00805f9b34fb");
     private static final long RECONNECT_DELAY_MS = 5000; // Reconnect delay: 5 seconds
+    private static final long RSSI_POLL_INTERVAL_MS = 2000;
 
     private final IBinder binder = new BluetoothBinder();
     private RxBleClient rxBleClient;
@@ -42,6 +44,16 @@ public class BluetoothService extends Service {
     private final Set<String> connectingDevices = new HashSet<>();
     private RxBleDevice connectedDevice;
     private Disposable reconnectDisposable;
+    private Disposable rssiPollDisposable;
+    private final Set<ConnectionStateListener> connectionStateListeners = new CopyOnWriteArraySet<>();
+
+    public interface ConnectionStateListener {
+        void onBluetoothConnecting(RxBleDevice device);
+        void onBluetoothConnected(RxBleDevice device);
+        void onBluetoothDisconnected(RxBleDevice device);
+        void onBluetoothError(RxBleDevice device, String error);
+        void onBluetoothRssiChanged(RxBleDevice device, int rssi);
+    }
 
     public class BluetoothBinder extends Binder {
         public BluetoothService getService() {
@@ -57,6 +69,84 @@ public class BluetoothService extends Service {
 
     public void setRxBleClient(RxBleClient client) {
         this.rxBleClient = client;
+    }
+
+    public void addConnectionStateListener(ConnectionStateListener listener) {
+        if (listener != null) {
+            connectionStateListeners.add(listener);
+        }
+    }
+
+    public void removeConnectionStateListener(ConnectionStateListener listener) {
+        if (listener != null) {
+            connectionStateListeners.remove(listener);
+        }
+    }
+
+    private void notifyBluetoothConnecting(RxBleDevice device) {
+        for (ConnectionStateListener listener : connectionStateListeners) {
+            listener.onBluetoothConnecting(device);
+        }
+    }
+
+    private void notifyBluetoothConnected(RxBleDevice device) {
+        for (ConnectionStateListener listener : connectionStateListeners) {
+            listener.onBluetoothConnected(device);
+        }
+    }
+
+    private void notifyBluetoothDisconnected(RxBleDevice device) {
+        for (ConnectionStateListener listener : connectionStateListeners) {
+            listener.onBluetoothDisconnected(device);
+        }
+    }
+
+    private void notifyBluetoothError(RxBleDevice device, String error) {
+        for (ConnectionStateListener listener : connectionStateListeners) {
+            listener.onBluetoothError(device, error);
+        }
+    }
+
+    private void notifyBluetoothRssiChanged(RxBleDevice device, int rssi) {
+        for (ConnectionStateListener listener : connectionStateListeners) {
+            listener.onBluetoothRssiChanged(device, rssi);
+        }
+    }
+
+    private void startRssiPolling() {
+        stopRssiPolling();
+        rssiPollDisposable =
+                Observable.interval(0, RSSI_POLL_INTERVAL_MS, TimeUnit.MILLISECONDS)
+                        .subscribe(
+                                tick -> {
+                                    RxBleConnection connection = activeConnection;
+                                    RxBleDevice device = connectedDevice;
+                                    if (connection == null || device == null) {
+                                        return;
+                                    }
+                                    connection.readRssi()
+                                            .subscribe(
+                                                    rssi -> notifyBluetoothRssiChanged(device, rssi),
+                                                    throwable ->
+                                                            Log.w(
+                                                                    TAG,
+                                                                    LOG_PREFIX
+                                                                            + "RSSI read failed: "
+                                                                            + throwable));
+                                },
+                                throwable ->
+                                        Log.w(
+                                                TAG,
+                                                LOG_PREFIX + "RSSI polling stopped: " + throwable));
+        connectionDisposables.add(rssiPollDisposable);
+    }
+
+    private void stopRssiPolling() {
+        if (rssiPollDisposable != null && !rssiPollDisposable.isDisposed()) {
+            rssiPollDisposable.dispose();
+            connectionDisposables.remove(rssiPollDisposable);
+        }
+        rssiPollDisposable = null;
     }
 
     public void connectToDevice(RxBleDevice device) {
@@ -84,6 +174,7 @@ public class BluetoothService extends Service {
 
         stopReconnect(); // Clear previous reconnect attempts
         connectedDevice = device;
+        notifyBluetoothConnecting(device);
 
         Disposable connectionDisposable = device.establishConnection(false)
                 .doOnDispose(() -> {
@@ -99,6 +190,8 @@ public class BluetoothService extends Service {
                             }
                             activeConnection = connection;
                             Log.d(TAG, LOG_PREFIX + "Connected to " + sanitizeDeviceName(device.getName()) + " (" + deviceAddress + ")");
+                            notifyBluetoothConnected(device);
+                            startRssiPolling();
                             // Persist this device so auto-connect can use it on next launch
                             getSharedPreferences("ConnectionPrefs", MODE_PRIVATE)
                                     .edit()
@@ -112,6 +205,9 @@ public class BluetoothService extends Service {
                             }
                             Log.e(TAG, LOG_PREFIX + "Connection error for device " + sanitizeDeviceName(device.getName()) + " (" + deviceAddress + "): " + throwable.toString());
                             activeConnection = null;
+                            notifyBluetoothError(device, throwable.toString());
+                            notifyBluetoothDisconnected(device);
+                            stopRssiPolling();
                             // Check if the error is a BleDisconnectedException with status 255
                             if (throwable instanceof BleDisconnectedException) {
                                 String errorMessage = throwable.toString();
@@ -215,6 +311,10 @@ public class BluetoothService extends Service {
     public void onDestroy() {
         super.onDestroy();
         connectionDisposables.dispose();
+        stopRssiPolling();
+        if (connectedDevice != null) {
+            notifyBluetoothDisconnected(connectedDevice);
+        }
         activeConnection = null;
         connectedDevice = null;
         stopReconnect();
@@ -223,9 +323,14 @@ public class BluetoothService extends Service {
 
     public void disconnect() {
         if (activeConnection != null) {
+            RxBleDevice previousDevice = connectedDevice;
             connectionDisposables.clear();
+            stopRssiPolling();
             activeConnection = null;
             connectedDevice = null;
+            if (previousDevice != null) {
+                notifyBluetoothDisconnected(previousDevice);
+            }
             Log.d(TAG, LOG_PREFIX + "Bluetooth disconnected");
         }
     }

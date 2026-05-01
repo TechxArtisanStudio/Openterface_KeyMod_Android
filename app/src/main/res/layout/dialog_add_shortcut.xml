@@ -25,6 +25,22 @@
         android:textSize="14sp"
         android:layout_marginBottom="8dp" />
 
+    <EditText
+        android:id="@+id/shortcut_icon_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Icon (emoji or drawable name, e.g. 📋 or content_copy_24)"
+        android:inputType="text"
+        android:layout_marginBottom="8dp" />
+
+    <EditText
+        android:id="@+id/shortcut_order_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Display order number (e.g. 1)"
+        android:inputType="number"
+        android:layout_marginBottom="8dp" />
+
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

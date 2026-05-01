@@ -97,6 +97,41 @@ The virtual keyboard provides a **full QWERTY layout** with these sections:
 - Tap **Fn** to access F1-F12 keys
 - Tap **?123** to switch to number/symbol layout
 
+### Fixed Shortcut Strip (Top Rows)
+
+In keyboard mode, the fixed shortcut strip uses two rows of keys beneath the swipeable favorites row.
+
+- **Target OS setting** (`Windows`, `Linux`, `macOS`) changes modifier **labels/icons** only:
+  - Row 2 Col 1 (`0xE0`): Ctrl / Control
+  - Row 2 Col 2 (`0xE2`): Alt / Option
+  - Row 2 Col 3 (`0xE3`): Win / Super / Command
+- The physical positions do not move across target OS values.
+- Row 2 already has dedicated **Tab** and **Enter** keys.
+
+On **Page 0** of the fixed strip (F‑key / digit row):
+
+- **`Fn` latched / local Fn on:** row 2 is **F6–F12**, row 3 is **F1–F5**, **DISPLAY** (icon/text shortcut strip mode), **`Fn`**.
+- **`Fn` cleared / local Fn off:** row 2 is **`6`** **`7`** **`8`** **`9`** **`0`** **`+`** **`-`** (from F6–F12), row 3 is **`1`** **`2`** **`3`** **`4`** **`5`** and **DISPLAY** shows **`=`** (sends equals); **`Fn`** still toggles latch.
+
+DISPLAY only toggles icon vs action labels when **`Fn`** is latched on this page.
+
+On **Page 1** of the fixed strip (ESC / navigation page), when **local Fn** (row 3 col 7 on that page) is on:
+
+- **Row 2** sends **Scroll Lock**, **PrtSc**, **Caps Lock**, **Pause/Break**, **Home**, **PgUp**; the IME toggle key is unchanged.
+- **Row 3** sends **Space**, **Bksp**, **Del**, **Insert**, **End**, **PgDn**.  
+  Ctrl/Alt/Win positions still support **long‑press** modifier lock using the underlying modifier keys.
+
+On **Page 2** of the fixed strip (**Shortcut Hub**), **local Fn** toggles two full punctuation rows (**no DISPLAY** on this page; use Page 0 for icon/text DISPLAY).
+
+- **Fn off — upper row:** **`(`**, **`)`**, **`[`**, **`]`**, **`:`**, **`#`**, **`@`**
+- **Fn off — lower row:** **`/`**, **`\`**, **`|`**, **`?`**, **`-`**, **`_`**, **`Fn`** (toggle)
+- **Fn on — upper row:** two **Shortcut Hub profile** slots (**tap** = activate profile, **long‑press** = assign), then **`~`** **`'`** **`"`** **`%`** **`^`**
+- **Fn on — lower row:** **`<`** **`>`** **`*`** **`&`** **`,`** **`.`**, **`Fn`**
+
+Shifted glyphs assume a US‑QWERTY‑style host layout; other layouts may produce different characters.
+
+Media keys are not sent as Consumer HID in this app build; use keyboard shortcuts on the host where needed.
+
 ---
 
 ## 🎮 Gamepad Mode

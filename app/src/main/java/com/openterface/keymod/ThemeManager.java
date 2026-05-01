@@ -99,6 +99,34 @@ public final class ThemeManager {
         return getConfiguredAccentColor(context);
     }
 
+    /**
+     * Primary container fill (pressed / selected keycaps) for the current color family.
+     * Matches {@link #getColorPrimary} — safe when the view context is not theme-wrapped.
+     */
+    public static int getColorPrimaryContainer(Context context) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        String family = prefs.getString(PREF_THEME_COLOR_FAMILY, FAMILY_ORANGE);
+        int colorResId;
+        if (FAMILY_BLUE.equals(family)) {
+            colorResId = R.color.theme_accent_blue_container;
+        } else if (FAMILY_GREEN.equals(family)) {
+            colorResId = R.color.theme_accent_green_container;
+        } else if (FAMILY_PINK.equals(family)) {
+            colorResId = R.color.theme_accent_pink_container;
+        } else if (FAMILY_PURPLE.equals(family)) {
+            colorResId = R.color.theme_accent_purple_container;
+        } else if (FAMILY_RED.equals(family)) {
+            colorResId = R.color.theme_accent_red_container;
+        } else if (FAMILY_TEAL.equals(family)) {
+            colorResId = R.color.theme_accent_teal_container;
+        } else if (FAMILY_INDIGO.equals(family)) {
+            colorResId = R.color.theme_accent_indigo_container;
+        } else {
+            colorResId = R.color.theme_accent_orange_container;
+        }
+        return ContextCompat.getColor(context, colorResId);
+    }
+
     public static int getConfiguredAccentColor(Context context) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         String family = prefs.getString(PREF_THEME_COLOR_FAMILY, FAMILY_ORANGE);

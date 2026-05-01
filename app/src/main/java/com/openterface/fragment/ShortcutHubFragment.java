@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -24,9 +25,13 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.ItemTouchHelper;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.openterface.keymod.ConnectionManager;
 import com.openterface.keymod.MainActivity;
+import com.openterface.keymod.MyShortcutsReorderAdapter;
 import com.openterface.keymod.R;
 import com.openterface.keymod.ShortcutProfileManager;
 import com.openterface.keymod.ShortcutProfileManager.ShortcutProfile;
@@ -34,6 +39,8 @@ import com.openterface.keymod.ShortcutProfileManager.ProfileChangeListener;
 import com.openterface.keymod.util.KeyParser;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -66,6 +73,9 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
     private Button tabMy;
     private LinearLayout tabsContainer;
     private GridView shortcutsGridView;
+    private RecyclerView myShortcutsRecyclerView;
+    private MyShortcutsReorderAdapter myShortcutsReorderAdapter;
+    private ItemTouchHelper myShortcutsReorderTouchHelper;
     private TextView emptyMyShortcuts;
 
     private static final String TAB_MY  = "my";
@@ -104,6 +114,9 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         if (shortcutsAdapter != null) {
             shortcutsAdapter.notifyDataSetChanged();
         }
+        if (myShortcutsReorderAdapter != null) {
+            myShortcutsReorderAdapter.notifyDataSetChanged();
+        }
     };
 
     @Override
@@ -111,6 +124,10 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         super.onResume();
         if (requireActivity() instanceof MainActivity) {
             ((MainActivity) requireActivity()).addOsChangeListener(osChangeListener);
+        }
+        if (selectedProfile != null && panelShortcutsDetail.getVisibility() == View.VISIBLE) {
+            profileManager.reloadProfilesFromPreferences();
+            loadProfiles();
         }
     }
 
@@ -141,6 +158,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         tabMy = view.findViewById(R.id.tab_my);
         tabsContainer = view.findViewById(R.id.tabs_container);
         shortcutsGridView = view.findViewById(R.id.shortcuts_gridview);
+        myShortcutsRecyclerView = view.findViewById(R.id.my_shortcuts_recycler);
         emptyMyShortcuts = view.findViewById(R.id.empty_my_shortcuts);
 
         profilesList = new ArrayList<>();
@@ -160,6 +178,16 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         adapter.notifyDataSetChanged();
         updateActiveProfileDisplay();
         updateEmptyState();
+        if (selectedProfile != null && panelShortcutsDetail != null
+                && panelShortcutsDetail.getVisibility() == View.VISIBLE) {
+            myShortcutsList = profileManager.getMyShortcuts(selectedProfile.id);
+            ShortcutProfile updated = profileManager.getProfileById(selectedProfile.id);
+            if (updated != null) {
+                selectedProfile = updated;
+                rebuildCategoryTabs(selectedProfile);
+            }
+            refreshShortcutsGrid();
+        }
     }
 
     private void setupListeners() {
@@ -334,49 +362,144 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         boolean hasCategories = selectedProfile.categories != null && !selectedProfile.categories.isEmpty();
 
         List<ShortcutProfileManager.Shortcut> toShow = new ArrayList<>();
-        
+
         // Priority 1: Show category shortcuts if a category is selected
         if (currentCategoryId != null && hasCategories) {
+            detachMyShortcutsReorderTouchHelper();
+            myShortcutsRecyclerView.setVisibility(View.GONE);
             for (ShortcutProfileManager.ShortcutCategory cat : selectedProfile.categories) {
                 if (cat.id.equals(currentCategoryId)) {
                     toShow = new ArrayList<>(cat.shortcuts);
                     break;
                 }
             }
-        } 
-        // Priority 2: Show My Shortcuts favorites
+        }
+        // Priority 2: Show My Shortcuts favorites (drag-reorder list; top strip uses same order)
         else if (TAB_MY.equals(currentTab)) {
+            myShortcutsList.clear();
+            myShortcutsList.addAll(profileManager.getMyShortcuts(selectedProfile.id));
+            sortShortcutsForDisplay(myShortcutsList);
             toShow = myShortcutsList;
             if (toShow.isEmpty()) {
-                // Profiles without categories (e.g., Default) should still show their built-in keys.
-                if (!hasCategories) {
-                    toShow = selectedProfile.shortcuts != null
-                            ? new ArrayList<>(selectedProfile.shortcuts)
-                            : new ArrayList<>();
-                }
-
-                if (!toShow.isEmpty()) {
-                    shortcutsGridView.setVisibility(View.VISIBLE);
-                    emptyMyShortcuts.setVisibility(View.GONE);
-                    shortcutsAdapter.setShortcuts(toShow);
-                    shortcutsAdapter.notifyDataSetChanged();
-                    return;
-                }
-
+                detachMyShortcutsReorderTouchHelper();
+                myShortcutsRecyclerView.setVisibility(View.GONE);
                 shortcutsGridView.setVisibility(View.GONE);
                 emptyMyShortcuts.setVisibility(View.VISIBLE);
                 return;
             }
-        } 
+            shortcutsGridView.setVisibility(View.GONE);
+            emptyMyShortcuts.setVisibility(View.GONE);
+            myShortcutsRecyclerView.setVisibility(View.VISIBLE);
+            bindMyShortcutsReorderRecycler();
+            return;
+        }
         // Priority 3: Show all flat shortcuts (for profiles without categories)
         else if (!hasCategories) {
+            detachMyShortcutsReorderTouchHelper();
+            myShortcutsRecyclerView.setVisibility(View.GONE);
             toShow = selectedProfile.shortcuts != null ? selectedProfile.shortcuts : new ArrayList<>();
+        } else {
+            detachMyShortcutsReorderTouchHelper();
+            myShortcutsRecyclerView.setVisibility(View.GONE);
         }
-        
+
         shortcutsGridView.setVisibility(View.VISIBLE);
         emptyMyShortcuts.setVisibility(View.GONE);
+        sortShortcutsForDisplay(toShow);
         shortcutsAdapter.setShortcuts(toShow);
         shortcutsAdapter.notifyDataSetChanged();
+    }
+
+    private void detachMyShortcutsReorderTouchHelper() {
+        if (myShortcutsReorderTouchHelper != null) {
+            myShortcutsReorderTouchHelper.attachToRecyclerView(null);
+            myShortcutsReorderTouchHelper = null;
+        }
+    }
+
+    private void bindMyShortcutsReorderRecycler() {
+        if (selectedProfile == null || myShortcutsRecyclerView == null) {
+            return;
+        }
+        String targetOs = requireContext().getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+                .getString("target_os", "macos");
+        List<ShortcutProfileManager.Shortcut> ordered = new ArrayList<>(
+                profileManager.getOrderedShortcutsForTopStrip(selectedProfile.id));
+
+        if (myShortcutsReorderAdapter == null) {
+            myShortcutsReorderAdapter = new MyShortcutsReorderAdapter(requireContext(), targetOs, ordered);
+            myShortcutsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+            myShortcutsRecyclerView.setAdapter(myShortcutsReorderAdapter);
+            myShortcutsReorderAdapter.setRowInteraction(new MyShortcutsReorderAdapter.RowInteraction() {
+                @Override
+                public void onRowClick(ShortcutProfileManager.Shortcut shortcut) {
+                    executeShortcut(shortcut);
+                }
+
+                @Override
+                public void onRowLongClick(ShortcutProfileManager.Shortcut shortcut) {
+                    showShortcutActionsMenu(shortcut);
+                }
+            });
+        } else {
+            myShortcutsReorderAdapter.replaceItems(ordered);
+        }
+
+        detachMyShortcutsReorderTouchHelper();
+
+        ItemTouchHelper.Callback callback = new ItemTouchHelper.SimpleCallback(
+                ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView,
+                    @NonNull RecyclerView.ViewHolder viewHolder,
+                    @NonNull RecyclerView.ViewHolder target) {
+                MyShortcutsReorderAdapter adapter = (MyShortcutsReorderAdapter) recyclerView.getAdapter();
+                if (adapter == null || selectedProfile == null) {
+                    return false;
+                }
+                int from = viewHolder.getBindingAdapterPosition();
+                int to = target.getBindingAdapterPosition();
+                if (from == RecyclerView.NO_POSITION || to == RecyclerView.NO_POSITION) {
+                    return false;
+                }
+                adapter.moveItem(from, to);
+                profileManager.reorderMyShortcuts(
+                        selectedProfile.id, new ArrayList<>(adapter.getItems()), false);
+                myShortcutsList.clear();
+                myShortcutsList.addAll(profileManager.getMyShortcuts(selectedProfile.id));
+                if (vibrator != null && vibrator.hasVibrator()) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(18, VibrationEffect.DEFAULT_AMPLITUDE));
+                }
+                return true;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+            }
+
+            @Override
+            public boolean isLongPressDragEnabled() {
+                return false;
+            }
+        };
+        myShortcutsReorderTouchHelper = new ItemTouchHelper(callback);
+        myShortcutsReorderTouchHelper.attachToRecyclerView(myShortcutsRecyclerView);
+        myShortcutsReorderAdapter.setDragHelper(myShortcutsReorderTouchHelper);
+        myShortcutsReorderAdapter.notifyDataSetChanged();
+    }
+
+    private void sortShortcutsForDisplay(List<ShortcutProfileManager.Shortcut> shortcuts) {
+        if (shortcuts == null || shortcuts.size() < 2) {
+            return;
+        }
+        final java.util.HashMap<String, Integer> existing = new java.util.HashMap<>();
+        for (int i = 0; i < shortcuts.size(); i++) {
+            ShortcutProfileManager.Shortcut shortcut = shortcuts.get(i);
+            existing.put(shortcut.id != null ? shortcut.id : ("idx_" + i), i);
+        }
+        Collections.sort(shortcuts, Comparator
+                .comparingInt((ShortcutProfileManager.Shortcut s) -> s.displayOrder > 0 ? s.displayOrder : Integer.MAX_VALUE)
+                .thenComparingInt(s -> existing.getOrDefault(s.id != null ? s.id : "", Integer.MAX_VALUE)));
     }
 
     private void addToMyFavorites(ShortcutProfileManager.Shortcut shortcut) {
@@ -384,23 +507,25 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
         for (ShortcutProfileManager.Shortcut s : myShortcutsList) {
             if (s.id.equals(shortcut.id)) {
                 new AlertDialog.Builder(requireContext())
-                        .setTitle("Already in ⭐ My")
-                        .setMessage("'" + shortcut.name + "' is already in your favorites.")
+                        .setTitle(R.string.shortcut_hub_already_in_favorites_title)
+                        .setMessage("'" + shortcut.name + "' is already in Favorites.")
                         .setPositiveButton("OK", null)
                         .show();
                 return;
             }
         }
         new AlertDialog.Builder(requireContext())
-                .setTitle("Add to ⭐ My Shortcuts")
-                .setMessage("Add '" + shortcut.name + "' (" + shortcut.label + ") to your favorites?")
+                .setTitle(R.string.shortcut_hub_add_to_favorites_title)
+                .setMessage("Add '" + shortcut.name + "' (" + shortcut.label + ") to Favorites?")
                 .setPositiveButton("Add", (d, w) -> {
                     myShortcutsList.add(shortcut);
                     profileManager.updateMyShortcuts(selectedProfile.id, myShortcutsList);
                     if (vibrator != null && vibrator.hasVibrator()) {
                         vibrator.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE));
                     }
-                    Toast.makeText(getContext(), "Added to ⭐ My: " + shortcut.name, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(),
+                            getString(R.string.shortcut_hub_added_to_favorites_toast, shortcut.name),
+                            Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
@@ -409,7 +534,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
     private void confirmRemoveFromFavorites(ShortcutProfileManager.Shortcut shortcut) {
         new AlertDialog.Builder(requireContext())
                 .setTitle("Remove Favorite")
-                .setMessage("Remove '" + shortcut.name + "' from My Shortcuts?")
+                .setMessage(getString(R.string.shortcut_hub_remove_from_favorites_message, shortcut.name))
                 .setPositiveButton("Remove", (d, w) -> {
                     myShortcutsList.removeIf(s -> s.id.equals(shortcut.id));
                     profileManager.updateMyShortcuts(selectedProfile.id, myShortcutsList);
@@ -460,12 +585,18 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
 
         EditText nameInput = dialogView.findViewById(R.id.shortcut_name_input);
         EditText dataInput = dialogView.findViewById(R.id.shortcut_data_input);
+        EditText iconInput = dialogView.findViewById(R.id.shortcut_icon_input);
+        EditText orderInput = dialogView.findViewById(R.id.shortcut_order_input);
         LinearLayout chipsRow = dialogView.findViewById(R.id.key_chips_row);
         TextView previewText = dialogView.findViewById(R.id.shortcut_preview);
 
         nameInput.setText(shortcut.name);
         String dataToken = KeyParser.toToken(shortcut.keyCode, shortcut.modifiers);
         dataInput.setText(dataToken);
+        iconInput.setText(shortcut.icon != null ? shortcut.icon : "");
+        if (shortcut.displayOrder > 0) {
+            orderInput.setText(String.valueOf(shortcut.displayOrder));
+        }
 
         String[][] tokens = {
             {"⎇ Alt", "<ALT>"}, {"^ Ctrl", "<CTRL>"}, {"⇧ Shift", "<SHIFT>"}, {"⌘ Cmd", "<CMD>"},
@@ -513,7 +644,8 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                 }
                 KeyParser.ParsedKey parsed = KeyParser.parse(d);
                 if (parsed.keyCode >= 0) {
-                    previewText.setText("Preview: " + KeyParser.toLabel(parsed.keyCode, parsed.modifiers));
+                    previewText.setText("Preview: " + KeyParser.toLabelForTargetOs(
+                            parsed.keyCode, parsed.modifiers, getTargetOs()));
                 } else {
                     previewText.setText("Preview: no valid key detected");
                 }
@@ -538,11 +670,13 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                         return;
                     }
 
-                    String label = KeyParser.toLabel(parsed.keyCode, parsed.modifiers);
+                    String label = KeyParser.toLabelForTargetOs(parsed.keyCode, parsed.modifiers, getTargetOs());
                     shortcut.name = name;
                     shortcut.label = label;
                     shortcut.modifiers = parsed.modifiers;
                     shortcut.keyCode = parsed.keyCode;
+                    shortcut.icon = iconInput.getText().toString().trim();
+                    shortcut.displayOrder = parseDisplayOrder(orderInput.getText().toString().trim(), shortcut.displayOrder);
 
                     profileManager.updateProfile(selectedProfile);
                     loadProfiles();
@@ -611,7 +745,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
             return;
         }
 
-        connectionManager.sendKeyEvent(shortcut.modifiers, shortcut.keyCode);
+        connectionManager.sendKeyEvent(normalizeModifiersForTargetOs(shortcut.modifiers), shortcut.keyCode);
         // Small delay then release key
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
             if (connectionManager != null) {
@@ -626,6 +760,26 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
 
         Log.d(TAG, "Sent shortcut: " + shortcut.name + " (" + shortcut.label + ")"
                 + " modifiers=" + shortcut.modifiers + " key=" + shortcut.keyCode);
+    }
+
+    private int normalizeModifiersForTargetOs(int modifiers) {
+        String targetOs = getTargetOs();
+        final int modCtrl = 0x01;
+        final int modCmd = 0x08;
+        if ("macos".equals(targetOs)) {
+            boolean hasCtrl = (modifiers & modCtrl) != 0;
+            boolean hasCmd = (modifiers & modCmd) != 0;
+            if (hasCtrl && !hasCmd) {
+                return (modifiers & ~modCtrl) | modCmd;
+            }
+        }
+        return modifiers;
+    }
+
+    private String getTargetOs() {
+        return requireContext()
+                .getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+                .getString("target_os", "macos");
     }
 
     private void showCreateProfileDialog() {
@@ -690,6 +844,8 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
 
         EditText nameInput = dialogView.findViewById(R.id.shortcut_name_input);
         EditText dataInput = dialogView.findViewById(R.id.shortcut_data_input);
+        EditText iconInput = dialogView.findViewById(R.id.shortcut_icon_input);
+        EditText orderInput = dialogView.findViewById(R.id.shortcut_order_input);
         LinearLayout chipsRow = dialogView.findViewById(R.id.key_chips_row);
         TextView previewText = dialogView.findViewById(R.id.shortcut_preview);
 
@@ -740,7 +896,7 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                 }
                 KeyParser.ParsedKey parsed = KeyParser.parse(data);
                 if (parsed.keyCode >= 0) {
-                    String label = KeyParser.toLabel(parsed.keyCode, parsed.modifiers);
+                    String label = KeyParser.toLabelForTargetOs(parsed.keyCode, parsed.modifiers, getTargetOs());
                     previewText.setText("Preview: " + label);
                 } else {
                     previewText.setText("Preview: no valid key detected");
@@ -769,9 +925,13 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                         return;
                     }
 
-                    String label = KeyParser.toLabel(parsed.keyCode, parsed.modifiers);
+                    String label = KeyParser.toLabelForTargetOs(parsed.keyCode, parsed.modifiers, getTargetOs());
                     ShortcutProfileManager.Shortcut shortcut = new ShortcutProfileManager.Shortcut(
                             "user-" + System.currentTimeMillis(), name, label, parsed.modifiers, parsed.keyCode);
+                    shortcut.icon = iconInput.getText().toString().trim();
+                    shortcut.displayOrder = parseDisplayOrder(
+                            orderInput.getText().toString().trim(),
+                            nextDisplayOrder(profile));
 
                     profile.shortcuts.add(shortcut);
                     profileManager.updateProfile(profile);
@@ -800,6 +960,29 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    private int nextDisplayOrder(ShortcutProfile profile) {
+        int max = 0;
+        List<ShortcutProfileManager.Shortcut> all = profile.getAllShortcutsFlat();
+        for (ShortcutProfileManager.Shortcut shortcut : all) {
+            if (shortcut != null && shortcut.displayOrder > max) {
+                max = shortcut.displayOrder;
+            }
+        }
+        return max + 1;
+    }
+
+    private int parseDisplayOrder(String raw, int fallback) {
+        if (TextUtils.isEmpty(raw)) {
+            return fallback > 0 ? fallback : 0;
+        }
+        try {
+            int value = Integer.parseInt(raw);
+            return Math.max(value, 0);
+        } catch (NumberFormatException ignored) {
+            return fallback > 0 ? fallback : 0;
+        }
     }
 
     private void viewShortcuts(ShortcutProfile profile) {
@@ -1121,9 +1304,20 @@ public class ShortcutHubFragment extends Fragment implements ProfileChangeListen
             }
 
             ShortcutProfileManager.Shortcut shortcut = shortcuts.get(position);
+            TextView iconText = convertView.findViewById(R.id.shortcut_icon);
             TextView nameText = convertView.findViewById(R.id.shortcut_name);
             TextView labelText = convertView.findViewById(R.id.shortcut_label);
 
+            String icon = shortcut.icon != null ? shortcut.icon.trim() : "";
+            if (!icon.isEmpty() && !icon.matches(".*[A-Za-z0-9_].*")) {
+                iconText.setText(icon);
+                iconText.setVisibility(View.VISIBLE);
+            } else if (!icon.isEmpty() && icon.length() <= 2) {
+                iconText.setText(icon);
+                iconText.setVisibility(View.VISIBLE);
+            } else {
+                iconText.setVisibility(View.GONE);
+            }
             nameText.setText(shortcut.name);
             labelText.setText(KeyParser.displayLabel(shortcut.label, getTargetOs()));
 

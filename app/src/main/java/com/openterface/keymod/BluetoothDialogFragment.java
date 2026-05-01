@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -22,7 +23,6 @@ import android.widget.Button;
 import android.widget.ListView;
 import android.widget.Switch;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -271,9 +271,11 @@ public class BluetoothDialogFragment extends DialogFragment {
             requireActivity().getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
             int screenWidth = displayMetrics.widthPixels;
             int screenHeight = displayMetrics.heightPixels;
+            boolean isLandscape =
+                    getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
 
-            int dialogWidth = (int) (screenWidth * 0.666);
-            int dialogHeight = (int) (screenHeight * 0.666);
+            int dialogWidth = isLandscape ? (int) (screenWidth * 0.9) : (int) (screenWidth * 0.666);
+            int dialogHeight = isLandscape ? (int) (screenHeight * 0.88) : (int) (screenHeight * 0.666);
 
             getDialog().getWindow().setLayout(dialogWidth, dialogHeight);
             getDialog().getWindow().setBackgroundDrawableResource(android.R.color.transparent);
@@ -343,10 +345,6 @@ public class BluetoothDialogFragment extends DialogFragment {
                                 pairedDevices.add(selectedBleDevice);
                                 savePairedDevice(selectedBleDevice);
                                 updateDeviceList();
-                            }
-                            // Notify MainActivity of connection
-                            if (connectionListener != null) {
-                                connectionListener.onBluetoothConnectionChanged(true);
                             }
                         } else {
                             Log.w(TAG, LOG_PREFIX + "Device name or MAC mismatch: " + deviceName);
@@ -660,7 +658,7 @@ public class BluetoothDialogFragment extends DialogFragment {
 
     private void showToast(String message) {
         if (isAdded() && getContext() != null) {
-            mainHandler.post(() -> Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show());
+            mainHandler.post(() -> UiToastLimiter.show(getContext(), message));
         }
     }
 

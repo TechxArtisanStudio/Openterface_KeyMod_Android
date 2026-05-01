@@ -31,6 +31,8 @@ public class KeyParser {
 
         int activeModifiers = 0;
         int foundKeyCode = -1;
+        /** Modifier bits at the moment the first key token is recognized (closing tags must not erase them). */
+        int modifiersAtFirstKey = 0;
 
         while (m.find()) {
             String token = m.group();
@@ -62,10 +64,12 @@ public class KeyParser {
 
             if (keyCode >= 0 && foundKeyCode < 0) {
                 foundKeyCode = keyCode;
+                modifiersAtFirstKey = activeModifiers;
             }
         }
 
-        return new ParsedKey(foundKeyCode, activeModifiers);
+        int outMods = foundKeyCode >= 0 ? modifiersAtFirstKey : activeModifiers;
+        return new ParsedKey(foundKeyCode, outMods);
     }
 
     private static int parseModifier(String token) {
@@ -160,12 +164,35 @@ public class KeyParser {
         return "~!@#$%^&*()_+{}|:\"<>?".indexOf(c) >= 0;
     }
 
-    public static String toLabel(int keyCode, int modifiers) {
+    /**
+     * Human-readable chord for the given Target OS (Gui/Cmd vs Win/Super, Alt vs Opt).
+     * Use this when building or saving shortcut labels so they match the app header Target OS.
+     */
+    public static String toLabelForTargetOs(int keyCode, int modifiers, String targetOs) {
+        String os = targetOs != null && !targetOs.trim().isEmpty() ? targetOs.trim() : "macos";
         StringBuilder sb = new StringBuilder();
-        if ((modifiers & 0x08) != 0) sb.append("Cmd+");
-        if ((modifiers & 0x01) != 0) sb.append("Ctrl+");
-        if ((modifiers & 0x02) != 0) sb.append("Shift+");
-        if ((modifiers & 0x04) != 0) sb.append("Alt+");
+        if ((modifiers & 0x08) != 0) {
+            if ("macos".equals(os)) {
+                sb.append("Cmd+");
+            } else if ("linux".equals(os)) {
+                sb.append("Super+");
+            } else {
+                sb.append("Win+");
+            }
+        }
+        if ((modifiers & 0x01) != 0) {
+            sb.append("Ctrl+");
+        }
+        if ((modifiers & 0x02) != 0) {
+            sb.append("Shift+");
+        }
+        if ((modifiers & 0x04) != 0) {
+            if ("macos".equals(os)) {
+                sb.append("Opt+");
+            } else {
+                sb.append("Alt+");
+            }
+        }
 
         if (keyCode >= 4 && keyCode <= 29) {
             sb.append((char) ('A' + keyCode - 4));
@@ -196,19 +223,22 @@ public class KeyParser {
     }
 
     /**
-     * Convert keyCode + modifiers back to macro token format (e.g. <CTRL><SHIFT>F</SHIFT></CTRL>).
+     * @deprecated Prefer {@link #toLabelForTargetOs(int, int, String)} with the current Target OS.
      */
+    public static String toLabel(int keyCode, int modifiers) {
+        return toLabelForTargetOs(keyCode, modifiers, "macos");
+    }
+
     /**
      * Convert shortcut label for display based on target OS.
-     * For macOS: Ctrl → Cmd, Alt → Opt
-     * For Windows/Linux: unchanged
+     * Normalizes legacy "Alt+" to "Opt+" on macOS only (does not rewrite Ctrl when Cmd is also present).
      */
     public static String displayLabel(String label, String targetOs) {
-        if (label == null) return "";
+        if (label == null) {
+            return "";
+        }
         if ("macos".equals(targetOs)) {
-            return label
-                    .replace("Ctrl+", "Cmd+")
-                    .replace("Alt+", "Opt+");
+            return label.replace("Alt+", "Opt+");
         }
         return label;
     }

@@ -12,6 +12,7 @@
     <dimen name="header_padding">8dp</dimen>
     <dimen name="header_elevation">4dp</dimen>
     <dimen name="header_icon_size">40dp</dimen>
+    <dimen name="header_end_scroll_width">156dp</dimen>
     <dimen name="header_title_size">18sp</dimen>
     
     <!-- Buttons -->
@@ -52,4 +53,7 @@
     <!-- Card -->
     <dimen name="card_corner_radius">12dp</dimen>
     <dimen name="card_elevation">3dp</dimen>
+
+    <!-- Shortcut Hub profile slots (fixed strip page 2): thick bottom accent inside key (~15–20% row) -->
+    <dimen name="profile_hub_slot_bottom_accent_height">3dp</dimen>
 </resources>

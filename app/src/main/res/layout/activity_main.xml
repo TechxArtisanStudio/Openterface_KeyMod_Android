@@ -66,7 +66,7 @@
 
                 <HorizontalScrollView
                     android:id="@+id/header_end_scroll"
-                    android:layout_width="176dp"
+                    android:layout_width="@dimen/header_end_scroll_width"
                     android:layout_height="wrap_content"
                     android:scrollbars="none"
                     android:fillViewport="false"
@@ -85,7 +85,7 @@
                     android:id="@+id/header_mode_slots_container"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="@dimen/spacing_tiny"
+                    android:layout_marginEnd="2dp"
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
@@ -124,7 +124,7 @@
                     android:id="@+id/target_os_header_button"
                     android:layout_width="@dimen/header_icon_size"
                     android:layout_height="@dimen/header_icon_size"
-                    android:layout_marginEnd="@dimen/spacing_tiny"
+                    android:layout_marginEnd="2dp"
                     android:src="@drawable/ic_os_macos"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/target_os_header_cd"
@@ -154,10 +154,10 @@
 
                     <ImageView
                         android:id="@+id/signal_bars"
-                        android:layout_width="24dp"
-                        android:layout_height="12dp"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
                         android:layout_marginTop="1dp"
-                        android:src="@drawable/ic_signal_bars"
+                        android:src="@drawable/signal_cellular_alt_off_24px"
                         android:tint="@color/primary"
                         android:visibility="gone"
                         android:contentDescription="Signal strength"/>

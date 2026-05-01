@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.hardware.usb.UsbDevice;
@@ -21,9 +22,11 @@ import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageView;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -34,6 +37,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
+import androidx.core.view.GravityCompat;
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
@@ -83,6 +88,15 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private ImageButton menuButton;
     private DrawerLayout drawerLayout;
     private String currentNavMode = LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
+    private View drawerImeRestoreTarget;
+    private boolean restoreImeAfterDrawerClose;
+    private DrawerCloseReason drawerCloseReason = DrawerCloseReason.NONE;
+
+    private enum DrawerCloseReason {
+        NONE,
+        CANCEL,
+        NAVIGATION
+    }
 
     // Sidebar nav item views
     private LinearLayout navKeyboardMouse;
@@ -92,7 +106,72 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private LinearLayout navVoice;
     private LinearLayout navPresentation;
     private ImageButton targetOsHeaderButton;
+    private HorizontalScrollView headerEndScroll;
     private final ImageButton[] headerModeSlotButtons = new ImageButton[3];
+    private final ConnectionManager.ConnectionStateListener connectionStateListener =
+            new ConnectionManager.ConnectionStateListener() {
+                @Override
+                public void onConnectionStateChanged(
+                        ConnectionManager.ConnectionType type,
+                        ConnectionManager.ConnectionState state) {
+                    runOnUiThread(() -> {
+                        updateConnectionButton(type, state);
+
+                        // Update fragments with new port if USB connected.
+                        if (type == ConnectionManager.ConnectionType.USB
+                                && state == ConnectionManager.ConnectionState.CONNECTED) {
+                            port = connectionManager.getUsbPort();
+                            isUsbConnected = true;
+                            isBluetoothConnected = false;
+                            updateFragmentsWithPort(port);
+                            startReading();
+                        } else if (type == ConnectionManager.ConnectionType.BLUETOOTH
+                                && state == ConnectionManager.ConnectionState.CONNECTED) {
+                            isUsbConnected = false;
+                            isBluetoothConnected = true;
+                            if (port != null) {
+                                try {
+                                    port.close();
+                                } catch (IOException e) {
+                                    Log.e(TAG, "Error closing port: " + e.getMessage());
+                                }
+                                port = null;
+                                updateFragmentsWithPort(null);
+                            }
+                        } else if (state == ConnectionManager.ConnectionState.DISCONNECTED
+                                || state == ConnectionManager.ConnectionState.ERROR) {
+                            isUsbConnected = false;
+                            isBluetoothConnected = false;
+                            if (port != null) {
+                                try {
+                                    port.close();
+                                } catch (IOException e) {
+                                    Log.e(TAG, "Error closing port: " + e.getMessage());
+                                }
+                                port = null;
+                                updateFragmentsWithPort(null);
+                            }
+                        }
+                    });
+                }
+
+                @Override
+                public void onConnectionError(String error) {
+                    runOnUiThread(
+                            () ->
+                                    UiToastLimiter.show(
+                                            MainActivity.this,
+                                            "main_connection_error",
+                                            error,
+                                            Toast.LENGTH_SHORT,
+                                            1800));
+                }
+
+                @Override
+                public void onBluetoothRssiChanged(int rssi) {
+                    // Top header intentionally does not render RSSI bars.
+                }
+            };
 
     /** Global target OS preference key */
     private static final String PREF_TARGET_OS = "target_os";
@@ -188,7 +267,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 if (connectionManager != null && 
                     connectionManager.getCurrentConnectionType() == ConnectionManager.ConnectionType.USB) {
                     connectionManager.disconnect();
-                    Toast.makeText(context, "USB device disconnected", Toast.LENGTH_SHORT).show();
+                    UiToastLimiter.show(context, "usb_device_disconnected", "USB device disconnected", Toast.LENGTH_SHORT, 1800);
                 }
             }
         }
@@ -207,7 +286,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                             connectionManager.connectUsb();
                         }
                     } else {
-                        Toast.makeText(context, "USB permission denied", Toast.LENGTH_SHORT).show();
+                        UiToastLimiter.show(context, "usb_permission_denied", "USB permission denied", Toast.LENGTH_SHORT, 1800);
                     }
                 }
             }
@@ -353,6 +432,9 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
 
     @Override
     protected void onDestroy() {
+        if (connectionManager != null) {
+            connectionManager.removeConnectionStateListener(connectionStateListener);
+        }
         super.onDestroy();
         if (scanSubscription != null && !scanSubscription.isDisposed()) {
             scanSubscription.dispose();
@@ -391,12 +473,15 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         navMacros = findViewById(R.id.nav_macros);
         navVoice = findViewById(R.id.nav_voice);
         navPresentation = findViewById(R.id.nav_presentation);
+        setupDrawerImeBehavior();
 
         targetOsHeaderButton = findViewById(R.id.target_os_header_button);
+        headerEndScroll = findViewById(R.id.header_end_scroll);
         if (targetOsHeaderButton != null) {
             targetOsHeaderButton.setOnClickListener(v -> showTargetOsPickerDialog());
             updateTargetOsHeaderIcon();
         }
+        applyHeaderEndScrollLayoutForOrientation();
         setupHeaderModeSlotButtons();
 
         // Display app version in sidebar footer
@@ -420,6 +505,123 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (shortcut != null) shortcutDrawable = shortcut.getCompoundDrawables()[1];
 
         setupButtonListeners();
+    }
+
+    private void setupDrawerImeBehavior() {
+        if (drawerLayout == null) {
+            return;
+        }
+        drawerLayout.addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
+            @Override
+            public void onDrawerOpened(View drawerView) {
+                hideImeForDrawerTransition();
+            }
+
+            @Override
+            public void onDrawerClosed(View drawerView) {
+                if (drawerCloseReason == DrawerCloseReason.CANCEL && restoreImeAfterDrawerClose) {
+                    tryRestoreImeAfterDrawerClose();
+                }
+                clearDrawerImeSnapshot();
+            }
+        });
+    }
+
+    private void snapshotImeBeforeOpeningDrawer() {
+        View focused = getCurrentFocus();
+        if (focused == null) {
+            clearDrawerImeSnapshot();
+            drawerCloseReason = DrawerCloseReason.CANCEL;
+            return;
+        }
+        drawerImeRestoreTarget = focused;
+        restoreImeAfterDrawerClose = isImeRestoreCandidate(focused);
+        drawerCloseReason = DrawerCloseReason.CANCEL;
+        focused.clearFocus();
+        hideImeForDrawerTransition();
+    }
+
+    private void markDrawerCloseAsNavigation() {
+        drawerCloseReason = DrawerCloseReason.NAVIGATION;
+        restoreImeAfterDrawerClose = false;
+        drawerImeRestoreTarget = null;
+    }
+
+    private void clearDrawerImeSnapshot() {
+        drawerImeRestoreTarget = null;
+        restoreImeAfterDrawerClose = false;
+        drawerCloseReason = DrawerCloseReason.NONE;
+    }
+
+    private boolean isImeRestoreCandidate(View view) {
+        return view != null
+                && view.getWindowToken() != null
+                && view.isShown()
+                && view.isEnabled()
+                && view.isFocusable();
+    }
+
+    private void hideImeForDrawerTransition() {
+        View focused = getCurrentFocus();
+        if (focused != null) {
+            focused.clearFocus();
+        }
+        InputMethodManager imm =
+                (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm == null) {
+            return;
+        }
+        android.os.IBinder token = null;
+        if (focused != null) {
+            token = focused.getWindowToken();
+        }
+        if (token == null && drawerLayout != null) {
+            token = drawerLayout.getWindowToken();
+        }
+        if (token == null && getWindow() != null && getWindow().getDecorView() != null) {
+            token = getWindow().getDecorView().getWindowToken();
+        }
+        if (token != null) {
+            imm.hideSoftInputFromWindow(token, 0);
+        }
+    }
+
+    private void tryRestoreImeAfterDrawerClose() {
+        View target = drawerImeRestoreTarget;
+        if (!isImeRestoreCandidate(target) || !ViewCompat.isAttachedToWindow(target)) {
+            return;
+        }
+        target.requestFocus();
+        InputMethodManager imm =
+                (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.showSoftInput(target, InputMethodManager.SHOW_IMPLICIT);
+        }
+    }
+
+    private void applyHeaderEndScrollLayoutForOrientation() {
+        if (headerEndScroll == null) {
+            return;
+        }
+        ViewGroup.LayoutParams lp = headerEndScroll.getLayoutParams();
+        if (lp == null) {
+            return;
+        }
+        lp.width = getResources().getDimensionPixelSize(R.dimen.header_end_scroll_width);
+        headerEndScroll.setLayoutParams(lp);
+        headerEndScroll.post(() -> {
+            boolean isLandscape =
+                    getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+            // Landscape target: show all header buttons by default.
+            // Portrait target: keep right-side actions visible first.
+            headerEndScroll.fullScroll(isLandscape ? View.FOCUS_LEFT : View.FOCUS_RIGHT);
+        });
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        applyHeaderEndScrollLayoutForOrientation();
     }
 
     private void setupHeaderModeSlotButtons() {
@@ -467,9 +669,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     }
 
     private void refreshHeaderModeSlotButtons() {
-        int tint = connectionManager != null
-                ? headerConnectionClusterTint(connectionManager.getCurrentConnectionState())
-                : ContextCompat.getColor(this, R.color.header_connection_idle);
+        int tint = headerNeutralActionTint();
         for (int i = 0; i < headerModeSlotButtons.length; i++) {
             ImageButton button = headerModeSlotButtons[i];
             if (button == null) {
@@ -485,56 +685,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     }
     
     private void setupConnectionStateListener() {
-        connectionManager.setConnectionStateListener(new ConnectionManager.ConnectionStateListener() {
-            @Override
-            public void onConnectionStateChanged(ConnectionManager.ConnectionType type, ConnectionManager.ConnectionState state) {
-                runOnUiThread(() -> {
-                    updateConnectionButton(type, state);
-                    
-                    // Update fragments with new port if USB connected
-                    if (type == ConnectionManager.ConnectionType.USB && 
-                        state == ConnectionManager.ConnectionState.CONNECTED) {
-                        port = connectionManager.getUsbPort();
-                        isUsbConnected = true;
-                        isBluetoothConnected = false;
-                        updateFragmentsWithPort(port);
-                        startReading();
-                    } else if (type == ConnectionManager.ConnectionType.BLUETOOTH && 
-                               state == ConnectionManager.ConnectionState.CONNECTED) {
-                        isUsbConnected = false;
-                        isBluetoothConnected = true;
-                        if (port != null) {
-                            try {
-                                port.close();
-                            } catch (IOException e) {
-                                Log.e(TAG, "Error closing port: " + e.getMessage());
-                            }
-                            port = null;
-                            updateFragmentsWithPort(null);
-                        }
-                    } else if (state == ConnectionManager.ConnectionState.DISCONNECTED) {
-                        isUsbConnected = false;
-                        isBluetoothConnected = false;
-                        if (port != null) {
-                            try {
-                                port.close();
-                            } catch (IOException e) {
-                                Log.e(TAG, "Error closing port: " + e.getMessage());
-                            }
-                            port = null;
-                            updateFragmentsWithPort(null);
-                        }
-                    }
-                });
-            }
-
-            @Override
-            public void onConnectionError(String error) {
-                runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, error, Toast.LENGTH_SHORT).show();
-                });
-            }
-        });
+        connectionManager.addConnectionStateListener(connectionStateListener);
     }
     
     private void initializeAutoConnect() {
@@ -549,7 +700,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             public void onAutoConnectStarted() {
                 Log.d(TAG, "Auto-connect started");
                 runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, "Auto-connecting to Bluetooth...", Toast.LENGTH_SHORT).show();
+                    UiToastLimiter.show(MainActivity.this, "auto_connect_started", "Auto-connecting to Bluetooth...", Toast.LENGTH_SHORT, 2200);
                 });
             }
 
@@ -565,7 +716,12 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                     // Dismiss any open dialogs (Connection dialog or Bluetooth dialog)
                     dismissAllDialogs();
                     
-                    Toast.makeText(MainActivity.this, "Auto-connected to " + device.getName(), Toast.LENGTH_SHORT).show();
+                    UiToastLimiter.show(
+                            MainActivity.this,
+                            "bluetooth_connected",
+                            "Auto-connected to " + device.getName(),
+                            Toast.LENGTH_SHORT,
+                            3000);
                 });
             }
 
@@ -573,16 +729,21 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             public void onAutoConnectFailed(String reason) {
                 Log.e(TAG, "Auto-connect failed: " + reason);
                 runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, "Auto-connect failed: " + reason, Toast.LENGTH_SHORT).show();
+                    UiToastLimiter.show(MainActivity.this, "auto_connect_failed", "Auto-connect failed: " + reason, Toast.LENGTH_SHORT, 2500);
                 });
             }
 
             @Override
             public void onAutoConnectRetrying(int retryCount) {
                 Log.d(TAG, "Auto-connect retrying: attempt " + retryCount);
-                runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, "Retrying Bluetooth connection (" + retryCount + "/3)...", Toast.LENGTH_SHORT).show();
-                });
+                if (retryCount == 1) {
+                    runOnUiThread(() -> UiToastLimiter.show(
+                            MainActivity.this,
+                            "auto_connect_retry",
+                            "Retrying Bluetooth connection...",
+                            Toast.LENGTH_SHORT,
+                            3000));
+                }
             }
         });
         
@@ -598,7 +759,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     private int headerConnectionClusterTint(ConnectionManager.ConnectionState state) {
         switch (state) {
             case CONNECTED:
-                return ContextCompat.getColor(this, R.color.connected);
+                return ThemeManager.getColorPrimary(this);
             case CONNECTING:
                 return ContextCompat.getColor(this, R.color.connecting);
             default:
@@ -606,31 +767,43 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         }
     }
 
+    /** Neutral tint for non-connection actions in the header strip. */
+    private int headerNeutralActionTint() {
+        return ContextCompat.getColor(this, R.color.text_secondary);
+    }
+
     private void updateConnectionButton(ConnectionManager.ConnectionType type, ConnectionManager.ConnectionState state) {
         if (connectionButton == null) return;
 
-        int tint = headerConnectionClusterTint(state);
-        connectionButton.setImageResource(R.drawable.ic_bluetooth);
-        connectionButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+        int connectionTint = headerConnectionClusterTint(state);
+        int neutralTint = headerNeutralActionTint();
+        if (state == ConnectionManager.ConnectionState.CONNECTING) {
+            connectionButton.setImageResource(R.drawable.bluetooth_searching_24px);
+        } else if (state == ConnectionManager.ConnectionState.CONNECTED) {
+            connectionButton.setImageResource(R.drawable.bluetooth_connected_24px);
+        } else {
+            connectionButton.setImageResource(R.drawable.bluetooth_24px);
+        }
+        connectionButton.setColorFilter(connectionTint, PorterDuff.Mode.SRC_IN);
         if (targetOsHeaderButton != null) {
-            targetOsHeaderButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+            targetOsHeaderButton.setColorFilter(neutralTint, PorterDuff.Mode.SRC_IN);
         }
         for (ImageButton slotButton : headerModeSlotButtons) {
             if (slotButton != null) {
-                slotButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+                slotButton.setColorFilter(neutralTint, PorterDuff.Mode.SRC_IN);
             }
         }
 
         switch (state) {
             case CONNECTED:
                 if (signalBars != null) {
-                    signalBars.setVisibility(View.VISIBLE);
-                    signalBars.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
+                    signalBars.setVisibility(View.GONE);
                 }
                 break;
             case CONNECTING:
                 if (signalBars != null) signalBars.setVisibility(View.GONE);
                 break;
+            case ERROR:
             case DISCONNECTED:
                 if (signalBars != null) signalBars.setVisibility(View.GONE);
                 break;
@@ -681,10 +854,11 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         if (menuButton != null) {
             menuButton.setOnClickListener(v -> {
                 if (drawerLayout != null) {
-                    if (drawerLayout.isDrawerOpen(android.view.Gravity.START)) {
-                        drawerLayout.closeDrawer(android.view.Gravity.START);
+                    if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                        drawerLayout.closeDrawer(GravityCompat.START);
                     } else {
-                        drawerLayout.openDrawer(android.view.Gravity.START);
+                        snapshotImeBeforeOpeningDrawer();
+                        drawerLayout.openDrawer(GravityCompat.START);
                     }
                 }
             });
@@ -694,7 +868,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         View sidebarCloseButton = findViewById(R.id.sidebar_close_button);
         if (sidebarCloseButton != null) {
             sidebarCloseButton.setOnClickListener(v -> {
-                if (drawerLayout != null) drawerLayout.closeDrawer(android.view.Gravity.START);
+                if (drawerLayout != null) drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
 
@@ -704,7 +878,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 currentNavMode = LaunchPanelActivity.MODE_KEYBOARD_MOUSE;
                 updateNavSelection();
                 showCompositeFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
         if (navGamepad != null) {
@@ -712,7 +887,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 currentNavMode = LaunchPanelActivity.MODE_GAMEPAD;
                 updateNavSelection();
                 showGamepadFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
         if (navShortcuts != null) {
@@ -720,7 +896,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 currentNavMode = LaunchPanelActivity.MODE_SHORTCUTS;
                 updateNavSelection();
                 showShortcutHubFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
         if (navMacros != null) {
@@ -728,7 +905,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 currentNavMode = LaunchPanelActivity.MODE_MACROS;
                 updateNavSelection();
                 showMacrosFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
         if (navVoice != null) {
@@ -736,7 +914,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 currentNavMode = LaunchPanelActivity.MODE_VOICE;
                 updateNavSelection();
                 showVoiceInputFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
         if (navPresentation != null) {
@@ -744,7 +923,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
                 currentNavMode = LaunchPanelActivity.MODE_PRESENTATION;
                 updateNavSelection();
                 showPresentationFragment();
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
             });
         }
 
@@ -752,7 +932,8 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         View chooseModeButton = findViewById(R.id.choose_mode_button);
         if (chooseModeButton != null) {
             chooseModeButton.setOnClickListener(v -> {
-                drawerLayout.closeDrawer(android.view.Gravity.START);
+                markDrawerCloseAsNavigation();
+                drawerLayout.closeDrawer(GravityCompat.START);
                 Intent intent = new Intent(MainActivity.this, LaunchPanelActivity.class);
                 intent.putExtra(LaunchPanelActivity.SHOW_PANEL, true);
                 startActivity(intent);
@@ -764,6 +945,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         View settingsButton = findViewById(R.id.settings_button);
         if (settingsButton != null) {
             settingsButton.setOnClickListener(v -> {
+                markDrawerCloseAsNavigation();
                 Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
                 startActivity(intent);
             });
@@ -883,10 +1065,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         targetOsHeaderButton.setImageResource(iconRes);
         targetOsHeaderButton.setContentDescription(
                 getString(R.string.target_os_header_cd_selected, getString(nameRes)));
-        if (connectionManager != null) {
-            int tint = headerConnectionClusterTint(connectionManager.getCurrentConnectionState());
-            targetOsHeaderButton.setColorFilter(tint, PorterDuff.Mode.SRC_IN);
-        }
+        targetOsHeaderButton.setColorFilter(headerNeutralActionTint(), PorterDuff.Mode.SRC_IN);
     }
 
     private void showTargetOsPickerDialog() {
@@ -1139,12 +1318,6 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             connectionManager.setBluetoothService(bluetoothService);
             connectionManager.syncBluetoothConnectionState(isConnected);
         }
-
-        // Ensure top connection icon reflects actual BLE callback state immediately.
-        updateConnectionButton(
-                isConnected ? ConnectionManager.ConnectionType.BLUETOOTH : ConnectionManager.ConnectionType.NONE,
-                isConnected ? ConnectionManager.ConnectionState.CONNECTED : ConnectionManager.ConnectionState.DISCONNECTED
-        );
         
         // Update ConnectionManager if Bluetooth is connected
         if (isConnected && bluetoothService != null && connectionManager != null) {
@@ -1162,9 +1335,9 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         }
         
         if (isConnected) {
-            Toast.makeText(this, "Bluetooth connected", Toast.LENGTH_SHORT).show();
+            UiToastLimiter.show(this, "bluetooth_connected", "Bluetooth connected", Toast.LENGTH_SHORT, 2500);
         } else {
-            Toast.makeText(this, "Bluetooth disconnected", Toast.LENGTH_SHORT).show();
+            UiToastLimiter.show(this, "bluetooth_disconnected", "Bluetooth disconnected", Toast.LENGTH_SHORT, 1800);
         }
     }
 

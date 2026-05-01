@@ -4,6 +4,8 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="background_light">#FFF5F5F5</color>
+    <!-- Full-screen reading help: dim veil (works without blur); API 31+ window blur shows through. -->
+    <color name="reorder_read_mode_dim_veil">#CC000000</color>
     <color name="card_unselected_bg">#FFF0F0F0</color>
     <color name="card_selected_bg">#FFF57C00</color>
     <color name="text_primary">#FF212121</color>
@@ -98,6 +100,7 @@
     <!-- Bluetooth dialogs -->
     <color name="bluetooth_dialog_bg">#FFF3F4F6</color>
     <color name="bluetooth_surface">#FFFFFFFF</color>
+    <color name="connection_dialog_header_bg">#FFE8ECF2</color>
 
     <!-- Presentation Mode Colors (Light) -->
     <color name="presentation_bg">#FFF5F7FA</color>
