@@ -190,6 +190,8 @@ public class CustomKeyboardView extends LinearLayout {
     private static final String APP_PREFS_NAME = "AppPrefs";
     private static final String KEY_SYSTEM_IME_CAPTURE = "system_ime_capture_mode";
     private static final String KEY_TOP_SHORTCUT_SHOW_ACTION_LABELS = "top_shortcut_show_action_labels";
+    /** When false: hide alternate hints on letter keys and use hold-to-repeat instead of long-press alternates. */
+    private static final String KEY_KEYBOARD_ALTERNATES_HINTS_ENABLED = "keyboard_alternates_hints_enabled";
     private static final int MOD_CTRL = 1;
     private static final int MOD_SHIFT = 2;
     private static final int MOD_ALT = 4;
@@ -212,6 +214,15 @@ public class CustomKeyboardView extends LinearLayout {
     private boolean shortcutsStripOnly = false;
     /** Top strip visual mode toggle (PH3): false icon-first, true action-label-first. */
     private boolean topShortcutShowActionLabels = false;
+    /**
+     * When false, lower-keyboard keys that normally support long-press alternates use hold-to-repeat
+     * (gaming) and keycap alternate hints are hidden. Toggled via Fn + slash (0x38).
+     */
+    private boolean keyboardAlternatesHintsEnabled = true;
+    private Runnable gamingRepeatRunnable;
+    private Runnable gamingRepeatStarterRunnable;
+    private Key gamingRepeatKey;
+    private boolean gamingRepeatActive;
 
     /** Split keyboard mode: which half to render (for landscape split mode with touchpad in middle) */
     public static final int SPLIT_NONE = 0;
@@ -599,6 +610,9 @@ public class CustomKeyboardView extends LinearLayout {
         systemImeCaptureMode = context
                 .getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
                 .getBoolean(KEY_SYSTEM_IME_CAPTURE, false);
+        keyboardAlternatesHintsEnabled = context
+                .getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_KEYBOARD_ALTERNATES_HINTS_ENABLED, true);
 
         // Load keyboard layout based on orientation (matching iOS behavior)
         reloadForCurrentOrientation();
@@ -1196,6 +1210,27 @@ public class CustomKeyboardView extends LinearLayout {
         splitPartner.post(() -> splitPartner.updateKeyboard());
     }
 
+    private void syncKeyboardAlternatesHintsToPartner() {
+        if (splitPartner == null) {
+            return;
+        }
+        splitPartner.keyboardAlternatesHintsEnabled = keyboardAlternatesHintsEnabled;
+        splitPartner.post(() -> splitPartner.updateKeyboard());
+    }
+
+    private void toggleKeyboardAlternatesHintsFromUser() {
+        keyboardAlternatesHintsEnabled = !keyboardAlternatesHintsEnabled;
+        Context ctx = getContext();
+        if (ctx != null) {
+            ctx.getSharedPreferences(APP_PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_KEYBOARD_ALTERNATES_HINTS_ENABLED, keyboardAlternatesHintsEnabled)
+                    .apply();
+        }
+        syncKeyboardAlternatesHintsToPartner();
+        updateKeyboard();
+    }
+
     /** Create a shared top scrolling panel view for split mode. */
     public FrameLayout createTopPanel() {
         rebuildTopShortcutPanels();
@@ -1686,7 +1721,31 @@ public class CustomKeyboardView extends LinearLayout {
                 src.isTopPanelKey);
     }
 
+    /** Letter-row keycap background (shared by {@link Button} and centered Fn-layer icon cells). */
+    private void applyLetterRowKeyFaceBackground(View v, Key key, boolean isFunctionalKey) {
+        v.setBackgroundResource(R.drawable.key_background);
+        if (isFunctionalKey) {
+            v.setBackgroundResource(R.drawable.function_button_background);
+        } else if (key.code == 0xE1 && isShiftLeftLocked) {
+            v.setBackgroundResource(R.drawable.press_button_background);
+            if (v instanceof TextView) {
+                ((TextView) v).setSelected(isShiftLeftLocked);
+            } else {
+                v.setSelected(isShiftLeftLocked);
+            }
+        } else if (key.code == KEY_MODE_FN && isFnLocked) {
+            v.setBackgroundResource(R.drawable.press_button_background);
+        } else if (key.code == 0xE0 && isCtrlLeftLocked) {
+            v.setBackgroundResource(R.drawable.press_button_background);
+        } else if (key.code == 0xE2 && isAltLeftLocked) {
+            v.setBackgroundResource(R.drawable.press_button_background);
+        } else if (key.code == 16) {
+            v.setBackgroundResource(R.drawable.key_background);
+        }
+    }
+
     private void updateKeyboard() {
+        stopGamingKeyRepeat();
         detachLocalImeFieldQuiet();
         removeAllViews();
 
@@ -1841,48 +1900,45 @@ public class CustomKeyboardView extends LinearLayout {
                     button = imageButton;
                     listenerTarget = imageButton;
                 } else {
+                    String fnDisplayLabel = getFnDisplayLabel(key);
+                    int fnDisplayIconResId = getFnDisplayIconResId(key);
+                    if (fnDisplayIconResId != 0) {
+                        FrameLayout fnIconCell = new FrameLayout(getContext());
+                        applyFlatKeyStyle(fnIconCell);
+                        fnIconCell.setLayoutParams(params);
+                        applyLetterRowKeyFaceBackground(fnIconCell, key, isFunctionalKey);
+
+                        ImageView fnIconView = new ImageView(getContext());
+                        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(
+                                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+                        fnIconView.setLayoutParams(iconLp);
+                        fnIconView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                        fnIconView.setImageResource(fnDisplayIconResId);
+                        Drawable iconDw = fnIconView.getDrawable();
+                        if (iconDw != null) {
+                            iconDw = iconDw.mutate();
+                            iconDw.setTint(resolveThemeTextColor());
+                            fnIconView.setImageDrawable(iconDw);
+                        }
+                        fnIconView.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4));
+                        fnIconView.setClickable(true);
+                        fnIconView.setFocusable(true);
+                        fnIconCell.setClickable(false);
+                        fnIconCell.addView(fnIconView);
+                        button = fnIconCell;
+                        listenerTarget = fnIconView;
+                    } else {
                     Button textButton = new Button(getContext());
                     applyFlatKeyStyle(textButton);
                     textButton.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-                    textButton.setBackgroundResource(R.drawable.key_background);
                     textButton.setGravity(Gravity.CENTER);
                     textButton.setTextSize(isLandscape(getContext())
                             ? BASE_KEYCAP_TEXT_SP_LANDSCAPE
                             : BASE_KEYCAP_TEXT_SP_PORTRAIT);
                     textButton.setPadding(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2));
+                    applyLetterRowKeyFaceBackground(textButton, key, isFunctionalKey);
 
-                    if (isFunctionalKey) {
-                        textButton.setBackgroundResource(R.drawable.function_button_background);
-                    } else if (key.code == 0xE1 && isShiftLeftLocked) {
-                        textButton.setBackgroundResource(R.drawable.press_button_background);
-                        textButton.setSelected(isShiftLeftLocked);
-                    } else if (key.code == KEY_MODE_FN && isFnLocked) {
-                        textButton.setBackgroundResource(R.drawable.press_button_background);
-                    } else if (key.code == 0xE0 && isCtrlLeftLocked) {
-                        textButton.setBackgroundResource(R.drawable.press_button_background);
-                    } else if (key.code == 0xE2 && isAltLeftLocked) {
-                        textButton.setBackgroundResource(R.drawable.press_button_background);
-                    } else if (key.code == 16) {
-                        textButton.setBackgroundResource(R.drawable.key_background);
-                    }
-
-                    String fnDisplayLabel = getFnDisplayLabel(key);
-                    int fnDisplayIconResId = getFnDisplayIconResId(key);
-                    if (fnDisplayIconResId != 0) {
-                        textButton.setText("");
-                        textButton.setSingleLine(true);
-                        textButton.setMaxLines(1);
-                        textButton.setEllipsize(null);
-                        textButton.setGravity(Gravity.CENTER);
-                        textButton.setPadding(0, 0, 0, 0);
-                        textButton.setCompoundDrawablesWithIntrinsicBounds(0, fnDisplayIconResId, 0, 0);
-                        textButton.setCompoundDrawablePadding(0);
-                        textButton.setTextColor(resolveThemeTextColor());
-                        android.graphics.drawable.Drawable topDrawable = textButton.getCompoundDrawables()[1];
-                        if (topDrawable != null) {
-                            topDrawable.setTint(resolveThemeTextColor());
-                        }
-                    } else if (!TextUtils.isEmpty(fnDisplayLabel)) {
+                    if (!TextUtils.isEmpty(fnDisplayLabel)) {
                         textButton.setText(fnDisplayLabel);
                         textButton.setSingleLine(true);
                         textButton.setMaxLines(1);
@@ -1919,7 +1975,8 @@ public class CustomKeyboardView extends LinearLayout {
                     }
                     boolean compactHintRow = !isLandscape(getContext());
                     String capHints = buildAlternateHintsLineForKeycap(key, compactHintRow);
-                    if (!TextUtils.isEmpty(capHints)
+                    if (keyboardAlternatesHintsEnabled
+                            && !TextUtils.isEmpty(capHints)
                             && TextUtils.isEmpty(fnDisplayLabel)
                             && fnDisplayIconResId == 0) {
                         FrameLayout keyContainer = new FrameLayout(getContext());
@@ -1947,7 +2004,8 @@ public class CustomKeyboardView extends LinearLayout {
                         keyContainer.addView(hintRow);
                         hintRow.bringToFront();
                         button = keyContainer;
-                    } else if (!TextUtils.isEmpty(key.cornerHint)
+                    } else if (keyboardAlternatesHintsEnabled
+                            && !TextUtils.isEmpty(key.cornerHint)
                             && TextUtils.isEmpty(fnDisplayLabel)
                             && fnDisplayIconResId == 0) {
                         FrameLayout keyContainer = new FrameLayout(getContext());
@@ -1977,10 +2035,11 @@ public class CustomKeyboardView extends LinearLayout {
                         textButton.setLayoutParams(params);
                         button = textButton;
                     }
-                    // Touch must stay on the Button: a clickable child (e.g. inner Button) consumes
-                    // events before the parent FrameLayout, so wrapping FrameLayout must NOT be the
-                    // listener target or long-press alternates never run.
+                    // Touch must stay on the inner key face (Button or ImageView): a clickable child
+                    // consumes events before the parent FrameLayout, so wrapping FrameLayout must NOT
+                    // be the listener target or long-press alternates never run.
                     listenerTarget = textButton;
+                    }
                 }
 
                 attachKeyListeners(listenerTarget, key);
@@ -1997,18 +2056,32 @@ public class CustomKeyboardView extends LinearLayout {
     /** Attaches click + touch + long-click listeners to a key view. */
     private void attachKeyListeners(View btn, Key key) {
         final boolean[] longPressConsumed = new boolean[]{false};
+        final boolean[] gamingHoldActive = new boolean[]{false};
         btn.setOnTouchListener((v, event) -> {
+            final boolean gamingTouch = !keyboardAlternatesHintsEnabled && keySupportsAlternatesWhenEnabled(key);
             int action = event.getActionMasked();
             switch (action) {
                 case MotionEvent.ACTION_DOWN: {
                     longPressConsumed[0] = false;
+                    gamingHoldActive[0] = false;
                     performKeyHapticFeedback(v);
+                    if (gamingTouch) {
+                        v.setPressed(true);
+                        gamingHoldActive[0] = true;
+                        sendHidKeyDataForKey(key);
+                        startGamingKeyRepeat(key);
+                        return true;
+                    }
                     if (shouldEnableAlternates(key)) {
                         alternatesGestureStartRawX = event.getRawX();
                         alternatesGestureStartRawY = event.getRawY();
                         final Runnable openAlternates = () -> showAlternatesPopup(v, key);
                         v.setTag(R.id.tag_custom_keyboard_pending_alternates, openAlternates);
                         longPressHandler.postDelayed(openAlternates, ALT_LONG_PRESS_TIMEOUT_MS);
+                    }
+                    if (isFnSlashAlternatesToggleKey(key)) {
+                        v.setPressed(true);
+                        return true;
                     }
                     return false;
                 }
@@ -2022,6 +2095,12 @@ public class CustomKeyboardView extends LinearLayout {
                         // cancel the stream before the alternates popup opens.
                         return true;
                     }
+                    if (gamingTouch && gamingHoldActive[0]) {
+                        return true;
+                    }
+                    if (isFnSlashAlternatesToggleKey(key)) {
+                        return true;
+                    }
                     return false;
                 }
                 case MotionEvent.ACTION_UP: {
@@ -2031,6 +2110,12 @@ public class CustomKeyboardView extends LinearLayout {
                         Runnable pending = (Runnable) pendingObj;
                         longPressHandler.removeCallbacks(pending);
                         v.setTag(R.id.tag_custom_keyboard_pending_alternates, null);
+                    }
+                    if (gamingTouch && gamingHoldActive[0]) {
+                        stopGamingKeyRepeat();
+                        repeatHandler.postDelayed(this::sendReleaseData, 30);
+                        gamingHoldActive[0] = false;
+                        return true;
                     }
                     if (isAlternatePopupVisible()) {
                         commitCurrentAlternateSelection();
@@ -2052,6 +2137,12 @@ public class CustomKeyboardView extends LinearLayout {
                         Runnable pending = (Runnable) pendingCancel;
                         longPressHandler.removeCallbacks(pending);
                         v.setTag(R.id.tag_custom_keyboard_pending_alternates, null);
+                    }
+                    if (gamingTouch && gamingHoldActive[0]) {
+                        stopGamingKeyRepeat();
+                        repeatHandler.postDelayed(this::sendReleaseData, 30);
+                        gamingHoldActive[0] = false;
+                        return true;
                     }
                     if (isAlternatePopupVisible()) {
                         dismissAlternatesPopup();
@@ -2080,7 +2171,16 @@ public class CustomKeyboardView extends LinearLayout {
         return x >= 0 && x <= view.getWidth() && y >= 0 && y <= view.getHeight();
     }
 
-    private boolean shouldEnableAlternates(Key key) {
+    /** Fn + slash (0x38): alternates/hints toggle — must own the touch stream (no alternates popup). */
+    private boolean isFnSlashAlternatesToggleKey(Key key) {
+        return isFnLocked && key != null && key.code == 0x38;
+    }
+
+    /**
+     * Keys that would show long-press alternates when {@link #keyboardAlternatesHintsEnabled} is true
+     * (used for gaming touch path when hints are off).
+     */
+    private boolean keySupportsAlternatesWhenEnabled(Key key) {
         if (key == null || key.isRepeatable || key.isTopPanelKey) {
             return false;
         }
@@ -2088,6 +2188,10 @@ public class CustomKeyboardView extends LinearLayout {
             return false;
         }
         if (extraNumpadFnLocked && resolveExtraNumpadFnMapping(key) != null) {
+            return false;
+        }
+        // Fn + slash (0x38): reserved for alternates/hints toggle — no long-press alternates on this cell.
+        if (isFnLocked && key.code == 0x38) {
             return false;
         }
         if (key.code >= 0xE0 && key.code <= 0xE7) {
@@ -2100,6 +2204,10 @@ public class CustomKeyboardView extends LinearLayout {
             return false;
         }
         return key.label.length() == 1 || key.symbolLabel.length() == 1 || !TextUtils.isEmpty(key.alternates);
+    }
+
+    private boolean shouldEnableAlternates(Key key) {
+        return keyboardAlternatesHintsEnabled && keySupportsAlternatesWhenEnabled(key);
     }
 
     private static class FnMapping {
@@ -2121,11 +2229,20 @@ public class CustomKeyboardView extends LinearLayout {
     }
 
     private String getFnDisplayLabel(Key key) {
+        // Fn + slash: long-press alternates toggle uses icons (see getFnDisplayIconResId).
+        if (isFnLocked && key != null && key.code == 0x38) {
+            return null;
+        }
         FnMapping mapping = resolveFnMapping(key);
         return mapping != null ? mapping.label : null;
     }
 
     private int getFnDisplayIconResId(Key key) {
+        if (isFnLocked && key != null && key.code == 0x38) {
+            return keyboardAlternatesHintsEnabled
+                    ? R.drawable.ic_keyboard_alternate_on
+                    : R.drawable.ic_keyboard_alternate_off;
+        }
         FnMapping mapping = resolveFnMapping(key);
         return mapping != null ? mapping.iconResId : 0;
     }
@@ -5336,6 +5453,23 @@ public class CustomKeyboardView extends LinearLayout {
         }
     }
 
+    private static boolean suppressFixedTopFnBaseCornerHintWhenLocalFnOn(int keyCode) {
+        switch (keyCode) {
+            case 0xE0:
+            case 0xE2:
+            case 0xE3:
+            case 0x2B:
+            case 0x52:
+            case 0x28:
+            case 0x50:
+            case 0x51:
+            case 0x4F:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     @Nullable
     private String resolveFixedTopLocalFnCornerHint(Key k,
             @Nullable FnMapping activeOverlay,
@@ -5345,6 +5479,12 @@ public class CustomKeyboardView extends LinearLayout {
         }
         FnMapping overlay = resolveFixedTopOverlayMapping(k);
         if (overlay == null) {
+            return null;
+        }
+        if (k.code == 0x29 && activeOverlay == null) {
+            return null;
+        }
+        if (activeOverlay != null && suppressFixedTopFnBaseCornerHintWhenLocalFnOn(k.code)) {
             return null;
         }
         String raw = activeOverlay != null
@@ -5698,6 +5838,12 @@ public class CustomKeyboardView extends LinearLayout {
             }
         }
 
+        // Fn + slash: toggles long-press alternates/hints (must run before generic shortcut send path).
+        if (isFnLocked && key.code == 0x38) {
+            toggleKeyboardAlternatesHintsFromUser();
+            return;
+        }
+
         // Top-strip Ctrl/Shift/Alt/Win use {@code shortcutModifiers == 0} in {@link #buildTopPanelModifierKey};
         // they must not take the profile-shortcut path — handled by touch listeners + switch below.
         if (key.shortcutModifiers >= 0 && !isTopModifierLockCandidate(key)) {
@@ -5764,6 +5910,18 @@ public class CustomKeyboardView extends LinearLayout {
             return;
         }
 
+        sendHidKeyDataForKey(key);
+    }
+
+    /**
+     * Sends one HID keyboard report for {@code key} (Fn layers, locked modifiers, extra numpad),
+     * with no profile/mode/UI side effects.
+     */
+    private void sendHidKeyDataForKey(Key key) {
+        if (key == null) {
+            return;
+        }
+        FnMapping fixedTopLocalFn = resolveFixedTopLocalFnMapping(key);
         FnMapping extraNumpadFn = resolveExtraNumpadFnMapping(key);
         FnMapping fnMapping = fixedTopLocalFn != null
                 ? fixedTopLocalFn
@@ -5805,6 +5963,49 @@ public class CustomKeyboardView extends LinearLayout {
         }
 
         sendKeyData(combinedValue, effectiveKeyCode);
+    }
+
+    private void startGamingKeyRepeat(final Key key) {
+        stopGamingKeyRepeat();
+        Context ctx = getContext();
+        if (ctx == null) {
+            return;
+        }
+        gamingRepeatKey = key;
+        gamingRepeatActive = true;
+        ViewConfiguration vc = ViewConfiguration.get(ctx);
+        final int initialDelay = vc.getKeyRepeatTimeout();
+        final int repeatDelay = vc.getKeyRepeatDelay();
+        gamingRepeatStarterRunnable = () -> {
+            if (!gamingRepeatActive || gamingRepeatKey != key) {
+                return;
+            }
+            gamingRepeatRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    if (!gamingRepeatActive || gamingRepeatKey != key) {
+                        return;
+                    }
+                    sendHidKeyDataForKey(key);
+                    repeatHandler.postDelayed(this, repeatDelay);
+                }
+            };
+            repeatHandler.post(gamingRepeatRunnable);
+        };
+        repeatHandler.postDelayed(gamingRepeatStarterRunnable, initialDelay);
+    }
+
+    private void stopGamingKeyRepeat() {
+        gamingRepeatActive = false;
+        gamingRepeatKey = null;
+        if (gamingRepeatStarterRunnable != null) {
+            repeatHandler.removeCallbacks(gamingRepeatStarterRunnable);
+            gamingRepeatStarterRunnable = null;
+        }
+        if (gamingRepeatRunnable != null) {
+            repeatHandler.removeCallbacks(gamingRepeatRunnable);
+            gamingRepeatRunnable = null;
+        }
     }
 
     /** Fn-layer numpad 0 → three keypad-zero presses (with release between each). */
