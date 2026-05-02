@@ -110,10 +110,10 @@ In keyboard mode, the fixed shortcut strip uses two rows of keys beneath the swi
 
 On **Page 0** of the fixed strip (F‑key / digit row):
 
-- **`Fn` latched / local Fn on:** row 2 is **F6–F12**, row 3 is **F1–F5**, **DISPLAY** (icon/text shortcut strip mode), **`Fn`**.
-- **`Fn` cleared / local Fn off:** row 2 is **`6`** **`7`** **`8`** **`9`** **`0`** **`+`** **`-`** (from F6–F12), row 3 is **`1`** **`2`** **`3`** **`4`** **`5`** and **DISPLAY** shows **`=`** (sends equals); **`Fn`** still toggles latch.
+- **`Fn` latched / local Fn on:** row 2 is **F6–F12**, row 3 is **F1–F5**, **`=`**, **`Fn`**.
+- **`Fn` cleared / local Fn off:** row 2 is **`6`** **`7`** **`8`** **`9`** **`0`** **`+`** **`-`** (from F6–F12), row 3 is **`1`** **`2`** **`3`** **`4`** **`5`** **`=`** (sends equals); **`Fn`** still toggles latch.
 
-DISPLAY only toggles icon vs action labels when **`Fn`** is latched on this page.
+**Shortcut strip display** (names vs icons vs combo text such as Alt+X) is controlled by the **DISPLAY** key on the **swipeable favorites row**: it appears on the **same page as “Create shortcut”**, immediately **after** that button. Each tap cycles through three modes: shortcut **name**, **icon** (when the shortcut has a drawable icon; otherwise combo text), and **chord** (combo text).
 
 On **Page 1** of the fixed strip (ESC / navigation page), when **local Fn** (row 3 col 7 on that page) is on:
 
@@ -121,7 +121,7 @@ On **Page 1** of the fixed strip (ESC / navigation page), when **local Fn** (row
 - **Row 3** sends **Space**, **Bksp**, **Del**, **Insert**, **End**, **PgDn**.  
   Ctrl/Alt/Win positions still support **long‑press** modifier lock using the underlying modifier keys.
 
-On **Page 2** of the fixed strip (**Shortcut Hub**), **local Fn** toggles two full punctuation rows (**no DISPLAY** on this page; use Page 0 for icon/text DISPLAY).
+On **Page 2** of the fixed strip (**Shortcut Hub**), **local Fn** toggles two full punctuation rows (strip display modes use the row‑1 DISPLAY key after Create, not the fixed strip).
 
 - **Fn off — upper row:** **`(`**, **`)`**, **`[`**, **`]`**, **`:`**, **`#`**, **`@`**
 - **Fn off — lower row:** **`/`**, **`\`**, **`|`**, **`?`**, **`-`**, **`_`**, **`Fn`** (toggle)
