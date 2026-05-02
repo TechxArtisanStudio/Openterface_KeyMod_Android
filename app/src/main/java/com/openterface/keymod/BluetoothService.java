@@ -46,6 +46,7 @@ public class BluetoothService extends Service {
     private Disposable reconnectDisposable;
     private Disposable rssiPollDisposable;
     private final Set<ConnectionStateListener> connectionStateListeners = new CopyOnWriteArraySet<>();
+    private volatile boolean reconnectSuppressed;
 
     public interface ConnectionStateListener {
         void onBluetoothConnecting(RxBleDevice device);
@@ -69,6 +70,14 @@ public class BluetoothService extends Service {
 
     public void setRxBleClient(RxBleClient client) {
         this.rxBleClient = client;
+    }
+
+    /**
+     * When true, {@link #scheduleReconnect} is a no-op (used during BluetoothAutoConnectManager
+     * multi-device attempts to avoid racing with its retry loop).
+     */
+    public void setReconnectSuppressed(boolean suppressed) {
+        this.reconnectSuppressed = suppressed;
     }
 
     public void addConnectionStateListener(ConnectionStateListener listener) {
@@ -192,12 +201,6 @@ public class BluetoothService extends Service {
                             Log.d(TAG, LOG_PREFIX + "Connected to " + sanitizeDeviceName(device.getName()) + " (" + deviceAddress + ")");
                             notifyBluetoothConnected(device);
                             startRssiPolling();
-                            // Persist this device so auto-connect can use it on next launch
-                            getSharedPreferences("ConnectionPrefs", MODE_PRIVATE)
-                                    .edit()
-                                    .putString("last_ble_device_mac", deviceAddress)
-                                    .putString("last_ble_device_name", sanitizeDeviceName(device.getName()))
-                                    .apply();
                         },
                         throwable -> {
                             synchronized (connectingDevices) {
@@ -222,14 +225,18 @@ public class BluetoothService extends Service {
                                     }
                                 }
                             }
-                            // Schedule reconnect for other cases
-                            scheduleReconnect(device);
+                            if (!reconnectSuppressed) {
+                                scheduleReconnect(device);
+                            }
                         }
                 );
         connectionDisposables.add(connectionDisposable);
     }
 
     private void scheduleReconnect(RxBleDevice device) {
+        if (reconnectSuppressed) {
+            return;
+        }
         stopReconnect();
         reconnectDisposable = Observable.timer(RECONNECT_DELAY_MS, TimeUnit.MILLISECONDS)
                 .subscribe(

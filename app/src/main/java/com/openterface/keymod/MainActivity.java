@@ -337,10 +337,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
         // Note: Bluetooth auto-connect will be initialized after service is bound
         // USB auto-connect is still handled by ConnectionManager
         new Handler().postDelayed(() -> {
-            // Only auto-connect USB here, Bluetooth will be handled by autoConnectManager
-            String lastType = getSharedPreferences("ConnectionPrefs", MODE_PRIVATE)
-                    .getString("last_connection_type", "");
-            if ("USB".equals(lastType)) {
+            if ("USB".equals(connectionManager.getLastConnectionType())) {
                 connectionManager.autoConnect();
             }
         }, 500);
@@ -689,12 +686,17 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
     }
     
     private void initializeAutoConnect() {
-        if (bluetoothService == null || rxBleClient == null) {
+        if (bluetoothService == null || rxBleClient == null || connectionManager == null) {
             Log.w(TAG, "Cannot initialize auto-connect: service or client not ready");
             return;
         }
-        
-        autoConnectManager = new BluetoothAutoConnectManager(this, rxBleClient, bluetoothService);
+        if (!connectionManager.isAutoConnectEnabled()) {
+            Log.d(TAG, "Bluetooth auto-connect disabled; skipping BluetoothAutoConnectManager");
+            return;
+        }
+
+        autoConnectManager =
+                new BluetoothAutoConnectManager(this, rxBleClient, bluetoothService, connectionManager);
         autoConnectManager.setAutoConnectListener(new BluetoothAutoConnectManager.AutoConnectListener() {
             @Override
             public void onAutoConnectStarted() {
@@ -839,6 +841,7 @@ public class MainActivity extends AppCompatActivity implements BluetoothDialogFr
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 BluetoothDialogFragment dialog = new BluetoothDialogFragment();
                 dialog.setRxBleClient(rxBleClient);
+                dialog.setConnectionManager(connectionManager);
                 dialog.setConnectionListener(this); // Set the listener
                 dialog.show(getSupportFragmentManager(), "BluetoothDialog");
             } else {

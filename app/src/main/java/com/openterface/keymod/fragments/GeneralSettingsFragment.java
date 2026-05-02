@@ -17,6 +17,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
+import com.openterface.keymod.ConnectionManager;
 import com.openterface.keymod.R;
 import com.openterface.keymod.ThemeManager;
 
@@ -28,7 +29,6 @@ import com.openterface.keymod.ThemeManager;
  */
 public class GeneralSettingsFragment extends Fragment {
 
-    private static final String PREF_AUTO_CONNECT = "auto_connect";
     private static final String PREF_KEEP_SCREEN_ON = "keep_screen_on";
     private static final String PREF_HAPTIC_FEEDBACK = "haptic_feedback";
     private static final String PREF_ORIENTATION_LOCK = "orientation_lock";
@@ -104,7 +104,8 @@ public class GeneralSettingsFragment extends Fragment {
 
     private void loadSettings() {
         isLoadingSettings = true;
-        autoConnectCheckBox.setChecked(prefs.getBoolean(PREF_AUTO_CONNECT, false));
+        ConnectionManager cm = new ConnectionManager(requireContext());
+        autoConnectCheckBox.setChecked(cm.isAutoConnectEnabled());
         keepScreenOnCheckBox.setChecked(prefs.getBoolean(PREF_KEEP_SCREEN_ON, true));
         hapticFeedbackCheckBox.setChecked(prefs.getBoolean(PREF_HAPTIC_FEEDBACK, true));
         orientationLockCheckBox.setChecked(prefs.getBoolean(PREF_ORIENTATION_LOCK, false));
@@ -133,9 +134,9 @@ public class GeneralSettingsFragment extends Fragment {
     }
 
     private void setupListeners() {
-        autoConnectCheckBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            prefs.edit().putBoolean(PREF_AUTO_CONNECT, isChecked).apply();
-        });
+        autoConnectCheckBox.setOnCheckedChangeListener(
+                (buttonView, isChecked) ->
+                        new ConnectionManager(requireContext()).setAutoConnectEnabled(isChecked));
 
         keepScreenOnCheckBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
             prefs.edit().putBoolean(PREF_KEEP_SCREEN_ON, isChecked).apply();

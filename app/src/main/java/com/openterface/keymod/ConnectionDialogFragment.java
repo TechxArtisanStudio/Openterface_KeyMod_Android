@@ -288,6 +288,9 @@ public class ConnectionDialogFragment extends DialogFragment {
         // Show the existing BluetoothDialogFragment
         BluetoothDialogFragment dialog = new BluetoothDialogFragment();
         dialog.setRxBleClient(rxBleClient);
+        if (connectionManager != null) {
+            dialog.setConnectionManager(connectionManager);
+        }
         dialog.setConnectionListener(isConnected -> {
             Log.d(TAG, "Bluetooth connection state changed: " + isConnected);
             if (isConnected) {

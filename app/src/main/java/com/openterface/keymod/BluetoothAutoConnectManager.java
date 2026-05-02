@@ -3,7 +3,6 @@ package com.openterface.keymod;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Looper;
@@ -17,87 +16,92 @@ import com.polidea.rxandroidble2.scan.ScanResult;
 import com.polidea.rxandroidble2.scan.ScanSettings;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeUnit;
 
 import io.reactivex.disposables.Disposable;
 
 /**
- * Manages automatic Bluetooth connection on app launch
- * - Tries to connect to the last connected device first
- * - Falls back to scanning for the best signal device if last device is unavailable
- * - Retries up to 3 times on failure
+ * Automatic Bluetooth connection on app launch: tries paired devices in last-used order via
+ * direct MAC connection, then optionally a short scan only when exactly one in-range device
+ * matches a known paired MAC.
  */
 public class BluetoothAutoConnectManager {
     private static final String TAG = "BTAutoConnect";
-    private static final int MAX_RETRIES = 3;
-    private static final int SCAN_DURATION_MS = 5000; // 5 seconds scan time
-    private static final int RETRY_DELAY_MS = 2000; // 2 seconds between retries
-    private static final String PREFS_NAME = "ConnectionPrefs";
-    private static final String KEY_LAST_BLE_DEVICE_MAC = "last_ble_device_mac";
-    private static final String KEY_LAST_BLE_DEVICE_NAME = "last_ble_device_name";
-    
+    private static final int MAX_ROUNDS = 3;
+    private static final int SCAN_DURATION_MS = 5000;
+    private static final int RETRY_DELAY_MS = 2000;
+    private static final int PER_DEVICE_TIMEOUT_MS = 12000;
+
     private final Context context;
     private final RxBleClient rxBleClient;
     private final BluetoothService bluetoothService;
+    private final ConnectionManager connectionManager;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final SharedPreferences prefs;
-    
+
     private Disposable scanDisposable;
-    private int currentRetry = 0;
+    private int currentRound = 0;
     private boolean isConnecting = false;
     private AutoConnectListener listener;
-    private String targetDeviceMac = null; // MAC address of device to connect to
-    
+    private BluetoothService.ConnectionStateListener attemptListener;
+    private Runnable attemptTimeoutRunnable;
+    private int attemptPairedIndex = -1;
+    private final AtomicBoolean attemptOutcomeHandled = new AtomicBoolean(false);
+
     public interface AutoConnectListener {
         void onAutoConnectStarted();
+
         void onAutoConnectSuccess(RxBleDevice device);
+
         void onAutoConnectFailed(String reason);
+
         void onAutoConnectRetrying(int retryCount);
     }
-    
-    public BluetoothAutoConnectManager(Context context, RxBleClient rxBleClient, BluetoothService bluetoothService) {
-        this.context = context;
+
+    public BluetoothAutoConnectManager(
+            Context context,
+            RxBleClient rxBleClient,
+            BluetoothService bluetoothService,
+            ConnectionManager connectionManager) {
+        this.context = context.getApplicationContext();
         this.rxBleClient = rxBleClient;
         this.bluetoothService = bluetoothService;
-        this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        this.connectionManager = connectionManager;
     }
-    
+
     public void setAutoConnectListener(AutoConnectListener listener) {
         this.listener = listener;
     }
-    
-    /**
-     * Start auto-connect process
-     */
+
     public void startAutoConnect() {
         if (isConnecting) {
             Log.d(TAG, "Auto-connect already in progress");
             return;
         }
-        
-        // Check if Bluetooth is supported and enabled
+        if (connectionManager != null && !connectionManager.isAutoConnectEnabled()) {
+            Log.d(TAG, "Auto-connect disabled in settings");
+            return;
+        }
         BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (bluetoothAdapter == null) {
             Log.e(TAG, "Bluetooth not supported on this device");
             notifyFailed("Bluetooth not supported");
             return;
         }
-        
         if (!bluetoothAdapter.isEnabled()) {
             Log.e(TAG, "Bluetooth is not enabled");
             notifyFailed("Bluetooth is disabled");
             return;
         }
-        
-        // Check permissions
         if (!hasRequiredPermissions()) {
             Log.e(TAG, "Missing required Bluetooth permissions");
             notifyFailed("Missing Bluetooth permissions");
             return;
         }
-        
-        // Check if already connected
         if (bluetoothService != null && bluetoothService.isConnected()) {
             Log.d(TAG, "Already connected to a Bluetooth device");
             RxBleDevice connectedDevice = bluetoothService.getConnectedDevice();
@@ -106,222 +110,317 @@ public class BluetoothAutoConnectManager {
             }
             return;
         }
-        
-        currentRetry = 0;
+        if (connectionManager == null) {
+            Log.e(TAG, "ConnectionManager is null");
+            notifyFailed("ConnectionManager not ready");
+            return;
+        }
+
+        currentRound = 0;
         isConnecting = true;
         if (listener != null) {
             listener.onAutoConnectStarted();
         }
-        
-        // Try to get last connected device
-        targetDeviceMac = prefs.getString(KEY_LAST_BLE_DEVICE_MAC, null);
-        String lastDeviceName = prefs.getString(KEY_LAST_BLE_DEVICE_NAME, null);
-        
-        if (targetDeviceMac != null && !targetDeviceMac.isEmpty()) {
-            Log.d(TAG, "Starting auto-connect to last device: " + lastDeviceName + " (" + targetDeviceMac + ")");
-        } else {
-            Log.d(TAG, "No last device found, will connect to best signal device");
-        }
-        
-        scanAndConnect();
+        bluetoothService.setReconnectSuppressed(true);
+        beginRound();
     }
-    
-    /**
-     * Stop auto-connect process
-     */
+
+    private void beginRound() {
+        if (!isConnecting) {
+            return;
+        }
+        List<PairedBleDevice> paired = connectionManager != null ? connectionManager.getPairedDevicesByRecency() : new ArrayList<>();
+        if (paired.isEmpty()) {
+            String lastMac = connectionManager != null ? connectionManager.getLastBleDeviceMac() : null;
+            if (lastMac != null && !lastMac.isEmpty()) {
+                trySingleMacThenFallback(lastMac);
+                return;
+            }
+            tryScanFallbackOnly();
+            return;
+        }
+        attemptPairedIndex = 0;
+        tryPairedAtIndex(attemptPairedIndex);
+    }
+
+    private void trySingleMacThenFallback(String mac) {
+        attemptPairedIndex = -1;
+        startAttemptForMac(mac, () -> tryScanFallbackOnly());
+    }
+
+    private void tryPairedAtIndex(int index) {
+        if (!isConnecting) {
+            return;
+        }
+        List<PairedBleDevice> paired = connectionManager.getPairedDevicesByRecency();
+        if (index >= paired.size()) {
+            tryScanFallbackOnly();
+            return;
+        }
+        PairedBleDevice p = paired.get(index);
+        attemptPairedIndex = index;
+        startAttemptForMac(
+                p.mac,
+                () -> {
+                    if (!isConnecting) {
+                        return;
+                    }
+                    tryPairedAtIndex(index + 1);
+                });
+    }
+
+    private void startAttemptForMac(String mac, Runnable onFailureNext) {
+        if (!isConnecting || bluetoothService == null) {
+            return;
+        }
+        attemptOutcomeHandled.set(false);
+        unregisterAttemptListener();
+        cancelAttemptTimeout();
+        final String expectedMac = mac.toUpperCase(Locale.US);
+        RxBleDevice device = rxBleClient.getBleDevice(expectedMac);
+        attemptListener =
+                new BluetoothService.ConnectionStateListener() {
+                    @Override
+                    public void onBluetoothConnecting(RxBleDevice d) {}
+
+                    @Override
+                    public void onBluetoothConnected(RxBleDevice d) {
+                        if (!isConnecting) {
+                            return;
+                        }
+                        if (d != null && d.getMacAddress().equalsIgnoreCase(expectedMac)) {
+                            if (attemptOutcomeHandled.compareAndSet(false, true)) {
+                                finishSuccess(d);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onBluetoothDisconnected(RxBleDevice d) {}
+
+                    @Override
+                    public void onBluetoothError(RxBleDevice d, String error) {
+                        if (!isConnecting) {
+                            return;
+                        }
+                        if (d != null && d.getMacAddress().equalsIgnoreCase(expectedMac)) {
+                            if (attemptOutcomeHandled.compareAndSet(false, true)) {
+                                onAttemptFailed(onFailureNext);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onBluetoothRssiChanged(RxBleDevice d, int rssi) {}
+                };
+        bluetoothService.addConnectionStateListener(attemptListener);
+        bluetoothService.setReconnectSuppressed(true);
+        Log.d(TAG, "Auto-connect attempt to " + expectedMac);
+        bluetoothService.connectToDevice(device);
+        attemptTimeoutRunnable =
+                () -> {
+                    if (!isConnecting) {
+                        return;
+                    }
+                    if (bluetoothService.isConnected()
+                            && bluetoothService.getConnectedDevice() != null
+                            && bluetoothService.getConnectedDevice()
+                                    .getMacAddress()
+                                    .equalsIgnoreCase(expectedMac)) {
+                        if (attemptOutcomeHandled.compareAndSet(false, true)) {
+                            finishSuccess(bluetoothService.getConnectedDevice());
+                        }
+                        return;
+                    }
+                    if (attemptOutcomeHandled.compareAndSet(false, true)) {
+                        onAttemptFailed(onFailureNext);
+                    }
+                };
+        handler.postDelayed(attemptTimeoutRunnable, PER_DEVICE_TIMEOUT_MS);
+    }
+
+    private void onAttemptFailed(Runnable onFailureNext) {
+        if (!isConnecting) {
+            return;
+        }
+        unregisterAttemptListener();
+        cancelAttemptTimeout();
+        if (bluetoothService != null) {
+            bluetoothService.disconnect();
+        }
+        handler.postDelayed(
+                () -> {
+                    if (!isConnecting) {
+                        return;
+                    }
+                    onFailureNext.run();
+                },
+                500);
+    }
+
+    private void tryScanFallbackOnly() {
+        if (!isConnecting) {
+            return;
+        }
+        Set<String> pairedMacs = new HashSet<>();
+        if (connectionManager != null) {
+            for (PairedBleDevice p : connectionManager.getPairedDevicesByRecency()) {
+                pairedMacs.add(p.mac.toUpperCase(Locale.US));
+            }
+        }
+        final List<ScanResult> candidates = new ArrayList<>();
+        ScanSettings scanSettings =
+                new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
+        if (scanDisposable != null && !scanDisposable.isDisposed()) {
+            scanDisposable.dispose();
+        }
+        scanDisposable =
+                rxBleClient.scanBleDevices(scanSettings)
+                        .timeout(SCAN_DURATION_MS, TimeUnit.MILLISECONDS)
+                        .subscribe(
+                                scanResult -> {
+                                    RxBleDevice device = scanResult.getBleDevice();
+                                    String name = sanitizeDeviceName(device.getName());
+                                    String deviceMac = device.getMacAddress();
+                                    if (!OpenterfaceBleDeviceNames.matchesAdvertisedName(name)) {
+                                        return;
+                                    }
+                                    if (!pairedMacs.contains(deviceMac.toUpperCase(Locale.US))) {
+                                        return;
+                                    }
+                                    boolean exists = false;
+                                    for (ScanResult r : candidates) {
+                                        if (r.getBleDevice().getMacAddress().equalsIgnoreCase(deviceMac)) {
+                                            exists = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!exists) {
+                                        candidates.add(scanResult);
+                                    }
+                                },
+                                throwable -> handleScanComplete(candidates),
+                                () -> handleScanComplete(candidates));
+    }
+
+    private void handleScanComplete(List<ScanResult> candidates) {
+        if (!isConnecting) {
+            return;
+        }
+        if (scanDisposable != null && !scanDisposable.isDisposed()) {
+            scanDisposable.dispose();
+        }
+        if (candidates.size() == 1) {
+            RxBleDevice d = candidates.get(0).getBleDevice();
+            startAttemptForMac(d.getMacAddress(), () -> handleRoundFailure("No reachable paired device"));
+            return;
+        }
+        handleRoundFailure(
+                candidates.isEmpty()
+                        ? "No paired Openterface devices in range"
+                        : "Multiple devices in range; open Bluetooth to pick one");
+    }
+
+    private void handleRoundFailure(String reason) {
+        currentRound++;
+        if (currentRound < MAX_ROUNDS) {
+            Log.d(TAG, "Round failed: " + reason + ", retry " + currentRound + "/" + MAX_ROUNDS);
+            if (listener != null) {
+                listener.onAutoConnectRetrying(currentRound);
+            }
+            unregisterAttemptListener();
+            cancelAttemptTimeout();
+            if (bluetoothService != null) {
+                bluetoothService.disconnect();
+            }
+            handler.postDelayed(this::beginRound, RETRY_DELAY_MS);
+        } else {
+            Log.e(TAG, "Auto-connect failed after " + MAX_ROUNDS + " rounds: " + reason);
+            cleanupSession();
+            notifyFailed("Failed after " + MAX_ROUNDS + " attempts: " + reason);
+        }
+    }
+
+    private synchronized void finishSuccess(RxBleDevice device) {
+        if (!isConnecting) {
+            return;
+        }
+        unregisterAttemptListener();
+        cancelAttemptTimeout();
+        if (scanDisposable != null && !scanDisposable.isDisposed()) {
+            scanDisposable.dispose();
+        }
+        cleanupSession();
+        Log.d(TAG, "Successfully connected to " + sanitizeDeviceName(device.getName()));
+        notifySuccess(device);
+    }
+
+    private void cleanupSession() {
+        isConnecting = false;
+        if (bluetoothService != null) {
+            bluetoothService.setReconnectSuppressed(false);
+        }
+    }
+
     public void stopAutoConnect() {
         isConnecting = false;
+        unregisterAttemptListener();
+        cancelAttemptTimeout();
         if (scanDisposable != null && !scanDisposable.isDisposed()) {
             scanDisposable.dispose();
         }
         handler.removeCallbacksAndMessages(null);
+        if (bluetoothService != null) {
+            bluetoothService.setReconnectSuppressed(false);
+        }
         Log.d(TAG, "Auto-connect stopped");
     }
-    
+
+    private void unregisterAttemptListener() {
+        if (bluetoothService != null && attemptListener != null) {
+            bluetoothService.removeConnectionStateListener(attemptListener);
+        }
+        attemptListener = null;
+    }
+
+    private void cancelAttemptTimeout() {
+        if (attemptTimeoutRunnable != null) {
+            handler.removeCallbacks(attemptTimeoutRunnable);
+        }
+        attemptTimeoutRunnable = null;
+    }
+
     private boolean hasRequiredPermissions() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            // Android 12 and above
-            boolean hasBluetoothConnect = ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
-            boolean hasBluetoothScan = ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
+            boolean hasBluetoothConnect =
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT)
+                            == PackageManager.PERMISSION_GRANTED;
+            boolean hasBluetoothScan =
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN)
+                            == PackageManager.PERMISSION_GRANTED;
             return hasBluetoothConnect && hasBluetoothScan;
         } else {
-            // Android 11 and below - need location permission
-            return ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            return ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                    == PackageManager.PERMISSION_GRANTED;
         }
     }
-    
-    private void scanAndConnect() {
-        String attemptMsg = "Starting BLE scan for Openterface devices (attempt " + (currentRetry + 1) + "/" + MAX_RETRIES + ")";
-        if (targetDeviceMac != null) {
-            attemptMsg += " - Looking for last device: " + targetDeviceMac;
-        }
-        Log.d(TAG, attemptMsg);
-        
-        final List<ScanResult> foundDevices = new ArrayList<>();
-        final ScanResult[] targetDeviceResult = new ScanResult[1]; // To store last connected device if found
-        
-        ScanSettings scanSettings = new ScanSettings.Builder()
-                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-                .build();
-        
-        scanDisposable = rxBleClient.scanBleDevices(scanSettings)
-                .timeout(SCAN_DURATION_MS, TimeUnit.MILLISECONDS)
-                .subscribe(
-                        scanResult -> {
-                            RxBleDevice device = scanResult.getBleDevice();
-                            String deviceName = sanitizeDeviceName(device.getName());
-                            String deviceMac = device.getMacAddress();
-                            int rssi = scanResult.getRssi();
-                            
-                            // Keep matcher aligned with Bluetooth dialog to avoid auto-connect missing valid devices.
-                            if (deviceName != null && deviceName.matches("(?i)(openterface|kvm).*")) {
-                                Log.d(TAG, "Found Openterface device: " + deviceName + " (" + deviceMac + ", RSSI: " + rssi + ")");
-                                
-                                // Check if this is the target device (last connected)
-                                if (targetDeviceMac != null && deviceMac.equals(targetDeviceMac)) {
-                                    Log.d(TAG, "Found target device (last connected): " + deviceName);
-                                    targetDeviceResult[0] = scanResult;
-                                    // Stop scan immediately when we find the target device
-                                    if (scanDisposable != null && !scanDisposable.isDisposed()) {
-                                        scanDisposable.dispose();
-                                    }
-                                    handleScanComplete(foundDevices, targetDeviceResult[0]);
-                                    return;
-                                }
-                                
-                                // Check if device already in list
-                                boolean exists = false;
-                                for (ScanResult existingResult : foundDevices) {
-                                    if (existingResult.getBleDevice().getMacAddress().equals(deviceMac)) {
-                                        exists = true;
-                                        break;
-                                    }
-                                }
-                                
-                                if (!exists) {
-                                    foundDevices.add(scanResult);
-                                }
-                            }
-                        },
-                        throwable -> {
-                            // Scan completed (timeout or error)
-                            Log.d(TAG, "Scan completed. Found " + foundDevices.size() + " Openterface devices");
-                            handleScanComplete(foundDevices, targetDeviceResult[0]);
-                        },
-                        () -> {
-                            // Scan completed normally
-                            Log.d(TAG, "Scan completed normally. Found " + foundDevices.size() + " Openterface devices");
-                            handleScanComplete(foundDevices, targetDeviceResult[0]);
-                        }
-                );
-    }
-    
-    private void handleScanComplete(List<ScanResult> foundDevices) {
-        handleScanComplete(foundDevices, null);
-    }
-    
-    private void handleScanComplete(List<ScanResult> foundDevices, ScanResult targetDevice) {
-        // Priority 1: Connect to last connected device if found
-        if (targetDevice != null) {
-            RxBleDevice device = targetDevice.getBleDevice();
-            String deviceName = sanitizeDeviceName(device.getName());
-            Log.d(TAG, "Connecting to last connected device: " + deviceName + " (RSSI: " + targetDevice.getRssi() + ")");
-            connectToDevice(device);
-            return;
-        }
-        
-        // Priority 2: If last device not found but other devices exist, connect to best signal
-        if (!foundDevices.isEmpty()) {
-            // Find device with best signal strength (highest RSSI)
-            ScanResult bestDevice = null;
-            int bestRssi = Integer.MIN_VALUE;
-            
-            for (ScanResult result : foundDevices) {
-                if (result.getRssi() > bestRssi) {
-                    bestRssi = result.getRssi();
-                    bestDevice = result;
-                }
-            }
-            
-            if (bestDevice != null) {
-                RxBleDevice device = bestDevice.getBleDevice();
-                String deviceName = sanitizeDeviceName(device.getName());
-                if (targetDeviceMac != null) {
-                    Log.d(TAG, "Last device not found, connecting to best signal device: " + deviceName + " (RSSI: " + bestRssi + ")");
-                } else {
-                    Log.d(TAG, "Connecting to best signal device: " + deviceName + " (RSSI: " + bestRssi + ")");
-                }
-                connectToDevice(device);
-                return;
-            }
-        }
-        
-        // No devices found at all
-        String failureMsg = targetDeviceMac != null 
-            ? "Last connected device not found and no other devices available"
-            : "No Openterface devices found";
-        Log.d(TAG, failureMsg);
-        handleConnectionFailure(failureMsg);
-    }
-    
-    private void connectToDevice(RxBleDevice device) {
-        Log.d(TAG, "Attempting to connect to " + sanitizeDeviceName(device.getName()));
-        
-        if (bluetoothService == null) {
-            Log.e(TAG, "BluetoothService is null");
-            handleConnectionFailure("BluetoothService not available");
-            return;
-        }
-        
-        bluetoothService.connectToDevice(device);
-        
-        // Wait and check if connection was successful
-        handler.postDelayed(() -> {
-            if (bluetoothService.isConnected() && 
-                bluetoothService.getConnectedDevice() != null &&
-                bluetoothService.getConnectedDevice().getMacAddress().equals(device.getMacAddress())) {
-                Log.d(TAG, "Successfully connected to " + sanitizeDeviceName(device.getName()));
-                isConnecting = false;
-                notifySuccess(device);
-            } else {
-                Log.w(TAG, "Failed to connect to " + sanitizeDeviceName(device.getName()));
-                handleConnectionFailure("Connection failed");
-            }
-        }, 3000); // Wait 3 seconds to verify connection
-    }
-    
-    private void handleConnectionFailure(String reason) {
-        currentRetry++;
-        
-        if (currentRetry < MAX_RETRIES) {
-            Log.d(TAG, "Connection failed: " + reason + ". Retrying... (" + currentRetry + "/" + MAX_RETRIES + ")");
-            if (listener != null) {
-                listener.onAutoConnectRetrying(currentRetry);
-            }
-            
-            // Retry after delay
-            handler.postDelayed(this::scanAndConnect, RETRY_DELAY_MS);
-        } else {
-            Log.e(TAG, "Auto-connect failed after " + MAX_RETRIES + " attempts: " + reason);
-            isConnecting = false;
-            notifyFailed("Failed after " + MAX_RETRIES + " attempts: " + reason);
-        }
-    }
-    
+
     private void notifySuccess(RxBleDevice device) {
         if (listener != null) {
             handler.post(() -> listener.onAutoConnectSuccess(device));
         }
     }
-    
+
     private void notifyFailed(String reason) {
         if (listener != null) {
             handler.post(() -> listener.onAutoConnectFailed(reason));
         }
     }
-    
+
     private String sanitizeDeviceName(String name) {
-        if (name == null) return "Unknown";
+        if (name == null) {
+            return "Unknown";
+        }
         return name.replaceAll("[^\\p{Print}]", "").trim();
     }
 }

@@ -6,7 +6,6 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.os.Bundle;
@@ -37,9 +36,10 @@ import com.polidea.rxandroidble2.scan.ScanSettings;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import io.reactivex.disposables.Disposable;
 
@@ -49,119 +49,187 @@ public class BluetoothDialogFragment extends DialogFragment {
     private static final String LOG_PREFIX = "[Bluetooth] ";
     private static final int REQUEST_BLUETOOTH_PERMISSIONS = 1001;
     private static final int REQUEST_ENABLE_BLUETOOTH = 1002;
-    private static final String PREFS_NAME = "BluetoothPrefs";
-    private static final String KEY_PAIRED_DEVICES = "paired_devices";
-    private static final String KEY_LAST_CONNECTED = "last_connected_times";
+    private static final int SCAN_DURATION_MS = 12000;
 
     private BluetoothAdapter bluetoothAdapter;
     private Switch bluetoothSwitch;
     private ListView devicesListView;
     private Button scanButton;
-    private CustomDeviceAdapter devicesAdapter;
-    private ArrayList<DeviceItem> devicesList;
+    private ListDeviceAdapter devicesAdapter;
+    private final ArrayList<ListRow> rows = new ArrayList<>();
     private RxBleClient rxBleClient;
     private Disposable scanSubscription;
-    private ArrayList<RxBleDevice> pairedDevices;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isScanning = false;
     private final Object scanLock = new Object();
     private BluetoothService bluetoothService;
     private boolean isServiceBound;
+    private ConnectionManager connectionManager;
 
-    // Callback interface to notify MainActivity of connection state changes
+    /** MAC upper case -> RSSI from current scan session */
+    private final Map<String, Integer> rssiByMac = new HashMap<>();
+
+    private final ArrayList<RxBleDevice> scannedDevices = new ArrayList<>();
+    private Runnable scanEndRunnable;
+
     public interface BluetoothConnectionListener {
         void onBluetoothConnectionChanged(boolean isConnected);
     }
 
     private BluetoothConnectionListener connectionListener;
 
-    private final ServiceConnection serviceConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            BluetoothService.BluetoothBinder binder = (BluetoothService.BluetoothBinder) service;
-            bluetoothService = binder.getService();
-            isServiceBound = true;
-            bluetoothService.setRxBleClient(rxBleClient);
-            boolean isConnected = bluetoothService.isConnected();
-            ((MainActivity) requireActivity()).isBluetoothConnected = isConnected;
-            // Notify MainActivity of initial connection state
-            if (connectionListener != null) {
-                connectionListener.onBluetoothConnectionChanged(isConnected);
-            }
-            // Check for connected device and update list
-            if (bluetoothAdapter.isEnabled() && isServiceBound) {
-                RxBleDevice connectedDevice = bluetoothService.getConnectedDevice();
-                if (connectedDevice != null) {
-                    // Ensure connected device is in pairedDevices
-                    boolean exists = false;
-                    for (RxBleDevice device : pairedDevices) {
-                        if (device.getMacAddress().equals(connectedDevice.getMacAddress()) &&
-                                sanitizeDeviceName(device.getName()).equalsIgnoreCase(sanitizeDeviceName(connectedDevice.getName()))) {
-                            exists = true;
-                            break;
-                        }
-                    }
-                    if (!exists) {
-                        pairedDevices.add(connectedDevice);
-                        savePairedDevice(connectedDevice);
-                    }
-                    updateDeviceList();
-                } else if (!pairedDevices.isEmpty()) {
-                    bluetoothService.connectToDevice(pairedDevices.get(0));
-                    saveLastConnected(pairedDevices.get(0).getMacAddress());
+    private final BluetoothService.ConnectionStateListener bleStateListener =
+            new BluetoothService.ConnectionStateListener() {
+                @Override
+                public void onBluetoothConnecting(RxBleDevice device) {
+                    postRebuild();
                 }
-            }
-        }
 
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            isServiceBound = false;
-            bluetoothService = null;
-            ((MainActivity) requireActivity()).isBluetoothConnected = false;
-            // Notify MainActivity of disconnection
-            if (connectionListener != null) {
-                connectionListener.onBluetoothConnectionChanged(false);
-            }
-        }
-    };
+                @Override
+                public void onBluetoothConnected(RxBleDevice device) {
+                    if (device != null) {
+                        String mac = device.getMacAddress().toUpperCase(Locale.US);
+                        scannedDevices.removeIf(d -> d.getMacAddress().equalsIgnoreCase(mac));
+                    }
+                    postRebuild();
+                }
 
-    private static class DeviceItem {
-        static final int TYPE_HEADER = 0;
-        static final int TYPE_DEVICE = 1;
+                @Override
+                public void onBluetoothDisconnected(RxBleDevice device) {
+                    postRebuild();
+                }
 
-        int type;
-        String title;
-        RxBleDevice bleDevice;
-        String lastConnectedTime;
-        int rssi; // RSSI in dBm, 0 means unknown
+                @Override
+                public void onBluetoothError(RxBleDevice device, String error) {
+                    postRebuild();
+                }
 
-        DeviceItem(int type, String title, RxBleDevice bleDevice, String lastConnectedTime) {
-            this.type = type;
-            this.title = title;
-            this.bleDevice = bleDevice;
-            this.lastConnectedTime = lastConnectedTime;
-            this.rssi = 0;
+                @Override
+                public void onBluetoothRssiChanged(RxBleDevice device, int rssi) {
+                    if (device != null) {
+                        rssiByMac.put(device.getMacAddress().toUpperCase(Locale.US), rssi);
+                    }
+                    postRebuild();
+                }
+            };
+
+    private void postRebuild() {
+        if (isAdded()) {
+            mainHandler.post(this::rebuildDeviceList);
         }
     }
 
-    private class CustomDeviceAdapter extends ArrayAdapter<DeviceItem> {
-        CustomDeviceAdapter(Context context, ArrayList<DeviceItem> devices) {
-            super(context, 0, devices);
+    private final ServiceConnection serviceConnection =
+            new ServiceConnection() {
+                @Override
+                public void onServiceConnected(ComponentName name, IBinder service) {
+                    BluetoothService.BluetoothBinder binder = (BluetoothService.BluetoothBinder) service;
+                    bluetoothService = binder.getService();
+                    isServiceBound = true;
+                    bluetoothService.setRxBleClient(rxBleClient);
+                    bluetoothService.addConnectionStateListener(bleStateListener);
+                    boolean isConnected = bluetoothService.isConnected();
+                    if (getActivity() instanceof MainActivity) {
+                        ((MainActivity) requireActivity()).isBluetoothConnected = isConnected;
+                    }
+                    if (connectionListener != null) {
+                        connectionListener.onBluetoothConnectionChanged(isConnected);
+                    }
+                    if (bluetoothAdapter != null
+                            && bluetoothAdapter.isEnabled()
+                            && isServiceBound
+                            && bluetoothService != null) {
+                        RxBleDevice connectedDevice = bluetoothService.getConnectedDevice();
+                        if (connectedDevice != null) {
+                            rebuildDeviceList();
+                        } else {
+                            connectMostRecentPairedIfIdle();
+                        }
+                    }
+                }
+
+                @Override
+                public void onServiceDisconnected(ComponentName name) {
+                    if (bluetoothService != null) {
+                        bluetoothService.removeConnectionStateListener(bleStateListener);
+                    }
+                    isServiceBound = false;
+                    bluetoothService = null;
+                    if (getActivity() instanceof MainActivity) {
+                        ((MainActivity) requireActivity()).isBluetoothConnected = false;
+                    }
+                    if (connectionListener != null) {
+                        connectionListener.onBluetoothConnectionChanged(false);
+                    }
+                }
+            };
+
+    private static final int TYPE_HEADER_PAIRED = 0;
+    private static final int TYPE_ROW_PAIRED = 1;
+    private static final int TYPE_HEADER_SCANNED = 2;
+    private static final int TYPE_ROW_SCANNED = 3;
+
+    private static class ListRow {
+        final int type;
+        final String headerTitle;
+        final PairedBleDevice paired;
+        final RxBleDevice scannedDevice;
+        final int rssi;
+
+        static ListRow headerPaired() {
+            return new ListRow(TYPE_HEADER_PAIRED, "Paired devices", null, null, 0);
+        }
+
+        static ListRow headerScanned() {
+            return new ListRow(TYPE_HEADER_SCANNED, "New devices (scan)", null, null, 0);
+        }
+
+        static ListRow paired(PairedBleDevice p, int rssi) {
+            return new ListRow(TYPE_ROW_PAIRED, null, p, null, rssi);
+        }
+
+        static ListRow scanned(RxBleDevice d, int rssi) {
+            return new ListRow(TYPE_ROW_SCANNED, null, null, d, rssi);
+        }
+
+        private ListRow(
+                int type,
+                String headerTitle,
+                PairedBleDevice paired,
+                RxBleDevice scannedDevice,
+                int rssi) {
+            this.type = type;
+            this.headerTitle = headerTitle;
+            this.paired = paired;
+            this.scannedDevice = scannedDevice;
+            this.rssi = rssi;
+        }
+    }
+
+    private class ListDeviceAdapter extends ArrayAdapter<ListRow> {
+        ListDeviceAdapter(Context context, ArrayList<ListRow> list) {
+            super(context, 0, list);
         }
 
         @NonNull
         @Override
         public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
-            DeviceItem item = getItem(position);
-            if (item == null) return convertView;
-
-            if (item.type == DeviceItem.TYPE_HEADER) {
-                if (convertView == null || convertView.getTag() == null || !convertView.getTag().equals("HEADER")) {
-                    convertView = LayoutInflater.from(getContext()).inflate(android.R.layout.simple_list_item_1, parent, false);
+            ListRow row = getItem(position);
+            if (row == null) {
+                return convertView;
+            }
+            int type = row.type;
+            if (type == TYPE_HEADER_PAIRED || type == TYPE_HEADER_SCANNED) {
+                if (convertView == null
+                        || convertView.getTag() == null
+                        || !convertView.getTag().equals("HEADER")) {
+                    convertView =
+                            LayoutInflater.from(getContext())
+                                    .inflate(android.R.layout.simple_list_item_1, parent, false);
                     convertView.setTag("HEADER");
                 }
                 TextView textView = convertView.findViewById(android.R.id.text1);
-                textView.setText(item.title);
+                textView.setText(row.headerTitle);
                 textView.setTextSize(14);
                 textView.setTypeface(null, android.graphics.Typeface.BOLD);
                 textView.setTextColor(ContextCompat.getColor(getContext(), R.color.text_secondary));
@@ -169,33 +237,39 @@ public class BluetoothDialogFragment extends DialogFragment {
                 convertView.setEnabled(false);
                 convertView.setOnClickListener(null);
             } else {
-                if (convertView == null || convertView.getTag() == null || !convertView.getTag().equals("DEVICE")) {
-                    convertView = LayoutInflater.from(getContext()).inflate(R.layout.list_item_bluetooth_device, parent, false);
+                if (convertView == null
+                        || convertView.getTag() == null
+                        || !convertView.getTag().equals("DEVICE")) {
+                    convertView =
+                            LayoutInflater.from(getContext())
+                                    .inflate(R.layout.list_item_bluetooth_device, parent, false);
                     convertView.setTag("DEVICE");
                 }
                 TextView nameView = convertView.findViewById(R.id.device_name);
                 TextView addressView = convertView.findViewById(R.id.device_address);
-                TextView lastConnectedView = convertView.findViewById(R.id.last_connected);
+                TextView detailView = convertView.findViewById(R.id.last_connected);
 
-                String deviceName = sanitizeDeviceName(item.bleDevice.getName());
-                String deviceAddress = item.bleDevice.getMacAddress();
-                nameView.setText(deviceName);
-                addressView.setText(deviceAddress);
-
-                if (item.rssi != 0) {
-                    String distance = rssiToEstimatedDistance(item.rssi);
-                    String signalStrength = item.rssi >= -50 ? "Excellent" : item.rssi >= -70 ? "Good" : "Weak";
-                    if (item.lastConnectedTime != null) {
-                        lastConnectedView.setText("Last connected: " + item.lastConnectedTime + " | " + item.rssi + " dBm (" + distance + ")");
+                if (type == TYPE_ROW_PAIRED && row.paired != null) {
+                    String mac = row.paired.mac;
+                    nameView.setText(row.paired.name);
+                    addressView.setText(mac);
+                    String status = pairedStatusLine(mac, row.rssi);
+                    detailView.setText(status);
+                    detailView.setVisibility(View.VISIBLE);
+                } else if (type == TYPE_ROW_SCANNED && row.scannedDevice != null) {
+                    String deviceName = sanitizeDeviceName(row.scannedDevice.getName());
+                    nameView.setText(deviceName);
+                    addressView.setText(row.scannedDevice.getMacAddress());
+                    if (row.rssi != 0) {
+                        String distance = rssiToEstimatedDistance(row.rssi);
+                        String signalStrength =
+                                row.rssi >= -50 ? "Excellent" : row.rssi >= -70 ? "Good" : "Weak";
+                        detailView.setText(
+                                signalStrength + " · " + row.rssi + " dBm · ~" + distance);
+                        detailView.setVisibility(View.VISIBLE);
                     } else {
-                        lastConnectedView.setText(signalStrength + " · " + item.rssi + " dBm · ~" + distance);
+                        detailView.setVisibility(View.GONE);
                     }
-                    lastConnectedView.setVisibility(View.VISIBLE);
-                } else if (item.lastConnectedTime != null) {
-                    lastConnectedView.setText("Last connected: " + item.lastConnectedTime);
-                    lastConnectedView.setVisibility(View.VISIBLE);
-                } else {
-                    lastConnectedView.setVisibility(View.GONE);
                 }
             }
             return convertView;
@@ -208,17 +282,68 @@ public class BluetoothDialogFragment extends DialogFragment {
 
         @Override
         public int getViewTypeCount() {
-            return 2;
+            return 4;
         }
 
         @Override
         public boolean isEnabled(int position) {
-            return getItem(position).type == DeviceItem.TYPE_DEVICE;
+            int t = getItem(position).type;
+            return t == TYPE_ROW_PAIRED || t == TYPE_ROW_SCANNED;
         }
     }
 
+    private String pairedStatusLine(String macUpper, int scanRssi) {
+        if (isServiceBound
+                && bluetoothService != null
+                && bluetoothService.isConnected()
+                && bluetoothService.getConnectedDevice() != null
+                && bluetoothService.getConnectedDevice().getMacAddress().equalsIgnoreCase(macUpper)) {
+            if (scanRssi != 0) {
+                return "Connected · " + scanRssi + " dBm";
+            }
+            return "Connected";
+        }
+        String last = formatRelativeTime(getCm().getPairedDevicesByRecency(), macUpper);
+        if (scanRssi != 0) {
+            return (last != null ? last + " · " : "In range · ") + scanRssi + " dBm";
+        }
+        return last != null ? last : "Saved (not in range)";
+    }
+
+    private String formatRelativeTime(List<PairedBleDevice> pairedList, String macUpper) {
+        for (PairedBleDevice p : pairedList) {
+            if (p.mac.equalsIgnoreCase(macUpper)) {
+                return formatAge(p.lastConnectedAtMs);
+            }
+        }
+        return null;
+    }
+
+    private String formatAge(long lastMs) {
+        long diff = System.currentTimeMillis() - lastMs;
+        long minutes = diff / 60000;
+        long hours = diff / 3600000;
+        long days = diff / 86400000;
+        if (minutes < 1) {
+            return "Last used: just now";
+        }
+        if (minutes < 60) {
+            return "Last used: " + minutes + " min ago";
+        }
+        if (hours < 24) {
+            return "Last used: " + hours + " hour" + (hours > 1 ? "s" : "") + " ago";
+        }
+        if (days < 7) {
+            return "Last used: " + days + " day" + (days > 1 ? "s" : "") + " ago";
+        }
+        return "Last used: " + new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                .format(new java.util.Date(lastMs));
+    }
+
     private String sanitizeDeviceName(String name) {
-        if (name == null) return "Unknown";
+        if (name == null) {
+            return "Unknown";
+        }
         return name.replaceAll("[^\\p{Print}]", "").trim();
     }
 
@@ -226,9 +351,19 @@ public class BluetoothDialogFragment extends DialogFragment {
         this.rxBleClient = client;
     }
 
-    // Set the connection listener
+    public void setConnectionManager(ConnectionManager manager) {
+        this.connectionManager = manager;
+    }
+
     public void setConnectionListener(BluetoothConnectionListener listener) {
         this.connectionListener = listener;
+    }
+
+    private ConnectionManager getCm() {
+        if (connectionManager != null) {
+            return connectionManager;
+        }
+        return new ConnectionManager(requireContext());
     }
 
     @Override
@@ -239,19 +374,16 @@ public class BluetoothDialogFragment extends DialogFragment {
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(
+            @NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.activity_bluetooth, container, false);
-        loadPairedDevices();
         initializeUIComponents(view);
         initializeBluetooth();
         bindService();
         if (!isServiceBound) {
-            bindService(); // Retry binding if not already bound
+            bindService();
         }
-        // Refresh device list to show connected device
-        if (isServiceBound && bluetoothService != null && bluetoothService.isConnected()) {
-            updateDeviceList();
-        }
+        rebuildDeviceList();
         return view;
     }
 
@@ -288,133 +420,115 @@ public class BluetoothDialogFragment extends DialogFragment {
         devicesListView = view.findViewById(R.id.devices_list);
         scanButton = view.findViewById(R.id.scan_button);
 
-        devicesList = new ArrayList<>();
-        pairedDevices = pairedDevices != null ? pairedDevices : new ArrayList<>();
-        devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Paired Devices", null, null));
-        for (RxBleDevice device : pairedDevices) {
-            String lastTime = formatLastConnected(getLastConnected(device.getMacAddress()));
-            devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device, lastTime));
-        }
-        devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Scanned BLE Devices", null, null));
-        devicesAdapter = new CustomDeviceAdapter(requireContext(), devicesList);
+        devicesAdapter = new ListDeviceAdapter(requireContext(), rows);
         devicesListView.setAdapter(devicesAdapter);
 
-        bluetoothSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (isChecked) {
-                enableBluetooth();
-            } else {
-                disableBluetooth();
-            }
-        });
+        bluetoothSwitch.setOnCheckedChangeListener(
+                (buttonView, isChecked) -> {
+                    if (isChecked) {
+                        enableBluetooth();
+                    } else {
+                        disableBluetooth();
+                    }
+                });
 
-        devicesListView.setOnItemClickListener((parent, v, position, id) -> {
-            DeviceItem item = devicesList.get(position);
-            if (item.type == DeviceItem.TYPE_DEVICE) {
-                RxBleDevice selectedBleDevice = item.bleDevice;
-                String deviceName = sanitizeDeviceName(selectedBleDevice.getName());
-                String deviceAddress = selectedBleDevice.getMacAddress();
-                
-                Log.d(TAG, LOG_PREFIX + "Device clicked: " + deviceName + " (" + deviceAddress + ")");
-                
-                if (deviceName.matches("(?i)(openterface|kvm|keymod).*")) {
-                    if (isServiceBound) {
-                        // Check if the device is already connected
-                        if (bluetoothService.isConnected() &&
-                                bluetoothService.getConnectedDevice() != null &&
-                                bluetoothService.getConnectedDevice().getMacAddress().equals(selectedBleDevice.getMacAddress())) {
-                            Log.d(TAG, LOG_PREFIX + "Device already connected: " + deviceName);
-                            showToast("Device is already connected");
-                            return;
-                        }
-                        // Verify name and MAC address match a paired device
-                        boolean isPaired = false;
-                        for (RxBleDevice device : pairedDevices) {
-                            if (device.getMacAddress().equals(selectedBleDevice.getMacAddress()) &&
-                                    sanitizeDeviceName(device.getName()).equalsIgnoreCase(deviceName)) {
-                                isPaired = true;
-                                break;
-                            }
-                        }
-                        if (isPaired || item.type == DeviceItem.TYPE_DEVICE) {
-                            Log.d(TAG, LOG_PREFIX + "Initiating connection to: " + deviceName);
-                            showToast("Connecting to " + deviceName + "...");
-                            bluetoothService.connectToDevice(selectedBleDevice);
-                            saveLastConnected(selectedBleDevice.getMacAddress());
-                            // Add to pairedDevices if not already present
-                            if (!isPaired) {
-                                pairedDevices.add(selectedBleDevice);
-                                savePairedDevice(selectedBleDevice);
-                                updateDeviceList();
-                            }
+        devicesListView.setOnItemClickListener(
+                (parent, v, position, id) -> {
+                    ListRow row = rows.get(position);
+                    if (row.type == TYPE_ROW_PAIRED && row.paired != null) {
+                        connectToMac(row.paired.mac, row.paired.name);
+                    } else if (row.type == TYPE_ROW_SCANNED && row.scannedDevice != null) {
+                        String n = sanitizeDeviceName(row.scannedDevice.getName());
+                        if (OpenterfaceBleDeviceNames.matchesAdvertisedName(n)) {
+                            connectToMac(row.scannedDevice.getMacAddress(), n);
                         } else {
-                            Log.w(TAG, LOG_PREFIX + "Device name or MAC mismatch: " + deviceName);
-                            showToast("Device name or MAC address does not match paired device");
+                            showToast("Please select an Openterface or KeyMod device");
+                        }
+                    }
+                });
+
+        devicesListView.setOnItemLongClickListener(
+                (parent, v, position, id) -> {
+                    ListRow row = rows.get(position);
+                    if (row.type != TYPE_ROW_PAIRED || row.paired == null) {
+                        showToast("Only saved devices can be forgotten");
+                        return false;
+                    }
+                    String mac = row.paired.mac;
+                    String deviceName = row.paired.name;
+                    if (isServiceBound
+                            && bluetoothService.isConnected()
+                            && bluetoothService.getConnectedDevice() != null
+                            && bluetoothService.getConnectedDevice().getMacAddress().equalsIgnoreCase(mac)) {
+                        bluetoothService.disconnect();
+                    }
+                    new AlertDialog.Builder(requireContext())
+                            .setTitle("Forget Device")
+                            .setMessage(
+                                    "Forget \""
+                                            + deviceName
+                                            + "\" ("
+                                            + mac
+                                            + ")?\n\nIt will no longer appear in the paired list.")
+                            .setPositiveButton(
+                                    "Forget",
+                                    (dialog, which) -> {
+                                        getCm().forgetPairedDevice(mac);
+                                        scannedDevices.removeIf(d -> d.getMacAddress().equalsIgnoreCase(mac));
+                                        rebuildDeviceList();
+                                        showToast("Device forgotten: " + deviceName);
+                                    })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                    return true;
+                });
+
+        scanButton.setOnClickListener(
+                v -> {
+                    if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
+                        if (!isScanning) {
+                            startBleScan();
+                        } else {
+                            showToast("Scan already in progress");
                         }
                     } else {
-                        Log.e(TAG, LOG_PREFIX + "BluetoothService not bound");
-                        showToast("Bluetooth service not available");
+                        showToast("Please enable Bluetooth first");
                     }
-                } else {
-                    Log.w(TAG, LOG_PREFIX + "Device does not match Openterface KM pattern: " + deviceName);
-                    showToast("Please select an openterface or KVM device");
-                }
-            }
-        });
+                });
+    }
 
-        devicesListView.setOnItemLongClickListener((parent, v, position, id) -> {
-            DeviceItem item = devicesList.get(position);
-            if (item.type == DeviceItem.TYPE_DEVICE) {
-                RxBleDevice device = item.bleDevice;
-                String deviceName = sanitizeDeviceName(device.getName());
-                String deviceAddress = device.getMacAddress();
+    private void connectToMac(String mac, String displayNameForToast) {
+        if (!isServiceBound || bluetoothService == null) {
+            showToast("Bluetooth service not available");
+            return;
+        }
+        if (rxBleClient == null) {
+            return;
+        }
+        RxBleDevice device = rxBleClient.getBleDevice(mac);
+        if (bluetoothService.isConnected()
+                && bluetoothService.getConnectedDevice() != null
+                && bluetoothService.getConnectedDevice().getMacAddress().equalsIgnoreCase(mac)) {
+            showToast("Device is already connected");
+            return;
+        }
+        showToast("Connecting to " + displayNameForToast + "...");
+        bluetoothService.connectToDevice(device);
+    }
 
-                // Only allow forgetting paired devices
-                boolean isPaired = false;
-                for (RxBleDevice paired : pairedDevices) {
-                    if (paired.getMacAddress().equals(deviceAddress)) {
-                        isPaired = true;
-                        break;
-                    }
-                }
-                if (!isPaired) {
-                    showToast("Device is not paired, nothing to forget");
-                    return false;
-                }
-
-                // Disconnect if currently connected to this device
-                if (isServiceBound && bluetoothService.isConnected() &&
-                        bluetoothService.getConnectedDevice() != null &&
-                        bluetoothService.getConnectedDevice().getMacAddress().equals(deviceAddress)) {
-                    bluetoothService.disconnect();
-                }
-
-                new AlertDialog.Builder(requireContext())
-                        .setTitle("Forget Device")
-                        .setMessage("Forget \"" + deviceName + "\" (" + deviceAddress + ")?\n\nIt will no longer appear in the paired list.")
-                        .setPositiveButton("Forget", (dialog, which) -> {
-                            removePairedDevice(device);
-                            updateDeviceList();
-                            showToast("Device forgotten: " + deviceName);
-                        })
-                        .setNegativeButton("Cancel", null)
-                        .show();
-
-                return true;
-            }
-            return false;
-        });
-
-        scanButton.setOnClickListener(v -> {
-            if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
-                if (!isScanning) {
-                    startBleScan();
-                } else {
-                    showToast("Scan already in progress");
-                }
-            } else {
-                showToast("Please enable Bluetooth first");
-            }
-        });
+    private void connectMostRecentPairedIfIdle() {
+        if (bluetoothAdapter == null
+                || !bluetoothAdapter.isEnabled()
+                || !isServiceBound
+                || bluetoothService == null
+                || bluetoothService.isConnected()
+                || isScanning) {
+            return;
+        }
+        List<PairedBleDevice> pl = getCm().getPairedDevicesByRecency();
+        if (!pl.isEmpty()) {
+            bluetoothService.connectToDevice(rxBleClient.getBleDevice(pl.get(0).mac));
+        }
     }
 
     private void initializeBluetooth() {
@@ -426,16 +540,19 @@ public class BluetoothDialogFragment extends DialogFragment {
             return;
         }
 
-        // Check permissions based on Android version
         boolean hasRequiredPermissions;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            // Android 12 and above
-            boolean hasBluetoothConnect = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
-            boolean hasBluetoothScan = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
+            boolean hasBluetoothConnect =
+                    ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT)
+                            == PackageManager.PERMISSION_GRANTED;
+            boolean hasBluetoothScan =
+                    ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_SCAN)
+                            == PackageManager.PERMISSION_GRANTED;
             hasRequiredPermissions = hasBluetoothConnect && hasBluetoothScan;
         } else {
-            // Android 11 and below - need location permission
-            hasRequiredPermissions = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            hasRequiredPermissions =
+                    ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+                            == PackageManager.PERMISSION_GRANTED;
         }
 
         if (hasRequiredPermissions) {
@@ -449,21 +566,18 @@ public class BluetoothDialogFragment extends DialogFragment {
     private void checkPermissions() {
         String[] permissions;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            // Android 12 and above
-            permissions = new String[]{
-                    Manifest.permission.BLUETOOTH_SCAN,
-                    Manifest.permission.BLUETOOTH_CONNECT
-            };
+            permissions =
+                    new String[] {
+                        Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT
+                    };
         } else {
-            // Android 11 and below
-            permissions = new String[]{
-                    Manifest.permission.ACCESS_FINE_LOCATION
-            };
+            permissions = new String[] {Manifest.permission.ACCESS_FINE_LOCATION};
         }
 
         ArrayList<String> permissionsToRequest = new ArrayList<>();
         for (String permission : permissions) {
-            if (ContextCompat.checkSelfPermission(requireContext(), permission) != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(requireContext(), permission)
+                    != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(permission);
             }
         }
@@ -476,16 +590,21 @@ public class BluetoothDialogFragment extends DialogFragment {
     }
 
     private void enableBluetooth() {
-        if (bluetoothAdapter == null) return;
-        
-        // Check permission based on Android version
+        if (bluetoothAdapter == null) {
+            return;
+        }
+
         boolean hasPermission;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            hasPermission = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+            hasPermission =
+                    ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT)
+                            == PackageManager.PERMISSION_GRANTED;
         } else {
-            hasPermission = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            hasPermission =
+                    ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+                            == PackageManager.PERMISSION_GRANTED;
         }
-        
+
         if (!hasPermission) {
             checkPermissions();
             bluetoothSwitch.setChecked(false);
@@ -495,36 +614,32 @@ public class BluetoothDialogFragment extends DialogFragment {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BLUETOOTH);
         } else if (isServiceBound && bluetoothService.isConnected()) {
-            // Skip scan if already connected
             showToast("Already connected to a device");
-            updateDeviceList();
-        } else if (!isScanning && isServiceBound && !pairedDevices.isEmpty()) {
-            bluetoothService.connectToDevice(pairedDevices.get(0));
-            saveLastConnected(pairedDevices.get(0).getMacAddress());
+            rebuildDeviceList();
+        } else if (!isScanning && isServiceBound) {
+            connectMostRecentPairedIfIdle();
+            if (getCm().getPairedDevicesByRecency().isEmpty()) {
+                startBleScan();
+            }
         } else if (!isScanning) {
             startBleScan();
         }
     }
 
     private void disableBluetooth() {
-        if (bluetoothAdapter == null) return;
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+        if (bluetoothAdapter == null) {
+            return;
+        }
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT)
+                != PackageManager.PERMISSION_GRANTED) {
             showToast("Bluetooth permissions required");
             return;
         }
         if (bluetoothAdapter.isEnabled()) {
             bluetoothAdapter.disable();
             stopScan();
-            devicesList.clear();
-            devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Paired Devices", null, null));
-            for (RxBleDevice device : pairedDevices) {
-                String lastTime = formatLastConnected(getLastConnected(device.getMacAddress()));
-                devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device, lastTime));
-            }
-            devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Scanned BLE Devices", null, null));
-            mainHandler.post(() -> devicesAdapter.notifyDataSetChanged());
+            rebuildDeviceList();
             showToast("Bluetooth disabled");
-            // Notify MainActivity of disconnection
             if (connectionListener != null) {
                 connectionListener.onBluetoothConnectionChanged(false);
             }
@@ -538,14 +653,17 @@ public class BluetoothDialogFragment extends DialogFragment {
             return;
         }
 
-        // Check permission based on Android version
         boolean hasPermission;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            hasPermission = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
+            hasPermission =
+                    ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_SCAN)
+                            == PackageManager.PERMISSION_GRANTED;
         } else {
-            hasPermission = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            hasPermission =
+                    ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+                            == PackageManager.PERMISSION_GRANTED;
         }
-        
+
         if (!hasPermission) {
             Log.w(TAG, LOG_PREFIX + "Required permission not granted for BLE scanning");
             checkPermissions();
@@ -561,68 +679,81 @@ public class BluetoothDialogFragment extends DialogFragment {
             mainHandler.post(() -> scanButton.setEnabled(false));
         }
 
-        Log.d(TAG, LOG_PREFIX + "Starting BLE scan for Openterface KM devices...");
+        Log.d(TAG, LOG_PREFIX + "Starting BLE scan for Openterface / KeyMod devices...");
         showToast("Scanning for Bluetooth devices...");
 
-        while (devicesList.size() > 2) {
-            devicesList.remove(devicesList.size() - 1);
-        }
-        mainHandler.post(() -> devicesAdapter.notifyDataSetChanged());
+        rssiByMac.clear();
+        scannedDevices.clear();
+        rebuildDeviceList();
 
-        ScanSettings scanSettings = new ScanSettings.Builder()
-                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-                .build();
+        if (scanEndRunnable != null) {
+            mainHandler.removeCallbacks(scanEndRunnable);
+        }
+        scanEndRunnable =
+                () -> {
+                    stopScan();
+                    rebuildDeviceList();
+                };
+        mainHandler.postDelayed(scanEndRunnable, SCAN_DURATION_MS);
+
+        ScanSettings scanSettings =
+                new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
 
         synchronized (scanLock) {
-            scanSubscription = rxBleClient.scanBleDevices(scanSettings)
-                    .subscribe(
-                            scanResult -> {
-                                RxBleDevice device = scanResult.getBleDevice();
-                                String deviceName = sanitizeDeviceName(device.getName());
-                                String deviceAddress = device.getMacAddress();
-
-                                if (!deviceName.matches("(?i)(openterface|kvm|keymod).*")) {
-                                    // Log.d(TAG, LOG_PREFIX + "Device does NOT match Openterface KM pattern, skipping: " + deviceName);
-                                    return;
-                                }
-
-                                Log.d(TAG, LOG_PREFIX + "Device matches Openterface KM pattern: " + deviceName);
-
-                                synchronized (scanLock) {
-                                    boolean foundInList = false;
-                                    for (DeviceItem existingItem : devicesList) {
-                                        if (existingItem.bleDevice != null && existingItem.bleDevice.getMacAddress().equals(deviceAddress)) {
-                                            existingItem.rssi = scanResult.getRssi();
-                                            foundInList = true;
-                                            break;
+            scanSubscription =
+                    rxBleClient
+                            .scanBleDevices(scanSettings)
+                            .timeout(SCAN_DURATION_MS, TimeUnit.MILLISECONDS)
+                            .subscribe(
+                                    scanResult -> {
+                                        RxBleDevice device = scanResult.getBleDevice();
+                                        String deviceName = sanitizeDeviceName(device.getName());
+                                        String deviceAddress = device.getMacAddress();
+                                        if (!OpenterfaceBleDeviceNames.matchesAdvertisedName(deviceName)) {
+                                            return;
                                         }
-                                    }
-
-                                    if (!foundInList) {
-                                        String lastTime = formatLastConnected(getLastConnected(deviceAddress));
-                                        int deviceRssi = scanResult.getRssi();
-                                        devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device, lastTime));
-                                        devicesList.get(devicesList.size() - 1).rssi = deviceRssi;
-                                    }
-
-                                    mainHandler.post(() -> {
-                                        devicesAdapter.notifyDataSetChanged();
-                                        showToast("Found: " + deviceName);
+                                        int rssi = scanResult.getRssi();
+                                        synchronized (scanLock) {
+                                            rssiByMac.put(deviceAddress.toUpperCase(Locale.US), rssi);
+                                            if (getCm().isPairedBleMac(deviceAddress)) {
+                                                mainHandler.post(this::rebuildDeviceList);
+                                                return;
+                                            }
+                                            boolean exists = false;
+                                            for (RxBleDevice d : scannedDevices) {
+                                                if (d.getMacAddress().equalsIgnoreCase(deviceAddress)) {
+                                                    exists = true;
+                                                    break;
+                                                }
+                                            }
+                                            if (!exists) {
+                                                scannedDevices.add(device);
+                                            }
+                                            mainHandler.post(this::rebuildDeviceList);
+                                        }
+                                    },
+                                    throwable -> {
+                                        Log.e(TAG, LOG_PREFIX + "Scan error: " + throwable.getMessage(), throwable);
+                                        showToast("Scan finished");
+                                        synchronized (scanLock) {
+                                            isScanning = false;
+                                            mainHandler.post(() -> scanButton.setEnabled(true));
+                                        }
+                                        if (scanEndRunnable != null) {
+                                            mainHandler.removeCallbacks(scanEndRunnable);
+                                        }
+                                        rebuildDeviceList();
+                                    },
+                                    () -> {
+                                        synchronized (scanLock) {
+                                            isScanning = false;
+                                            mainHandler.post(() -> scanButton.setEnabled(true));
+                                        }
+                                        if (scanEndRunnable != null) {
+                                            mainHandler.removeCallbacks(scanEndRunnable);
+                                        }
+                                        rebuildDeviceList();
                                     });
-
-                                    Log.d(TAG, LOG_PREFIX + "Added device to list: " + deviceName);
-                                    stopScan();
-                                }
-                            },
-                            throwable -> {
-                                Log.e(TAG, LOG_PREFIX + "Scan error: " + throwable.getMessage(), throwable);
-                                showToast("Scan error: " + throwable.getMessage());
-                                synchronized (scanLock) {
-                                    isScanning = false;
-                                    mainHandler.post(() -> scanButton.setEnabled(true));
-                                }
-                            }
-                    );
         }
     }
 
@@ -631,28 +762,48 @@ public class BluetoothDialogFragment extends DialogFragment {
             if (scanSubscription != null && !scanSubscription.isDisposed()) {
                 scanSubscription.dispose();
             }
+            if (scanEndRunnable != null) {
+                mainHandler.removeCallbacks(scanEndRunnable);
+                scanEndRunnable = null;
+            }
             if (isScanning) {
                 isScanning = false;
-                mainHandler.post(() -> {
-                    scanButton.setEnabled(true);
-                });
+                mainHandler.post(() -> scanButton.setEnabled(true));
             }
         }
     }
 
+    private void rebuildDeviceList() {
+        rows.clear();
+        rows.add(ListRow.headerPaired());
+        List<PairedBleDevice> paired = getCm().getPairedDevicesByRecency();
+        for (PairedBleDevice p : paired) {
+            int rssi = rssiByMac.getOrDefault(p.mac.toUpperCase(Locale.US), 0);
+            rows.add(ListRow.paired(p, rssi));
+        }
+        rows.add(ListRow.headerScanned());
+        for (RxBleDevice d : scannedDevices) {
+            int rssi = rssiByMac.getOrDefault(d.getMacAddress().toUpperCase(Locale.US), 0);
+            rows.add(ListRow.scanned(d, rssi));
+        }
+        if (devicesAdapter != null) {
+            mainHandler.post(() -> devicesAdapter.notifyDataSetChanged());
+        }
+    }
+
     private String rssiToEstimatedDistance(int rssi) {
-        if (rssi == 0) return "?";
-        // RSSI to distance using path loss model: d = 10^((txPower - rssi) / (10 * n))
-        // txPower at 1m ≈ -59 dBm, path loss exponent n = 2.0
+        if (rssi == 0) {
+            return "?";
+        }
         double txPower = -59.0;
         double n = 2.0;
         double distance = Math.pow(10.0, (txPower - rssi) / (10.0 * n));
         if (distance < 1.0) {
             return (int) (distance * 100) + " cm";
         } else if (distance < 10.0) {
-            return String.format(java.util.Locale.getDefault(), "%.1f m", distance);
+            return String.format(Locale.getDefault(), "%.1f m", distance);
         } else {
-            return String.format(java.util.Locale.getDefault(), "%.0f m", distance);
+            return String.format(Locale.getDefault(), "%.0f m", distance);
         }
     }
 
@@ -662,127 +813,9 @@ public class BluetoothDialogFragment extends DialogFragment {
         }
     }
 
-    private void updateDeviceList() {
-        devicesList.clear();
-        devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Paired Devices", null, null));
-        for (RxBleDevice device : pairedDevices) {
-            String lastTime = formatLastConnected(getLastConnected(device.getMacAddress()));
-            devicesList.add(new DeviceItem(DeviceItem.TYPE_DEVICE, null, device, lastTime));
-        }
-        devicesList.add(new DeviceItem(DeviceItem.TYPE_HEADER, "Scanned BLE Devices", null, null));
-        mainHandler.post(() -> devicesAdapter.notifyDataSetChanged());
-    }
-
-    private void savePairedDevice(RxBleDevice device) {
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        Set<String> pairedDeviceSet = new HashSet<>(prefs.getStringSet(KEY_PAIRED_DEVICES, new HashSet<>()));
-        String deviceEntry = device.getMacAddress() + ";" + sanitizeDeviceName(device.getName());
-
-        // Remove any existing entry with the same MAC address to avoid duplicates
-        pairedDeviceSet.removeIf(entry -> entry.startsWith(device.getMacAddress() + ";"));
-        pairedDeviceSet.add(deviceEntry);
-
-        prefs.edit().putStringSet(KEY_PAIRED_DEVICES, pairedDeviceSet).apply();
-        Log.d(TAG, LOG_PREFIX + "Saved paired device: " + deviceEntry);
-    }
-
-    private void removePairedDevice(RxBleDevice device) {
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String mac = device.getMacAddress();
-
-        // Remove from SharedPreferences
-        Set<String> pairedDeviceSet = new HashSet<>(prefs.getStringSet(KEY_PAIRED_DEVICES, new HashSet<>()));
-        pairedDeviceSet.removeIf(entry -> entry.startsWith(mac + ";"));
-        prefs.edit().putStringSet(KEY_PAIRED_DEVICES, pairedDeviceSet).apply();
-
-        // Remove from in-memory list
-        pairedDevices.removeIf(d -> d.getMacAddress().equals(mac));
-
-        // Clear last-connected time
-        prefs.edit().remove(KEY_LAST_CONNECTED + "_" + mac).apply();
-
-        Log.d(TAG, LOG_PREFIX + "Removed paired device: " + mac);
-    }
-
-    private void saveLastConnected(String macAddress) {
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String now = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(new java.util.Date());
-        prefs.edit().putString(KEY_LAST_CONNECTED + "_" + macAddress, now).apply();
-    }
-
-    private String getLastConnected(String macAddress) {
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getString(KEY_LAST_CONNECTED + "_" + macAddress, null);
-    }
-
-    private String formatLastConnected(String timestamp) {
-        if (timestamp == null) return null;
-        try {
-            java.text.SimpleDateFormat inputFormat = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
-            java.util.Date date = inputFormat.parse(timestamp);
-            if (date == null) return timestamp;
-
-            long now = System.currentTimeMillis();
-            long diff = now - date.getTime();
-            long minutes = diff / 60000;
-            long hours = diff / 3600000;
-            long days = diff / 86400000;
-
-            if (minutes < 1) return "Just now";
-            if (minutes < 60) return minutes + " min ago";
-            if (hours < 24) return hours + " hour" + (hours > 1 ? "s" : "") + " ago";
-            if (days < 7) return days + " day" + (days > 1 ? "s" : "") + " ago";
-            return timestamp;
-        } catch (Exception e) {
-            return timestamp;
-        }
-    }
-
-    private void loadPairedDevices() {
-        pairedDevices = new ArrayList<>();
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        Set<String> pairedDeviceSet = prefs.getStringSet(KEY_PAIRED_DEVICES, new HashSet<>());
-        Set<String> uniqueMacAddresses = new HashSet<>();
-
-        for (String deviceEntry : pairedDeviceSet) {
-            String[] parts = deviceEntry.split(";", 2);
-            if (parts.length < 2) continue; // Skip invalid entries
-            String macAddress = parts[0];
-            String storedName = parts[1];
-
-            if (!uniqueMacAddresses.add(macAddress)) {
-                Log.w(TAG, LOG_PREFIX + "Duplicate MAC address found in SharedPreferences: " + macAddress);
-                continue;
-            }
-
-            try {
-                RxBleDevice device = rxBleClient.getBleDevice(macAddress);
-                // Only add if the current device name matches the stored name
-                if (sanitizeDeviceName(device.getName()).equalsIgnoreCase(storedName)) {
-                    pairedDevices.add(device);
-                    Log.d(TAG, LOG_PREFIX + "Loaded paired device: " + macAddress + ", name: " + storedName);
-                } else {
-                    Log.w(TAG, LOG_PREFIX + "Device name mismatch for MAC " + macAddress + ": expected " + storedName + ", got " + sanitizeDeviceName(device.getName()) + " (case-insensitive check failed)");
-                }
-            } catch (Exception e) {
-                Log.e(TAG, LOG_PREFIX + "Error loading paired device: " + macAddress + ", error: " + e.getMessage());
-            }
-        }
-
-        // Update SharedPreferences to remove invalid entries
-        if (pairedDeviceSet.size() != pairedDevices.size()) {
-            Set<String> cleanedDeviceSet = new HashSet<>();
-            for (RxBleDevice device : pairedDevices) {
-                String deviceEntry = device.getMacAddress() + ";" + sanitizeDeviceName(device.getName());
-                cleanedDeviceSet.add(deviceEntry);
-            }
-            prefs.edit().putStringSet(KEY_PAIRED_DEVICES, cleanedDeviceSet).apply();
-            Log.d(TAG, LOG_PREFIX + "Cleaned up invalid entries in SharedPreferences");
-        }
-    }
-
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(
+            int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_BLUETOOTH_PERMISSIONS) {
             boolean allGranted = true;
@@ -794,8 +827,8 @@ public class BluetoothDialogFragment extends DialogFragment {
                     }
                 }
             }
-            if (allGranted && isServiceBound && !pairedDevices.isEmpty()) {
-                bluetoothService.connectToDevice(pairedDevices.get(0));
+            if (allGranted && isServiceBound) {
+                connectMostRecentPairedIfIdle();
             } else {
                 showToast("Bluetooth permissions denied");
                 bluetoothSwitch.setEnabled(false);
@@ -806,12 +839,15 @@ public class BluetoothDialogFragment extends DialogFragment {
     private void showPermissionSettingsDialog() {
         new AlertDialog.Builder(requireContext())
                 .setTitle("Permissions Required")
-                .setMessage("Bluetooth permissions are required to scan and connect to devices. Please grant them in the settings.")
-                .setPositiveButton("Go to Settings", (dialog, which) -> {
-                    Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                    intent.setData(android.net.Uri.parse("package:" + requireContext().getPackageName()));
-                    startActivity(intent);
-                })
+                .setMessage(
+                        "Bluetooth permissions are required to scan and connect to devices. Please grant them in the settings.")
+                .setPositiveButton(
+                        "Go to Settings",
+                        (dialog, which) -> {
+                            Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                            intent.setData(android.net.Uri.parse("package:" + requireContext().getPackageName()));
+                            startActivity(intent);
+                        })
                 .setNegativeButton("Cancel", (dialog, which) -> dismiss())
                 .setCancelable(false)
                 .show();
@@ -823,8 +859,8 @@ public class BluetoothDialogFragment extends DialogFragment {
         if (requestCode == REQUEST_ENABLE_BLUETOOTH) {
             if (resultCode == requireActivity().RESULT_OK) {
                 showToast("Bluetooth enabled");
-                if (isServiceBound && !pairedDevices.isEmpty()) {
-                    bluetoothService.connectToDevice(pairedDevices.get(0));
+                if (isServiceBound) {
+                    connectMostRecentPairedIfIdle();
                 }
             } else {
                 bluetoothSwitch.setChecked(false);
@@ -837,6 +873,9 @@ public class BluetoothDialogFragment extends DialogFragment {
     public void onDestroyView() {
         super.onDestroyView();
         stopScan();
+        if (bluetoothService != null) {
+            bluetoothService.removeConnectionStateListener(bleStateListener);
+        }
         if (isServiceBound) {
             requireContext().unbindService(serviceConnection);
             isServiceBound = false;

@@ -18,8 +18,18 @@ import com.hoho.android.usbserial.driver.UsbSerialProber;
 import com.polidea.rxandroidble2.RxBleClient;
 import com.polidea.rxandroidble2.RxBleDevice;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
@@ -33,6 +43,11 @@ public class ConnectionManager {
     private static final String KEY_LAST_BLE_DEVICE_MAC = "last_ble_device_mac";
     private static final String KEY_LAST_BLE_DEVICE_NAME = "last_ble_device_name";
     private static final String KEY_AUTO_CONNECT_ENABLED = "auto_connect_enabled";
+    private static final String KEY_PAIRED_BLE_JSON = "paired_ble_devices_json";
+    private static final String KEY_PAIRED_BLE_LEGACY_MIGRATED = "paired_ble_legacy_prefs_migrated";
+    private static final String LEGACY_BT_PREFS = "BluetoothPrefs";
+    private static final String LEGACY_PAIRED_DEVICES = "paired_devices";
+    private static final String LEGACY_LAST_CONNECTED_PREFIX = "last_connected_times_";
     private static final String ACTION_USB_PERMISSION = "com.openterface.ch32v208serial.USB_PERMISSION";
     private static final int AUTO_CONNECT_TIMEOUT_MS = 5000;
 
@@ -181,13 +196,8 @@ public class ConnectionManager {
 
         if ("USB".equals(lastType)) {
             connectUsb();
-        } else if ("BLUETOOTH".equals(lastType)) {
-            String macAddress = prefs.getString(KEY_LAST_BLE_DEVICE_MAC, null);
-            if (macAddress != null) {
-                // Bluetooth auto-connect will be handled by BluetoothService
-                Log.d(TAG, "Last BLE device: " + macAddress);
-            }
         }
+        // Bluetooth auto-connect is handled by BluetoothAutoConnectManager in MainActivity.
     }
 
     /**
@@ -256,23 +266,17 @@ public class ConnectionManager {
      * Connect to BLE device
      */
     public void connectBluetooth(RxBleDevice device) {
-        Log.d(TAG, "Connecting to BLE device: " + device.getMacAddress() 
+        Log.d(TAG, "Connecting to BLE device: " + device.getMacAddress()
                 + ", bluetoothService=" + (bluetoothService != null ? "ready" : "NOT_READY"));
-        updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.CONNECTING);
-        
         this.bleDevice = device;
-        
-        // Save last connection
-        saveLastConnection(ConnectionType.BLUETOOTH, device.getMacAddress(), device.getName());
-        
-        // Check if BluetoothService is available before marking as connected
         if (bluetoothService != null && bluetoothService.isConnected()) {
             updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.CONNECTED);
             Log.d(TAG, "Bluetooth service ready, marked as CONNECTED");
         } else {
+            updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.CONNECTING);
             Log.w(TAG, "Bluetooth service not ready yet, service=" + (bluetoothService != null ? "exists" : "NULL"));
-            // Service might connect later - listener will be updated by BluetoothService
         }
+        // Last connection + paired list are persisted from BluetoothService callbacks on success.
     }
 
     /**
@@ -371,6 +375,183 @@ public class ConnectionManager {
     }
 
     /**
+     * BLE devices the user has successfully connected to, newest first.
+     */
+    public List<PairedBleDevice> getPairedDevicesByRecency() {
+        migrateLegacyBluetoothPrefsIfNeeded();
+        List<PairedBleDevice> list = readPairedBleDevicesFromPrefs();
+        list.sort(Comparator.comparingLong((PairedBleDevice p) -> p.lastConnectedAtMs).reversed());
+        return list;
+    }
+
+    /**
+     * Upsert a paired device and bump last-connected time (call after a successful GATT connection).
+     */
+    public void recordPairedDevice(String mac, String name) {
+        if (mac == null || mac.isEmpty()) {
+            return;
+        }
+        migrateLegacyBluetoothPrefsIfNeeded();
+        String normalizedMac = mac.toUpperCase(Locale.US);
+        String safeName = name != null && !name.isEmpty() ? sanitizeBleName(name) : "Unknown";
+        List<PairedBleDevice> list = readPairedBleDevicesFromPrefs();
+        long now = System.currentTimeMillis();
+        boolean found = false;
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).mac.equalsIgnoreCase(normalizedMac)) {
+                list.set(i, new PairedBleDevice(normalizedMac, safeName, now));
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            list.add(new PairedBleDevice(normalizedMac, safeName, now));
+        }
+        writePairedBleDevicesToPrefs(list);
+    }
+
+    public void forgetPairedDevice(String mac) {
+        if (mac == null || mac.isEmpty()) {
+            return;
+        }
+        migrateLegacyBluetoothPrefsIfNeeded();
+        String normalizedMac = mac.toUpperCase(Locale.US);
+        List<PairedBleDevice> list = readPairedBleDevicesFromPrefs();
+        list.removeIf(p -> p.mac.equalsIgnoreCase(normalizedMac));
+        writePairedBleDevicesToPrefs(list);
+    }
+
+    public boolean isPairedBleMac(String mac) {
+        if (mac == null) {
+            return false;
+        }
+        migrateLegacyBluetoothPrefsIfNeeded();
+        for (PairedBleDevice p : readPairedBleDevicesFromPrefs()) {
+            if (p.mac.equalsIgnoreCase(mac)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void migrateLegacyBluetoothPrefsIfNeeded() {
+        if (prefs.getBoolean(KEY_PAIRED_BLE_LEGACY_MIGRATED, false)) {
+            return;
+        }
+        List<PairedBleDevice> merged = new ArrayList<>();
+        SharedPreferences legacy = context.getSharedPreferences(LEGACY_BT_PREFS, Context.MODE_PRIVATE);
+        Set<String> legacySet = legacy.getStringSet(LEGACY_PAIRED_DEVICES, null);
+        SimpleDateFormat legacyFmt =
+                new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+        if (legacySet != null) {
+            for (String entry : legacySet) {
+                if (entry == null) {
+                    continue;
+                }
+                String[] parts = entry.split(";", 2);
+                if (parts.length < 2) {
+                    continue;
+                }
+                String mac = parts[0].toUpperCase(Locale.US);
+                String name = sanitizeBleName(parts[1]);
+                long lastMs = System.currentTimeMillis();
+                String ts = legacy.getString(LEGACY_LAST_CONNECTED_PREFIX + mac, null);
+                if (ts != null) {
+                    try {
+                        java.util.Date d = legacyFmt.parse(ts);
+                        if (d != null) {
+                            lastMs = d.getTime();
+                        }
+                    } catch (ParseException ignored) {
+                    }
+                }
+                merged.add(new PairedBleDevice(mac, name, lastMs));
+            }
+        }
+        String lastMac = prefs.getString(KEY_LAST_BLE_DEVICE_MAC, null);
+        String lastName = prefs.getString(KEY_LAST_BLE_DEVICE_NAME, null);
+        if (lastMac != null && !lastMac.isEmpty()) {
+            String norm = lastMac.toUpperCase(Locale.US);
+            boolean exists = false;
+            for (PairedBleDevice p : merged) {
+                if (p.mac.equalsIgnoreCase(norm)) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                merged.add(
+                        new PairedBleDevice(
+                                norm,
+                                lastName != null ? sanitizeBleName(lastName) : "Unknown",
+                                System.currentTimeMillis()));
+            }
+        }
+        if (!merged.isEmpty()) {
+            writePairedBleDevicesToPrefs(merged);
+        }
+        SharedPreferences.Editor legEd = legacy.edit();
+        legEd.remove(LEGACY_PAIRED_DEVICES);
+        for (String key : legacy.getAll().keySet()) {
+            if (key != null && key.startsWith(LEGACY_LAST_CONNECTED_PREFIX)) {
+                legEd.remove(key);
+            }
+        }
+        legEd.apply();
+        prefs.edit().putBoolean(KEY_PAIRED_BLE_LEGACY_MIGRATED, true).apply();
+        Log.d(TAG, "Migrated legacy BluetoothPrefs paired devices into ConnectionPrefs");
+    }
+
+    private List<PairedBleDevice> readPairedBleDevicesFromPrefs() {
+        List<PairedBleDevice> out = new ArrayList<>();
+        String json = prefs.getString(KEY_PAIRED_BLE_JSON, null);
+        if (json == null || json.isEmpty()) {
+            return out;
+        }
+        try {
+            JSONArray arr = new JSONArray(json);
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) {
+                    continue;
+                }
+                String mac = o.optString("mac", "");
+                String name = o.optString("name", "Unknown");
+                long last = o.optLong("last", 0L);
+                if (!mac.isEmpty()) {
+                    out.add(new PairedBleDevice(mac.toUpperCase(Locale.US), name, last));
+                }
+            }
+        } catch (JSONException e) {
+            Log.w(TAG, "Failed to parse paired BLE JSON, resetting list", e);
+        }
+        return out;
+    }
+
+    private void writePairedBleDevicesToPrefs(List<PairedBleDevice> devices) {
+        JSONArray arr = new JSONArray();
+        for (PairedBleDevice p : devices) {
+            JSONObject o = new JSONObject();
+            try {
+                o.put("mac", p.mac);
+                o.put("name", p.name);
+                o.put("last", p.lastConnectedAtMs);
+                arr.put(o);
+            } catch (JSONException e) {
+                Log.w(TAG, "Failed to serialize paired device", e);
+            }
+        }
+        prefs.edit().putString(KEY_PAIRED_BLE_JSON, arr.toString()).apply();
+    }
+
+    private static String sanitizeBleName(String name) {
+        if (name == null) {
+            return "Unknown";
+        }
+        return name.replaceAll("[^\\p{Print}]", "").trim();
+    }
+
+    /**
      * Auto-connect settings
      */
     public boolean isAutoConnectEnabled() {
@@ -419,7 +600,10 @@ public class ConnectionManager {
                 @Override
                 public void onBluetoothConnected(RxBleDevice device) {
                     bleDevice = device;
-                    saveLastConnection(ConnectionType.BLUETOOTH, device.getMacAddress(), device.getName());
+                    String mac = device.getMacAddress();
+                    String name = sanitizeBleName(device.getName());
+                    recordPairedDevice(mac, name);
+                    saveLastConnection(ConnectionType.BLUETOOTH, mac, name);
                     updateConnectionState(ConnectionType.BLUETOOTH, ConnectionState.CONNECTED);
                 }
 
