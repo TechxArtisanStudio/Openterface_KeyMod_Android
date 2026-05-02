@@ -235,6 +235,17 @@ by TechxArtisan</string>
     <string name="bluetooth_settings_title">Bluetooth Settings</string>
     <string name="scan_for_devices">Scan for Devices</string>
     <string name="bluetooth_on_off">Bluetooth On/Off</string>
+    <string name="bluetooth_card_tap_hint">Tap to manage</string>
+    <string name="bluetooth_status_connected_with_hint">%1$s\n%2$s</string>
+    <string name="bt_paired_actions_hint">Tap a paired device to connect or disconnect. Long-press to forget.</string>
+    <string name="bt_disconnect_confirm_title">Disconnect</string>
+    <string name="bt_disconnect_confirm_message">Disconnect from \"%1$s\"?\nYou can reconnect from this list.</string>
+    <string name="bt_forget_device_title">Forget device</string>
+    <string name="bt_forget_device_message">Forget \"%1$s\" (%2$s)?\n\nIt will no longer appear in the paired list.</string>
+    <string name="bt_forget_confirm">Forget</string>
+    <string name="bt_disconnect_confirm">Disconnect</string>
+    <string name="bt_device_forgotten_toast">Device forgotten: %1$s</string>
+    <string name="bt_disconnected_toast">Disconnected: %1$s</string>
     
     <!-- Mode Selection Strings -->
     <string name="mode_keyboard">Keyboard Mode</string>

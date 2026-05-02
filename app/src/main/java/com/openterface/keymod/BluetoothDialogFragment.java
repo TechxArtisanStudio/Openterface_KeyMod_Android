@@ -436,7 +436,11 @@ public class BluetoothDialogFragment extends DialogFragment {
                 (parent, v, position, id) -> {
                     ListRow row = rows.get(position);
                     if (row.type == TYPE_ROW_PAIRED && row.paired != null) {
-                        connectToMac(row.paired.mac, row.paired.name);
+                        if (isCurrentlyConnectedTo(row.paired.mac)) {
+                            confirmDisconnect(row.paired.name);
+                        } else {
+                            connectToMac(row.paired.mac, row.paired.name);
+                        }
                     } else if (row.type == TYPE_ROW_SCANNED && row.scannedDevice != null) {
                         String n = sanitizeDeviceName(row.scannedDevice.getName());
                         if (OpenterfaceBleDeviceNames.matchesAdvertisedName(n)) {
@@ -463,22 +467,19 @@ public class BluetoothDialogFragment extends DialogFragment {
                         bluetoothService.disconnect();
                     }
                     new AlertDialog.Builder(requireContext())
-                            .setTitle("Forget Device")
+                            .setTitle(R.string.bt_forget_device_title)
                             .setMessage(
-                                    "Forget \""
-                                            + deviceName
-                                            + "\" ("
-                                            + mac
-                                            + ")?\n\nIt will no longer appear in the paired list.")
+                                    getString(R.string.bt_forget_device_message, deviceName, mac))
                             .setPositiveButton(
-                                    "Forget",
+                                    R.string.bt_forget_confirm,
                                     (dialog, which) -> {
                                         getCm().forgetPairedDevice(mac);
                                         scannedDevices.removeIf(d -> d.getMacAddress().equalsIgnoreCase(mac));
                                         rebuildDeviceList();
-                                        showToast("Device forgotten: " + deviceName);
+                                        showToast(
+                                                getString(R.string.bt_device_forgotten_toast, deviceName));
                                     })
-                            .setNegativeButton("Cancel", null)
+                            .setNegativeButton(android.R.string.cancel, null)
                             .show();
                     return true;
                 });
@@ -495,6 +496,30 @@ public class BluetoothDialogFragment extends DialogFragment {
                         showToast("Please enable Bluetooth first");
                     }
                 });
+    }
+
+    private boolean isCurrentlyConnectedTo(String mac) {
+        return isServiceBound
+                && bluetoothService != null
+                && bluetoothService.isConnected()
+                && bluetoothService.getConnectedDevice() != null
+                && bluetoothService.getConnectedDevice().getMacAddress().equalsIgnoreCase(mac);
+    }
+
+    private void confirmDisconnect(String displayName) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.bt_disconnect_confirm_title)
+                .setMessage(getString(R.string.bt_disconnect_confirm_message, displayName))
+                .setPositiveButton(
+                        R.string.bt_disconnect_confirm,
+                        (d, w) -> {
+                            if (isServiceBound && bluetoothService != null) {
+                                bluetoothService.disconnect();
+                            }
+                            showToast(getString(R.string.bt_disconnected_toast, displayName));
+                        })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void connectToMac(String mac, String displayNameForToast) {

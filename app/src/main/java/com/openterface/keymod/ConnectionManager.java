@@ -419,6 +419,14 @@ public class ConnectionManager {
         List<PairedBleDevice> list = readPairedBleDevicesFromPrefs();
         list.removeIf(p -> p.mac.equalsIgnoreCase(normalizedMac));
         writePairedBleDevicesToPrefs(list);
+
+        String lastMac = prefs.getString(KEY_LAST_BLE_DEVICE_MAC, null);
+        if (lastMac != null && lastMac.equalsIgnoreCase(normalizedMac)) {
+            prefs.edit()
+                    .remove(KEY_LAST_BLE_DEVICE_MAC)
+                    .remove(KEY_LAST_BLE_DEVICE_NAME)
+                    .apply();
+        }
     }
 
     public boolean isPairedBleMac(String mac) {

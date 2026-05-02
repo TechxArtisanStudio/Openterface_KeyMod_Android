@@ -42,6 +42,19 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@id/devices_list" />
 
+    <TextView
+        android:id="@+id/paired_actions_hint"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/bt_paired_actions_hint"
+        android:textSize="11sp"
+        android:textColor="@color/text_secondary"
+        app:layout_constraintTop_toBottomOf="@id/scan_button"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/devices_list"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
     <ListView
         android:id="@+id/devices_list"
         android:layout_width="0dp"

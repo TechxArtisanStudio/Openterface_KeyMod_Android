@@ -248,34 +248,21 @@ public class ConnectionDialogFragment extends DialogFragment {
 
         Log.d(TAG, "handleBluetoothConnection called");
         ConnectionManager.ConnectionType currentType = connectionManager.getCurrentConnectionType();
-        
-        if (currentType == ConnectionManager.ConnectionType.BLUETOOTH && 
-            connectionManager.getCurrentConnectionState() == ConnectionManager.ConnectionState.CONNECTED) {
-            // Disconnect Bluetooth
-            Log.d(TAG, "Disconnecting Bluetooth");
-            if (isServiceBound && bluetoothService != null) {
-                bluetoothService.disconnect();
-                connectionManager.disconnect();
-                UiToastLimiter.show(requireContext(), "bt_disconnected", "Bluetooth disconnected", android.widget.Toast.LENGTH_SHORT, 1800);
-            }
-        } else {
-            // Disconnect USB if connected
-            if (currentType == ConnectionManager.ConnectionType.USB) {
-                Log.d(TAG, "Disconnecting USB first");
-                connectionManager.disconnect();
-            }
-            
-            // Check permissions and show Bluetooth dialog
-            Log.d(TAG, "Checking Bluetooth permissions");
-            if (checkBluetoothPermissions()) {
-                Log.d(TAG, "Permissions granted, showing Bluetooth dialog");
-                showBluetoothDeviceDialog();
-            } else {
-                Log.d(TAG, "Requesting Bluetooth permissions");
-                requestBluetoothPermissions();
-            }
+
+        // Always open Bluetooth Settings from this card (disconnect only from that screen).
+        if (currentType == ConnectionManager.ConnectionType.USB) {
+            Log.d(TAG, "Disconnecting USB first before Bluetooth settings");
+            connectionManager.disconnect();
         }
-        
+
+        if (checkBluetoothPermissions()) {
+            Log.d(TAG, "Permissions granted, showing Bluetooth dialog");
+            showBluetoothDeviceDialog();
+        } else {
+            Log.d(TAG, "Requesting Bluetooth permissions");
+            requestBluetoothPermissions();
+        }
+
         updateUI();
     }
 
@@ -443,7 +430,15 @@ public class ConnectionDialogFragment extends DialogFragment {
             if (bluetoothSignal != null) bluetoothSignal.setVisibility(View.GONE);
         } else if (isBluetoothConnected) {
             String deviceName = connectionManager.getLastBleDeviceName();
-            bluetoothStatus.setText(deviceName != null ? deviceName : getString(R.string.connected));
+            if (deviceName != null && !deviceName.isEmpty()) {
+                bluetoothStatus.setText(
+                        getString(
+                                R.string.bluetooth_status_connected_with_hint,
+                                deviceName,
+                                getString(R.string.bluetooth_card_tap_hint)));
+            } else {
+                bluetoothStatus.setText(getString(R.string.connected));
+            }
             bluetoothStatusIcon.setImageResource(R.drawable.bluetooth_connected_24px);
             bluetoothStatusIcon.setColorFilter(connected, PorterDuff.Mode.SRC_IN);
             if (bluetoothSignal != null) {
